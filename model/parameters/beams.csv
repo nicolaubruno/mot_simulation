@@ -1,0 +1,16 @@
+#
+# id			-> [integer] Identification code
+# delta  		-> [gamma] Laser detuning in units of the transition rate (gamma) related to the used transition 
+# k_dic  	-> [2D-array] Azimuthal and polar angles of the wave vector on the lab frame
+# eps			-> [3D-array] (sigma-, pi, sigma+) Polarization vector on the frame with pi parallel to the wave vector
+# I_peak 		-> [float] Peak of intensity relative to saturation intensity (I_peak / I_sat)
+# w				-> [m] "Waist Radius"
+#
+#
+id | delta | k_dic | eps | I_peak | w
+1 | -70 | [0, 90] | [1, 0, 0] | 1 | 0.036
+2 | -70 | [90, 90] | [1, 0, 0] | 1 | 0.036
+3 | -70 | [180, 90] | [0, 0, 1] | 1 | 0.036
+4 | -70 | [270, 90] | [0, 0, 1] | 1 | 0.036
+5 | -70 | [0, 0] | [1, 0, 0] | 1 | 0.036
+6 | -70 | [0, 180] | [0, 0, 1] | 1 | 0.036

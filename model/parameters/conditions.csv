@@ -1,0 +1,12 @@
+# 
+# id		-> [integer] Identification code
+# T_0		-> [uK] Initial temperature 
+# i_max		-> [positive integer] Maximum number of iteration (simulation of individual atoms)
+# r_max		-> [mm] Maximum distance (threshold)
+# num_sim	-> [positive integer] Number of simulations (individual atoms) stopped by reach the maximum distance (r_max)
+# num_bins	-> [positive integer] Number of bins in the histogram
+# g_bool	-> [boolean] True - use gravity, False - do not use gravity
+#
+#
+id | T_0 | i_max | r_max | num_sim | num_bins | g_bool
+1 | 50.0 | 1.0e5 | 30.0 | 30 | 200 | True
