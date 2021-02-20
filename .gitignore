@@ -1,6 +1,6 @@
 *.nogit.*
 *.nogit
-*.csv
+#*.csv
 *.txt
 *.dat
 
