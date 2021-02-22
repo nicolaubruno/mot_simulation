@@ -13,7 +13,7 @@ class Controller:
     #
     @property
     def model(self):
-        self._model
+        return self._model
 
 
     ''' Methods '''

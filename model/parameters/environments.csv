@@ -1,0 +1,10 @@
+# 
+# id 			-> [integer] Identification code
+# name 			-> [string] Identification short name
+# beams_setup 	-> [array] Set up of beams
+# B_0		 	-> [float (G / cm)] Magnetic field gradient
+# B_direction	-> [2D-array (degree)] Azimuthal and polar angles of the magnetic field on the lab frame
+# 
+#
+id,name,beams_setup,B_0,B_direction 
+1,6-Beams,[1 2 3 4 5 6],5.6338264,[45 180]

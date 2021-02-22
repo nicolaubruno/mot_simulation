@@ -6,7 +6,7 @@
 # mass      -> [Da or u] Mass
 #
 #
-id | symbol | name | Z | mass
-1 | Dy | Dysprosium | 66 | 163.929174751
-2 | Er | Erbium | 68 | 166.0
-3 | Cs | Caesium | 55 | 132.90545
+id,symbol,name,Z,mass
+1,Dy,Dysprosium,66,163.929174751
+2,Er,Erbium,68,166.0
+3,Cs,Caesium,55,132.90545

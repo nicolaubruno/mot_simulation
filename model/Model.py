@@ -1,5 +1,6 @@
 #
 # Libraries and modules
+import numpy as np
 import pandas as pd
 
 #
@@ -7,15 +8,9 @@ class Model:
 
     ''' Attributes '''
 
-    # DataFrame with all atoms
-    @property
-    def all_atoms(self):
-        return self._all_atoms
-
-    # Index of the attribute all_atoms corresponding to the atom that will be used in the simulation (active atom)
-    @property
-    def active_atom_id(self):
-        return self._active_atom_id
+    #
+    # Constant
+    #
 
     # Planck's constant
     @property
@@ -42,18 +37,59 @@ class Model:
     def mu_B(self):
         return 9.274009994e-24 # J / T
     
+    #
+    # Simulation parameters
+    #
+
+    #
+    @property
+    def atom(self):
+        return self._atom
+    
+    #
+    @property
+    def transition(self):
+        return self._transition
+
+    #
+    @property
+    def conditions(self):
+        return self._conditions
+    
+    
 
     ''' Methods '''
 
     #
     def __init__(self):
-        atoms_data = {
-            'symbol': ['Dy', 'Er'],\
-            'name': ['Dysprosium', 'Erbium'],\
-            'atomic_number': [66, 68],\
-            'mass': [163.92917475, 166.0]
-        }
+        self.__load_parameters()        
 
-        self._all_atoms = pd.DataFrame(atoms_data, index=atoms_data['symbol'])
+    #
+    def __load_parameters(self):
+        #
+        # Active parameters
+        #
+        active_parameters = pd.read_csv('model/parameters/active.csv', header=0).iloc[0]
 
-        print(self._all_atoms)
+        #
+        # Transition
+        #
+        all_transitions = pd.read_csv('model/parameters/transitions.csv', header=12, index_col=0)
+        transition = all_transitions.loc[active_parameters['transition']].astype(object)
+        self._transition = transition.iloc[1:]
+
+        #
+        # Atom
+        #
+        all_atoms = pd.read_csv('model/parameters/atoms.csv', header=8, index_col=0)
+        self._atom = all_atoms.loc[transition['atom_id']].astype(object)
+
+        #
+        # Conditions
+        #
+        all_conditions = pd.read_csv('model/parameters/conditions.csv', header=10, index_col=0)
+        self._condition = all_conditions.loc[active_parameters['conditions']]
+
+        #
+        # Environment
+        #
