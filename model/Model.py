@@ -56,6 +56,15 @@ class Model:
     def conditions(self):
         return self._conditions
     
+    #
+    @property
+    def beams(self):
+        return self._beams
+
+    #
+    @property
+    def magnetic_field(self):
+        return self._magnetic_field
     
 
     ''' Methods '''
@@ -74,22 +83,53 @@ class Model:
         #
         # Transition
         #
-        all_transitions = pd.read_csv('model/parameters/transitions.csv', header=12, index_col=0)
-        transition = all_transitions.loc[active_parameters['transition']].astype(object)
-        self._transition = transition.iloc[1:]
+        all_transitions = pd.read_csv('model/parameters/transitions.csv', header=12, index_col='id')
+        self._transition = all_transitions.loc[active_parameters['transition']].astype(object)
+        self._transition.index = [idx.strip() for idx in self._transition.index]
 
         #
         # Atom
         #
-        all_atoms = pd.read_csv('model/parameters/atoms.csv', header=8, index_col=0)
-        self._atom = all_atoms.loc[transition['atom_id']].astype(object)
+        all_atoms = pd.read_csv('model/parameters/atoms.csv', header=8, index_col='id')
+        self._atom = all_atoms.loc[self._transition['atom_id']].astype(object)
+        self._atom.index = [idx.strip() for idx in self._atom.index]
 
         #
         # Conditions
         #
-        all_conditions = pd.read_csv('model/parameters/conditions.csv', header=10, index_col=0)
-        self._condition = all_conditions.loc[active_parameters['conditions']]
+        all_conditions = pd.read_csv('model/parameters/conditions.csv', header=10, index_col='id')
+        self._conditions = all_conditions.loc[active_parameters['conditions']]
+        self._conditions.index = [idx.strip() for idx in self._conditions.index]
 
         #
         # Environment
         #
+        all_environments = pd.read_csv('model/parameters/environments.csv', header=8, index_col='id')
+        env = all_environments.loc[active_parameters['environment']]
+        env.index = [idx.strip() for idx in env.index]
+
+        #
+        # Beams
+        #
+        beams_setup = self.__string_to_array(env['beams_setup'], astype='int')
+        all_beams = pd.read_csv('model/parameters/beams.csv', header=9, index_col='id')
+        self._beams = all_beams.loc[beams_setup]
+        self._beams.columns = [col.strip() for col in self._beams.columns]
+
+        for idx in self._beams.index:
+            elem = self._beams.at[idx, 'k_dic']
+            self._beams.at[idx, 'k_dic'] = self.__string_to_array(elem, astype='float')
+
+            elem = self._beams.at[idx, 'eps']
+            self._beams.at[idx, 'eps'] = self.__string_to_array(elem, astype='float')
+
+        #
+        # Magnetic field
+        #
+        self._magnetic_field = env[['B_0', 'B_direction']]
+        self._magnetic_field['B_0'] = float(self._magnetic_field['B_0'])
+        self._magnetic_field['B_direction'] = self.__string_to_array(self._magnetic_field['B_direction'], astype='float')
+
+    #
+    def __string_to_array(self, str, astype='int'):
+        return np.array(str.replace('[', '').replace(']', '').split(' ')).astype(astype)
