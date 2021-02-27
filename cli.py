@@ -2,14 +2,13 @@
 # Libraries and Modules
 from controller import Controller
 import click
+import numpy as np
+import matplotlib.pyplot as plt
 
 #
 # Controller Object
 ctrler = Controller()
 
 #
-# CLI commands
-@click.group()
-def cli():
-    pass
-
+# Initial menu
+ctrler.initial_menu()

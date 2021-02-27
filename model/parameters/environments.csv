@@ -8,3 +8,4 @@
 #
 id,name,beams_setup,B_0,B_direction
 1,6-Beams,[1 2 3 4 5 6],5.6338264,[45 180]
+2,6-Beams-Dreon-Paper,[7 8 9 10 11 12],1.71,[45 180]
