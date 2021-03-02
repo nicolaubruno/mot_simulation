@@ -170,7 +170,11 @@ class Model:
         self._magnetic_field['B_direction'] = self.__string_to_array(self._magnetic_field['B_direction'], astype='float')
 
     #
-    # Internal methods
+    def run_simulation(self):
+        pass       
+
+    #
+    # Utility methods
     #
 
     #
