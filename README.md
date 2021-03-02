@@ -1,2 +1,3 @@
-# DypoLab_MOT_Monte_Carlo_Simulation
-Monte Carlo Simulation for Magneto Optical Trapping of narrow-line atoms
+# MOTSim
+
+Monte Carlo Simulation of ultra-cold atoms in a Magneto Optical Trapping.
