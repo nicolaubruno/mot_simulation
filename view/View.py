@@ -106,10 +106,11 @@ class View:
             1 : 'Atom',\
             2 : 'Transition',\
             3 : 'Beams setup',\
-            4 : 'Magnetic field',\
+            4 : 'Magnetic field gradient',\
             5 : 'Initial conditions',\
             6 : 'Settings',\
-            7 : 'Initial Menu'
+            7 : 'Constants',\
+            8 : 'Initial Menu'
         }
 
         while call_menu:
@@ -125,7 +126,7 @@ class View:
                 header = '\nBeams setup\n\n' + self.__model.beams.to_string()
 
             elif option_code == 4:
-                header = '\nMagnetic field\n\n' + self.__model.magnetic_field.to_string()
+                header = '\nMagnetic field gradient\n\n' + 'B_0 = ' + str(self.__model.B_0)
 
             elif option_code == 5:
                 header = '\nInitial conditions\n\n'
@@ -136,6 +137,9 @@ class View:
                 header = '\nSettings\n\n' + self.__model.settings.to_string()
 
             elif option_code == 7:
+                header = '\nConstants\n\n' + self.__model.constants.to_string()
+
+            elif option_code == 8:
                 call_menu = False
 
         return option_code

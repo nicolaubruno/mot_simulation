@@ -1,4 +1,14 @@
-#include "sim_atom.h"
+
+//  Header
+
+#include "mot_sim.h"
+
+// --
+
+// Simulation of a single atom
+
+
+// Test function
 
 int C_factorial(int n){
     if (n > 1) {
@@ -7,3 +17,4 @@ int C_factorial(int n){
         return 1;
     }
 }
+

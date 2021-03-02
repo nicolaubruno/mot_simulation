@@ -5,12 +5,11 @@
 # lambda	-> [float (nm)] Resonant wave length
 # J_gnd		-> [integer] Total angular momentum of the ground state
 # J_exc		-> [integer] Total angular momentum of the excited state
-# mJ_gnd	-> [integer] Projection of the total angular momentum of the ground state
 # g_gnd		-> [float] Landè factor of the ground state
 # g_exc		-> [float] Landè factor of excited state
 #
 #
-id,atom_id,gamma,lambda,J_gnd,J_exc,mJ_gnd,g_gnd,g_exc
-1,1,136.0,626.0,8,9,-8,1.24,1.29
-2,2,190.0,583.0,6,7,-6,1.167,1.195
-3,3,520.0,852.0,4,5,-4,0.25,0.40
+id,atom_id,gamma,lambda,J_gnd,J_exc,g_gnd,g_exc
+1,1,136.0,626.0,8,9,1.24,1.29
+2,2,190.0,583.0,6,7,1.167,1.195
+3,3,520.0,852.0,4,5,0.25,0.40

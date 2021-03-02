@@ -10,40 +10,6 @@ class Model:
     ''' Attributes '''
 
     #
-    # Constants
-    #
-
-    #
-    # Planck's constant
-    @property
-    def h(self):
-        return 6.62607004e-34 # J * s
-
-    #
-    # Elementary charge
-    @property
-    def e(self):
-        return 1.60217662e-19 # C
-
-    #
-    # Speed of light
-    @property
-    def c(self):
-        return 2.99792458e8 # m / s
-
-    #
-    # Boltzmann constant
-    @property
-    def k_B(self):
-        return 1.38064852e-23 # J / K
-
-    #
-    # Bohr magneton
-    @property
-    def mu_B(self):
-        return 9.274009994e-24 # J / T
-    
-    #
     # Simulation parameters
     #
 
@@ -67,10 +33,10 @@ class Model:
     def beams(self):
         return self._beams
 
-    #
+    # Magnetic Field Gradient
     @property
-    def magnetic_field(self):
-        return self._magnetic_field
+    def B_0(self):
+        return self._B_0
 
     #
     # Initial temperature
@@ -84,6 +50,11 @@ class Model:
     def g_bool(self):
         return self._g_bool
     
+    #
+    # Physical constants
+    @property
+    def constants(self):
+        return self._constants
     
 
     ''' Methods '''
@@ -101,7 +72,7 @@ class Model:
         #
         # Transition
         path = 'model/parameters/transitions.csv'
-        all_transitions = pd.read_csv(path, header=12, index_col='id')
+        all_transitions = pd.read_csv(path, header=11, index_col='id')
         self. __check_id_in_CSV_file(all_transitions, path)
 
         self._transition = all_transitions.loc[active_parameters['transition']].astype(object)
@@ -140,7 +111,7 @@ class Model:
         #
         # Environment
         path = 'model/parameters/environments.csv'
-        all_environments = pd.read_csv(path, header=8, index_col='id')
+        all_environments = pd.read_csv(path, header=7, index_col='id')
         self. __check_id_in_CSV_file(all_environments, path)
 
         env = all_environments.loc[active_parameters['environment']]
@@ -164,10 +135,15 @@ class Model:
             self._beams.at[idx, 'eps'] = self.__string_to_array(elem, astype='float')
 
         #
-        # Magnetic field
-        self._magnetic_field = env[['B_0', 'B_direction']]
-        self._magnetic_field['B_0'] = float(self._magnetic_field['B_0'])
-        self._magnetic_field['B_direction'] = self.__string_to_array(self._magnetic_field['B_direction'], astype='float')
+        # Magnetic field gradient
+        self._B_0 = float(env['B_0'])
+
+        #
+        # Constants
+        path = 'model/parameters/constants.csv'
+        self._constants = pd.read_csv(path, header=8, index_col='id')
+        self. __check_id_in_CSV_file(self._constants, path)
+        self._constants.columns = [idx.strip() for idx in self._constants.columns]
 
     #
     def run_simulation(self):

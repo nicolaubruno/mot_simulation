@@ -1,0 +1,14 @@
+# 
+# id            -> [integer] Identification code
+# name          -> [string] Variable Name
+# value         -> [float] English name of the atom
+# unit          -> [string] Unit
+# description   -> [string] Short description about the constant
+#
+#
+id,name,value,unit,description
+1,"h",6.62607004e-34,"J * s","Planck constant"
+2,"e",1.60217662e-19,"C","Elementary charge"
+3,"c",2.99792458e8,"m / s","Speed of light"
+4,"k_B",1.38064852e-23,"J / K","Boltzmann constant"
+5,"mu_B",9.274009994e-24,"J / T","Bohr magneton"
