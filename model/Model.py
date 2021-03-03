@@ -3,6 +3,7 @@
 import numpy as np
 import pandas as pd
 import sys
+import mot_sim as C_ext
 
 #
 class Model:
@@ -147,7 +148,7 @@ class Model:
 
     #
     def run_simulation(self):
-        pass       
+        C_ext.run()
 
     #
     # Utility methods
