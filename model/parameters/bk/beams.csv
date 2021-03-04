@@ -1,4 +1,5 @@
 #
+# id			-> [integer] Identification code
 # delta  		-> [gamma] Laser detuning in units of the transition rate (gamma) related to the used transition 
 # k_dic			-> [2D-array] Azimuthal and polar angles of the wave vector on the lab frame
 # eps			-> [3D-array] (sigma-, pi, sigma+) Polarization vector on the frame with pi parallel to the wave vector
@@ -6,10 +7,16 @@
 # w				-> [millimetre] "Waist Radius"
 #
 #
-delta,k_dic,eps,s_0,w
--70,[0 90],[1 0 0],1,36
--70,[90 90],[1 0 0],1,36
--70,[180 90],[0 0 1],1,36
--70,[270 90],[0 0 1],1,36
--70,[0 0],[1 0 0],1,36
--70,[0 180],[0 0 1],1,36
+id,delta,k_dic,eps,s_0,w
+1,-70,[0 90],[1 0 0],1,36
+2,-70,[90 90],[1 0 0],1,36
+3,-70,[180 90],[0 0 1],1,36
+4,-70,[270 90],[0 0 1],1,36
+5,-70,[0 0],[1 0 0],1,36
+6,-70,[0 180],[0 0 1],1,36
+7,-70,[0 180],[0 0 1],0.65,20
+8,-70,[0 180],[0 0 1],0.65,20
+9,-70,[0 180],[0 0 1],0.65,20
+10,-70,[0 180],[0 0 1],0.65,20
+11,-70,[0 180],[0 0 1],0.65,20
+12,-70,[0 180],[0 0 1],0.65,20

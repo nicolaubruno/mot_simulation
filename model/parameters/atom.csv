@@ -1,0 +1,12 @@
+# 
+# symbol    -> [two-characters string] Atom symbol
+# name      -> [string] English name of the atom
+# Z         -> [integer] Atomic number
+# mass      -> [Da or u] Mass
+#
+#
+atom
+symbol,Dy
+name,Dysprosium
+Z,66
+mass,163.929174751

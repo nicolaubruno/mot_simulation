@@ -106,11 +106,9 @@ class View:
             1 : 'Atom',\
             2 : 'Transition',\
             3 : 'Beams setup',\
-            4 : 'Magnetic field gradient',\
-            5 : 'Initial conditions',\
-            6 : 'Settings',\
-            7 : 'Constants',\
-            8 : 'Initial Menu'
+            4 : 'Conditions',\
+            5 : 'Constants',\
+            6 : 'Initial Menu'
         }
 
         while call_menu:
@@ -126,20 +124,13 @@ class View:
                 header = '\nBeams setup\n\n' + self.__model.beams.to_string()
 
             elif option_code == 4:
-                header = '\nMagnetic field gradient\n\n' + 'B_0 = ' + str(self.__model.B_0)
+                header = '\nConditions\n\n' + self.__model.conditions.to_string()
 
             elif option_code == 5:
-                header = '\nInitial conditions\n\n'
-                header += 'Initial Temperature: ' + str(self.__model.T_0) + '\n'
-                header += 'Gravity status: ' + str(self.__model.g_bool)
-
-            elif option_code == 6:
-                header = '\nSettings\n\n' + self.__model.settings.to_string()
-
-            elif option_code == 7:
                 header = '\nConstants\n\n' + self.__model.constants.to_string()
 
-            elif option_code == 8:
+            elif option_code == 6:
+                option_code = -1;
                 call_menu = False
 
         return option_code

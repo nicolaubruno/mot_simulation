@@ -1,8 +1,9 @@
 #
 # Libraries and modules
+import sys, os, hashlib
 import numpy as np
 import pandas as pd
-import sys
+from datetime import datetime as dt
 import mot_sim as C_ext
 
 #
@@ -15,44 +16,31 @@ class Model:
     #
 
     #
+    # Series
     @property
     def atom(self):
         return self._atom
     
     #
+    # Series
     @property
     def transition(self):
         return self._transition
 
     #
+    # Series
     @property
-    def settings(self):
-        return self._settings
-    
+    def conditions(self):
+        return self._conditions
+
     #
+    # Dataframe
     @property
     def beams(self):
         return self._beams
 
-    # Magnetic Field Gradient
-    @property
-    def B_0(self):
-        return self._B_0
-
     #
-    # Initial temperature
-    @property
-    def T_0(self):
-        return self._T_0
-
-    #
-    # Gravity status
-    @property
-    def g_bool(self):
-        return self._g_bool
-    
-    #
-    # Physical constants
+    # Dataframe
     @property
     def constants(self):
         return self._constants
@@ -68,86 +56,59 @@ class Model:
     def __load_parameters(self):
         #
         # Active parameters
-        active_parameters = pd.read_csv('model/parameters/active.csv', header=0, dtype='int').iloc[0]
-
-        #
-        # Transition
-        path = 'model/parameters/transitions.csv'
-        all_transitions = pd.read_csv(path, header=11, index_col='id')
-        self. __check_id_in_CSV_file(all_transitions, path)
-
-        self._transition = all_transitions.loc[active_parameters['transition']].astype(object)
-        self._transition.index = [idx.strip() for idx in self._transition.index]
+        #active_parameters = pd.read_csv('model/parameters/active.csv', header=0, dtype='int').iloc[0]
 
         #
         # Atom
-        path = 'model/parameters/atoms.csv'
-        all_atoms = pd.read_csv(path, header=8, index_col='id')
-        self. __check_id_in_CSV_file(all_atoms, path)
-
-        self._atom = all_atoms.loc[self._transition['atom_id']].astype(object)
-        self._atom.index = [idx.strip() for idx in self._atom.index]
+        path = 'model/parameters/atom.csv'
+        self._atom = pd.read_csv(path, header=7, index_col=0, squeeze=True).astype(object)
 
         #
-        # Settings
-        path = 'model/parameters/settings.csv'
-        all_settings = pd.read_csv(path, header=8, index_col='id', dtype='int')
-        self. __check_id_in_CSV_file(all_settings, path)
-
-        self._settings = all_settings.loc[active_parameters['settings']]
-        self._settings.index = [idx.strip() for idx in self._settings.index]
-
-        #
-        # Initial conditions
-        path = 'model/parameters/initial_conditions.csv'
-        all_conditions = pd.read_csv(path, header=6, index_col='id')
-        self. __check_id_in_CSV_file(all_conditions, path)
-
-        initial_conditions = all_conditions.loc[active_parameters['initial_conditions']]
-        initial_conditions.index = [idx.strip() for idx in initial_conditions.index]
-
-        self._T_0 = initial_conditions['T_0'] # Initial Temperature
-        self._g_bool = initial_conditions['g_bool'] # Gravity status
-
-        #
-        # Environment
-        path = 'model/parameters/environments.csv'
-        all_environments = pd.read_csv(path, header=7, index_col='id')
-        self. __check_id_in_CSV_file(all_environments, path)
-
-        env = all_environments.loc[active_parameters['environment']]
-        env.index = [idx.strip() for idx in env.index]
+        # Transition
+        path = 'model/parameters/transition.csv'
+        self._transition = pd.read_csv(path, header=9, index_col=0, squeeze=True).astype(object)
 
         #
         # Beams
         path = 'model/parameters/beams.csv'
-        beams_setup = self.__string_to_array(env['beams_setup'], astype='int')
-        all_beams = pd.read_csv(path, header=9, index_col='id')
-        self. __check_id_in_CSV_file(all_beams, path)
-
-        self._beams = all_beams.loc[beams_setup]
-        self._beams.columns = [col.strip() for col in self._beams.columns]
-
-        for idx in self._beams.index:
-            elem = self._beams.at[idx, 'k_dic']
-            self._beams.at[idx, 'k_dic'] = self.__string_to_array(elem, astype='float')
-
-            elem = self._beams.at[idx, 'eps']
-            self._beams.at[idx, 'eps'] = self.__string_to_array(elem, astype='float')
+        self._beams = pd.read_csv(path, header=8)
+        self._beams.index += 1
 
         #
-        # Magnetic field gradient
-        self._B_0 = float(env['B_0'])
+        # Conditions
+        path = 'model/parameters/conditions.csv'
+        self._conditions = pd.read_csv(path, header=10, index_col=0, squeeze=True).astype(object)
 
         #
         # Constants
         path = 'model/parameters/constants.csv'
-        self._constants = pd.read_csv(path, header=8, index_col='id')
-        self. __check_id_in_CSV_file(self._constants, path)
-        self._constants.columns = [idx.strip() for idx in self._constants.columns]
+        self._constants = pd.read_csv(path, header=8, index_col=0)
 
     #
     def run_simulation(self):
+        #
+        # Check if results directory exists
+        results_dir_path = "model/results/"
+        if not os.path.exists(results_dir_path):
+            os.mkdir(results_dir_path)
+
+        #
+        # Create a directory to store the results of the simulations
+        code = str(int(dt.now().timestamp()))
+        results_dir_path += code + '/'
+        os.mkdir(results_dir_path)
+
+        #
+        # Save the parameters of the simulation
+        parameters_dir = results_dir_path + 'parameters/'
+        os.mkdir(parameters_dir)
+
+        self.atom.to_csv(parameters_dir + 'atom.csv');
+        self.transition.to_csv(parameters_dir + 'transition.csv');
+        self.beams.to_csv(parameters_dir + 'beams.csv');
+        self.conditions.to_csv(parameters_dir + 'conditions.csv');
+        self.constants.to_csv(parameters_dir + 'constants.csv');
+
         C_ext.run()
 
     #

@@ -5,15 +5,17 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <ctype.h>
 
 // 
 // Constants
 //
 
 #define STRING_BUFFER_SIZE 1024
-#define NUM_ACTIVE_PARAMS 4
 #define DELIM ","
-#define MAX_BEAMS 128
+#define MAX_BEAMS 16
+//#define ROOT_PATH "../"
+#define ROOT_PATH "model/"
 
 //
 // Structures
@@ -35,7 +37,6 @@ typedef struct{
 
 // Transition
 typedef struct{
-    atom_t atom; /* Atom related to transition */
     float gamma; /* [float (kHz / (2*pi))] Transition rate */
     float lambda; /* [float (nm)] Resonant wave length */
     int J_gnd; /* [integer] Total angular momentum of the ground state */
@@ -44,18 +45,24 @@ typedef struct{
     float g_exc; /* [float] Landè factor of the excited state */
 } transition_t;
 
-// Settings
+// Conditions
 typedef struct{
+    float T_0; /* [float (uK)] Initial temperature  */
+    float B_0; /* Magnetic Field gradient */
+    int g_bool; /* [0 or 1] 1 - use gravity, 0 - do not use gravity */
     int i_max; /* [positive integer] Maximum number of iteration (simulation of individual atoms) */
     float r_max; /* [float (cm)] Maximum distance (threshold) */
     int num_bins; /* [positive integer] Number of bins in the histogram */
-} settings_t;
+} conditions_t;
 
-// Initial Conditions
-typedef struct {
-    float T_0; /* [float (uK)] Initial temperature  */
-    int g_bool; /* [0 or 1] 1 - use gravity, 0 - do not use gravity */
-} initial_conditions_t;
+// Constants
+typedef struct{
+    float h; /* Planck constant */
+    float e; /* Elementary charge */
+    float c; /* Speed of light */
+    float k_B; /* Boltzmann constant */
+    float mu_B; /* Bohr magneton */
+} constants_t;
 
 // Beam
 typedef struct {
@@ -71,13 +78,6 @@ typedef struct {
     int num; /* Number of beams */
     beam_t *beams;
 } beams_setup_t;
-
-// Environment
-typedef struct{
-    beams_setup_t beams_setup; /* Beams setup */
-    float B; /* Magnetic Field */
-    float g_bool; /* [0 or 1] 1 - use gravity, 0 - do not use gravity */
-} environment_t;
 
 //
 // Variables
@@ -105,36 +105,30 @@ float mu_B;
 // Execute simulation for a single atom
 int C_run();
 
-// Get active parameters IDs
-int *C_get_active_params();
-
-// Get environment
-environment_t C_get_environment(int id);
+// Get atom
+atom_t C_get_atom();
 
 // Get transition
-transition_t C_get_transition(int id);
+transition_t C_get_transition();
 
-// Get atom
-atom_t C_get_atom(int id);
-
-// Get settings
-settings_t C_get_settings(int id);
-
-// Get initial conditions
-initial_conditions_t C_get_initial_conditions(int id);
+// Get conditions
+conditions_t C_get_conditions();
 
 // Get beams setup
-beams_setup_t C_get_beams_setup(int num_beams, int *beams_id);
+beams_setup_t C_get_beams();
 
 // Get physical constant from CSV files
-int C_get_constants(float *h, float *e, float *c, float *k_B, float *mu_B);
+constants_t C_get_constants();
 
 //
 // Utility functions
 //
 
 // Get int array from string in the format [i1 i2 ... in]
-int C_get_int_array(char *str, int max_size, int *arr);
+int *C_get_int_array(char *str, int *size);
 
 // Get float array from string in the format [f1 f2 ... fn]
-int C_get_float_array(char *str, int max_size, float *arr);
+float *C_get_float_array(char *str, int *size);
+
+// Concatenate ROOT_PATH to a filename
+char *concatenate_ROOT_PATH(char *filename);

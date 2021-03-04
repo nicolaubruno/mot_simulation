@@ -37,7 +37,7 @@ class Controller:
                 code = self.__view.parameters()
 
                 # Initial Menu
-                if code == 8:
+                if code == -1:
                     call_menu = True
 
             #

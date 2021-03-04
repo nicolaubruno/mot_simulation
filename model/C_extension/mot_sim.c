@@ -12,165 +12,74 @@ int C_run(){
     //
 
     // Simple variables
+    //char *results_path = concatenate_ROOT_PATH("results/");
     int i;
 
     // Parameters of the simulation
-    int *active_params_ids = C_get_active_params();
-    transition_t transition = C_get_transition(active_params_ids[0]);
-    environment_t environment = C_get_environment(active_params_ids[1]);
-    initial_conditions_t initial_conditions = C_get_initial_conditions(active_params_ids[2]);
-    settings_t settings = C_get_settings(active_params_ids[3]);
+    atom_t atom = C_get_atom();
+    transition_t transition = C_get_transition();
+    conditions_t conditions = C_get_conditions();
+    beams_setup_t beams_setup = C_get_beams();
+    constants_t cts = C_get_constants();
 
     //
+    // Show all parameters
     //
-    //
+
+    /*
+    printf("\nAtom\n--\n");
+    printf("symbol = %s\n", atom.symbol);
+    printf("Z = %d\n", atom.Z);
+    printf("mass = %f\n", atom.mass);
+
+    printf("\nTransition\n--\n");
+    printf("gamma = %f\n", transition.gamma);
+    printf("J_gnd = %d\n", transition.J_gnd);
+    printf("J_exc = %d\n", transition.J_exc);
+    printf("g_gnd = %f\n", transition.g_gnd);
+    printf("g_exc = %f\n", transition.g_exc);
+
+    printf("\nConditions\n--\n");
+    printf("T_0 = %f\n", conditions.T_0);
+    printf("B_0 = %f\n", conditions.B_0);
+    printf("g_bool = %d\n", conditions.g_bool);
+    printf("i_max = %d\n", conditions.i_max);
+    printf("r_max = %f\n", conditions.r_max);
+    printf("num_bins = %d\n", conditions.num_bins);
+
+    printf("\nBeams setup\n--\n");
+    printf("num_beams = %d\n", beams_setup.num);
+
+    for(i = 0; i < beams_setup.num; i++){
+        printf("\nBeam %d\n--\n", (i+1));
+        printf("delta = %f\n", beams_setup.beams[i].delta);
+        printf("k_dic = [%f, %f]\n", beams_setup.beams[i].k_dic[0], beams_setup.beams[i].k_dic[1]);
+        printf("eps = [%f, %f, %f]\n", beams_setup.beams[i].eps[0], beams_setup.beams[i].eps[1], beams_setup.beams[i].eps[2]);
+        printf("s_0 = %f\n", beams_setup.beams[i].s_0);
+        printf("w = %f\n", beams_setup.beams[i].w);
+    }
+
+    printf("\nConstants\n--\n");
+    printf("h = %f\n", cts.h);
+    printf("e = %f\n", cts.e);
+    printf("c = %f\n", cts.c);
+    printf("k_B = %f\n", cts.k_B);
+    printf("mu_B = %f\n", cts.mu_B);
+    */
 
     return 0;
 }
 
-// Get transition
-transition_t C_get_transition(int id){
-    //
-    // Variables
-    //
-    transition_t transition;
-    int row_cter = 0, num_row_header = 12;
-    char *rest;
-    char row[STRING_BUFFER_SIZE];
-    //char path[] = "model/parameters/transitions.csv";
-    char path[] = "../parameters/transitions.csv";
-    char *token;
-    FILE *fp;
-
-    // Open file
-    fp = fopen(path, "r");
-
-    if (fp == NULL) {
-        printf("Error to access the file \"%s\".\n", path);
-        exit(0);
-    }
-
-    // Get transition
-    while(!(fgets(row, STRING_BUFFER_SIZE, fp) == NULL)){
-        rest = row;
-        token = strtok_r(rest, DELIM, &rest);
-
-        // Skip head
-        if(row_cter >= num_row_header){
-            // Check line
-            if(atoi(token) == id){
-                //
-                // Atom (atom_id)
-                //
-
-                token = strtok_r(rest, DELIM, &rest);
-
-                if(!token){
-                    printf("Invalid atom_id in the transition id=%d in the file \"%s\"!\n", id, path);
-                    exit(0);
-                
-                } else transition.atom = C_get_atom(atoi(token));
-
-                //
-                // Transition rate (gamma)
-                //
-
-                token = strtok_r(rest, DELIM, &rest);
-
-                if(!token){
-                    printf("Invalid gamma in the transition id=%d in the file \"%s\"!\n", id, path);
-                    exit(0);
-
-                } else transition.gamma = atof(token);
-
-                //
-                // Resonant wave length (lambda)
-                //
-
-                token = strtok_r(rest, DELIM, &rest);
-
-                if(!token){
-                    printf("Invalid lambda in the transition id=%d in the file \"%s\"!\n", id, path);
-                    exit(0);
-
-                } else transition.lambda = atof(token);
-
-                //
-                // Total angular momentum of the ground state (J_gnd)
-                //
-
-                token = strtok_r(rest, DELIM, &rest);
-
-                if(token == NULL){
-                    printf("Invalid J_gnd in the transition id=%d in the file \"%s\"!\n", id, path);
-                    exit(0);
-
-                } else transition.J_gnd = atoi(token);
-
-                //
-                // Total angular momentum of the excited state (J_exc)
-                //
-
-                token = strtok_r(rest, DELIM, &rest);
-
-                if(!token){
-                    printf("Invalid J_exc in the transition id=%d in the file \"%s\"!\n", id, path);
-                    exit(0);
-
-                } else transition.J_exc = atoi(token);
-                
-                //
-                // Landè factor of the ground state (g_gnd)
-                //
-
-                token = strtok_r(rest, DELIM, &rest);
-
-                if(!token){
-                    printf("Invalid g_gnd in the transition id=%d in the file \"%s\"!\n", id, path);
-                    exit(0);
-
-                } else transition.g_gnd = atof(token);
-                
-                //
-                // Landè factor of the excited state (g_exc)
-                //
-
-                token = strtok_r(rest, DELIM, &rest);
-
-                if(!token){
-                    printf("Invalid g_exc in the transition id=%d in the file \"%s\"!\n", id, path);
-                    exit(0);
-
-                } else transition.g_exc = atof(token);
-
-                // Stop looping
-                break;
-            }  
-        }        
-
-        row_cter++;
-    }
-
-    // Check if there are added transition in the file
-    if(row_cter < num_row_header) {
-        printf("Entry with transitions in the file \"%s\"!\n", path);
-        exit(0);
-    }
-
-    return transition;
-}
-
 // Get atom
-atom_t C_get_atom(int id){
+atom_t C_get_atom(){
     //
     // Variables
     //
 
     atom_t atom;
-    int row_cter = 0, num_row_header = 9;
+    int row_cter = 0;
     char row[STRING_BUFFER_SIZE];
-    //char path[] = "model/parameters/atoms.csv";
-    char path[] = "../parameters/atoms.csv";
+    char *path = concatenate_ROOT_PATH("parameters/atom.csv");
     char *token, *rest;
     FILE *fp;
 
@@ -178,515 +87,496 @@ atom_t C_get_atom(int id){
     fp = fopen(path, "r");
 
     if (fp == NULL) {
-        printf("Error to access the file \"%s\".\n", path);
+        printf("Error to access the file \"%s\"\n", path);
         exit(0);
     }
 
-    // Get transition
+    // Skip header
     while(!(fgets(row, STRING_BUFFER_SIZE, fp) == NULL)){
+        if(row[0] == '#') row_cter++;
+        else break;
+    }
+
+    // Symbol
+    if(!(fgets(row, STRING_BUFFER_SIZE, fp) == NULL)){
         rest = row;
-        token = strtok_r(rest, DELIM, &rest);
+        token = strtok_r(rest, DELIM, &rest); // Variable name
+        token = strtok_r(rest, DELIM, &rest); // Value
 
-        // Skip head
-        if(row_cter >= num_row_header){
-            // Check line
-            if(atoi(token) == id){
-                //
-                // Atom symbol (symbol)
-                //
+        if(!token){
+            printf("Variable symbol is invalid in the file \"%s\"\n", path);
+            exit(0);
+        } else {
+            if(token[2] == '\n') token[2] = '\0';
 
-                token = strtok_r(rest, DELIM, &rest);
-
-                if(!token){
-                    printf("Invalid symbol in the atom id=%d in the file \"%s\"\n", id, path);
-                    exit(0);
-                } else atom.symbol = token;
-
-                //
-                // Atom name (name)
-                //
-
-                token = strtok_r(rest, DELIM, &rest);
-
-                if(!token){
-                    printf("Invalid name in the atom id=%d in the file \"%s\"\n", id, path);
-                    exit(0);
-                } 
-
-                //
-                // Atomic number (Z)
-                //
-
-                token = strtok_r(rest, DELIM, &rest);
-
-                if(!token){
-                    printf("Invalid Z in the atom id=%d in the file \"%s\"\n", id, path);
-                    exit(0);
-                } else atom.Z = atoi(token);
-
-                //
-                // Atom mass (mass)
-                //
-
-                token = strtok_r(rest, DELIM, &rest);
-
-                if(!token){
-                    printf("Invalid mass in the atom id=%d in the file \"%s\"\n", id, path);
-                    exit(0);
-                } else atom.mass = atof(token);
-
-                // Stop looping
-                break;
-            }  
-        }        
-        
-        row_cter++;
+            atom.symbol = (char *) malloc(strlen(token) * sizeof(char));
+            strcpy(atom.symbol, token);
+        };
     }
 
-    // Check if there are added atoms in the file
-    if(row_cter < num_row_header) {
-        printf("Entry with atoms in the file \"%s\"\n", path);
-        exit(0);
+    // Name
+    if(!(fgets(row, STRING_BUFFER_SIZE, fp) == NULL)){
+        rest = row;
+        token = strtok_r(rest, DELIM, &rest); // Variable name
+        token = strtok_r(rest, DELIM, &rest); // Value
+
+        if(!token){
+            printf("Variable name is invalid in the file \"%s\"\n", path);
+            exit(0);
+        }
     }
 
+    // Atomic number
+    if(!(fgets(row, STRING_BUFFER_SIZE, fp) == NULL)){
+        rest = row;
+        token = strtok_r(rest, DELIM, &rest); // Variable name
+        token = strtok_r(rest, DELIM, &rest); // Value
+
+        if(!token){
+            printf("Variable Z is invalid in the file \"%s\"\n", path);
+            exit(0);
+        } else atom.Z = atoi(token);
+    }
+
+    // Mass
+    if(!(fgets(row, STRING_BUFFER_SIZE, fp) == NULL)){
+        rest = row;
+        token = strtok_r(rest, DELIM, &rest); // Variable name
+        token = strtok_r(rest, DELIM, &rest); // Value
+
+        if(!token){
+            printf("Variable mass is invalid in the file \"%s\"\n", path);
+            exit(0);
+        } else atom.mass = atoi(token);
+    }
+
+    fclose(fp);
     return atom;
 }
 
-// Get environment
-environment_t C_get_environment(int id){
+// Get transition
+transition_t C_get_transition(){
     //
     // Variables
     //
 
-    environment_t environment;
-    int *beams_id = (int*) malloc(sizeof(int));
-    int row_cter = 0, num_row_header = 8, num_beams, i;
+    transition_t transition;
+    int row_cter = 0;
     char row[STRING_BUFFER_SIZE];
-    //char path[] = "model/parameters/environments.csv";
-    char path[] = "../parameters/environments.csv";
-    char *token, *token2, *rest, *str_beams_id;
+    char *path = concatenate_ROOT_PATH("parameters/transition.csv");
+    char *token, *rest;
     FILE *fp;
 
     // Open file
     fp = fopen(path, "r");
 
     if (fp == NULL) {
-        printf("Error to access the file \"%s\".\n", path);
+        printf("Error to access the file \"%s\"\n", path);
         exit(0);
     }
 
-    // Get transition
+    // Skip header
     while(!(fgets(row, STRING_BUFFER_SIZE, fp) == NULL)){
-        rest = row;
-        token = strtok_r(rest, DELIM, &rest);
-
-        // Skip head
-        if(row_cter >= num_row_header){
-            // Check line
-            if(atoi(token) == id){
-                //
-                // Name
-                //
-
-                token = strtok_r(rest, DELIM, &rest);
-
-                if(!token){
-                    printf("Invalid name in the environment id=%d in the file \"%s\"\n", id, path);
-                    exit(0);
-                }
-
-                //
-                // Beams setup
-                //
-
-                token = strtok_r(rest, DELIM, &rest);
-
-                if(!token){
-                    printf("Invalid bemas_setup in the environment id=%d in the file \"%s\"\n", id, path);
-                    exit(0);
-                } else {
-                    // Get IDs of the beams    
-                    num_beams = C_get_int_array(token, MAX_BEAMS, beams_id);
-
-                    // Get beams from CSV file
-                    environment.beams_setup = C_get_beams_setup(num_beams, beams_id);
-                }
-
-                // Stop looping
-                break;
-            }  
-        }        
-        
-        row_cter++;
+        if(row[0] == '#') row_cter++;
+        else break;
     }
 
-    // Check if there are added atoms in the file
-    if(row_cter < num_row_header) {
-        printf("Entry with atoms in the file \"%s\"\n", path);
+    // Transition rate
+    if(!(fgets(row, STRING_BUFFER_SIZE, fp) == NULL)){
+        rest = row;
+        token = strtok_r(rest, DELIM, &rest); // Variable name
+        token = strtok_r(rest, DELIM, &rest); // Value
+
+        if(!token){
+            printf("Variable gamma is invalid in the file \"%s\"\n", path);
+            exit(0);
+        } else transition.gamma = atof(token);
+    }
+
+    // Resonant wave length
+    if(!(fgets(row, STRING_BUFFER_SIZE, fp) == NULL)){
+        rest = row;
+        token = strtok_r(rest, DELIM, &rest); // Variable name
+        token = strtok_r(rest, DELIM, &rest); // Value
+
+        if(!token){
+            printf("Variable lambda is invalid in the file \"%s\"\n", path);
+            exit(0);
+        } else transition.lambda = atof(token);
+    }
+
+    // Total angular momentum of the ground state
+    if(!(fgets(row, STRING_BUFFER_SIZE, fp) == NULL)){
+        rest = row;
+        token = strtok_r(rest, DELIM, &rest); // Variable name
+        token = strtok_r(rest, DELIM, &rest); // Value
+
+        if(!token){
+            printf("Variable J_gnd is invalid in the file \"%s\"\n", path);
+            exit(0);
+        } else transition.J_gnd = atoi(token);
+    }
+
+    // Total angular momentum of the excited state
+    if(!(fgets(row, STRING_BUFFER_SIZE, fp) == NULL)){
+        rest = row;
+        token = strtok_r(rest, DELIM, &rest); // Variable name
+        token = strtok_r(rest, DELIM, &rest); // Value
+
+        if(!token){
+            printf("Variable J_exc is invalid in the file \"%s\"\n", path);
+            exit(0);
+        } else transition.J_exc = atoi(token);
+    }
+
+    // Landè factor of the ground state
+    if(!(fgets(row, STRING_BUFFER_SIZE, fp) == NULL)){
+        rest = row;
+        token = strtok_r(rest, DELIM, &rest); // Variable name
+        token = strtok_r(rest, DELIM, &rest); // Value
+
+        if(!token){
+            printf("Variable g_gnd is invalid in the file \"%s\"\n", path);
+            exit(0);
+        } else transition.g_gnd = atof(token);
+    }
+
+    // Landè factor of the excited state
+    if(!(fgets(row, STRING_BUFFER_SIZE, fp) == NULL)){
+        rest = row;
+        token = strtok_r(rest, DELIM, &rest); // Variable name
+        token = strtok_r(rest, DELIM, &rest); // Value
+
+        if(!token){
+            printf("Variable g_exc is invalid in the file \"%s\"\n", path);
+            exit(0);
+        } else transition.g_exc = atof(token);
+    }
+
+    fclose(fp);
+    return transition;
+}
+
+// Get conditions
+conditions_t C_get_conditions(){
+    //
+    // Variables
+    //
+
+    conditions_t conditions;
+    int row_cter = 0;
+    char row[STRING_BUFFER_SIZE];
+    char *path = concatenate_ROOT_PATH("parameters/conditions.csv");
+    char *token, *rest;
+    FILE *fp;
+
+    // Open file
+    fp = fopen(path, "r");
+
+    if (fp == NULL) {
+        printf("Error to access the file \"%s\"\n", path);
         exit(0);
     }
 
-    return environment;
+    // Skip header
+    while(!(fgets(row, STRING_BUFFER_SIZE, fp) == NULL)){
+        if(row[0] == '#') row_cter++;
+        else break;
+    }
+
+    // Initial temperature 
+    if(!(fgets(row, STRING_BUFFER_SIZE, fp) == NULL)){
+        rest = row;
+        token = strtok_r(rest, DELIM, &rest); // Variable name
+        token = strtok_r(rest, DELIM, &rest); // Value
+
+        if(!token){
+            printf("Variable T_0 is invalid in the file \"%s\"\n", path);
+            exit(0);
+        } else conditions.T_0 = atof(token);
+    }
+
+    // Magnetic field gradient
+    if(!(fgets(row, STRING_BUFFER_SIZE, fp) == NULL)){
+        rest = row;
+        token = strtok_r(rest, DELIM, &rest); // Variable name
+        token = strtok_r(rest, DELIM, &rest); // Value
+
+        if(!token){
+            printf("Variable B_0 is invalid in the file \"%s\"\n", path);
+            exit(0);
+        } else conditions.B_0 = atof(token);
+    }
+
+    // Gravity
+    if(!(fgets(row, STRING_BUFFER_SIZE, fp) == NULL)){
+        rest = row;
+        token = strtok_r(rest, DELIM, &rest); // Variable name
+        token = strtok_r(rest, DELIM, &rest); // Value
+
+        if(!token){
+            printf("Variable g_bool is invalid in the file \"%s\"\n", path);
+            exit(0);
+        } else conditions.g_bool = atoi(token);
+    }
+
+    // Maximum number of iteration
+    if(!(fgets(row, STRING_BUFFER_SIZE, fp) == NULL)){
+        rest = row;
+        token = strtok_r(rest, DELIM, &rest); // Variable name
+        token = strtok_r(rest, DELIM, &rest); // Value
+
+        if(!token){
+            printf("Variable i_max is invalid in the file \"%s\"\n", path);
+            exit(0);
+        } else conditions.i_max = atoi(token);
+    }
+
+    // Maximum distance
+    if(!(fgets(row, STRING_BUFFER_SIZE, fp) == NULL)){
+        rest = row;
+        token = strtok_r(rest, DELIM, &rest); // Variable name
+        token = strtok_r(rest, DELIM, &rest); // Value
+
+        if(!token){
+            printf("Variable r_max is invalid in the file \"%s\"\n", path);
+            exit(0);
+        } else conditions.r_max = atof(token);
+    }
+
+    // Number of simulations
+    if(!(fgets(row, STRING_BUFFER_SIZE, fp) == NULL)){
+        rest = row;
+        token = strtok_r(rest, DELIM, &rest); // Variable name
+        token = strtok_r(rest, DELIM, &rest); // Value
+
+        if(!token){
+            printf("Variable num_sim is invalid in the file \"%s\"\n", path);
+            exit(0);
+        }
+    }
+
+    // Number of bins
+    if(!(fgets(row, STRING_BUFFER_SIZE, fp) == NULL)){
+        rest = row;
+        token = strtok_r(rest, DELIM, &rest); // Variable name
+        token = strtok_r(rest, DELIM, &rest); // Value
+
+        if(!token){
+            printf("Variable num_bins is invalid in the file \"%s\"\n", path);
+            exit(0);
+        } else conditions.num_bins = atoi(token);
+    }
+
+    fclose(fp);
+    return conditions;
 }
 
 // Get beams setup
-beams_setup_t C_get_beams_setup(int num_beams, int *beams_id){
+beams_setup_t C_get_beams(){
     //
     // Variables
     //
 
     beams_setup_t beams_setup;
-    beam_t beams[num_beams];
+    beam_t *beams = (beam_t*) malloc(MAX_BEAMS * sizeof(beam_t));
+    beam_t *c_beams;
 
-    int row_cter = 0, num_row_header = 10, i, beam_idx;
+    int row_cter = 0, num_beams = 0, n;
     char row[STRING_BUFFER_SIZE];
-    //char path[] = "model/parameters/beams.csv";
-    char path[] = "../parameters/beams.csv";
+    char *path = concatenate_ROOT_PATH("parameters/beams.csv");
     char *token, *rest;
     FILE *fp;
-
-    // Number of beams
-    beams_setup.num = num_beams;
-    beams_setup.beams = (beam_t*) malloc(num_beams * sizeof(beam_t));
 
     // Open file
     fp = fopen(path, "r");
 
     if (fp == NULL) {
-        printf("Error to access the file \"%s\".\n", path);
+        printf("Error to access the file \"%s\"\n", path);
         exit(0);
     }
 
-    //
+    // Skip header
+    while(!(fgets(row, STRING_BUFFER_SIZE, fp) == NULL)){
+        if(row[0] == '#') row_cter++;
+        else break;
+    }
+
     // Get beams
-    //
+    while(!(fgets(row, STRING_BUFFER_SIZE, fp) == NULL)){
+        //
+        // Laser detuning
+        //
 
-    beam_idx = 0;
-
-    while(!(fgets(row, STRING_BUFFER_SIZE, fp) == NULL) && (beam_idx < num_beams)){
         rest = row;
-        token = strtok_r(rest, DELIM, &rest);
+        token = strtok_r(rest, DELIM, &rest); // Value
 
-        // Skip head
-        if(row_cter >= num_row_header){
-            // Check line
-            for(i = 0; i < num_beams; i++){
-                if(atoi(token) == beams_id[i]){
-                    //
-                    // Detuning (delta)
-                    //
+        if(!token){
+            printf("Variable num_bins is invalid in the file \"%s\"\n", path);
+            exit(0);
+        } else beams[num_beams].delta = atof(token);
 
-                    token = strtok_r(rest, DELIM, &rest);
+        //
+        // Wave vector direction
+        //
 
-                    if(!token){
-                        printf("Invalid delta in the beam id=%d in the file \"%s\"\n", beams_id[i], path);
-                        exit(0);
-                    } else {
-                        if(token[0] == '-') beams_setup.beams[beam_idx].delta = -atof((token + 1)); 
-                        else beams_setup.beams[beam_idx].delta = atof(token);
-                    }
+        token = strtok_r(rest, DELIM, &rest); // Value
 
-                    //
-                    // Wave vector direction (k_dic)
-                    //
+        if(!token){
+            printf("Variable k_dic is invalid in the file \"%s\"\n", path);
+            exit(0);
+        } else beams[num_beams].k_dic = C_get_float_array(token, &n);
 
-                    token = strtok_r(rest, DELIM, &rest);
+        //
+        // Polarization vector
+        //
 
-                    if(!token){
-                        printf("Invalid k_dic in the beam id=%d in the file \"%s\"\n", beams_id[i], path);
-                        exit(0);
-                    } else {
-                        beams_setup.beams[beam_idx].k_dic = (float*) malloc(sizeof(float));
-                        C_get_float_array(token, 2, beams_setup.beams[beam_idx].k_dic);
-                    }
+        token = strtok_r(rest, DELIM, &rest); // Value
 
-                    //
-                    // Polarization vector (eps)
-                    //
+        if(!token){
+            printf("Variable eps is invalid in the file \"%s\"\n", path);
+            exit(0);
+        } else beams[num_beams].eps = C_get_float_array(token, &n);
 
-                    token = strtok_r(rest, DELIM, &rest);
+        //
+        // Peak of the saturation parameter
+        //
 
-                    if(!token){
-                        printf("Invalid eps in the beam id=%d in the file \"%s\"\n", beams_id[i], path);
-                        exit(0);
-                    } else {
-                        beams_setup.beams[beam_idx].eps = (float*) malloc(sizeof(float));
-                        C_get_float_array(token, 3, beams_setup.beams[beam_idx].eps);
-                    }
+        token = strtok_r(rest, DELIM, &rest); // Value
 
-                    //
-                    // Peak of the saturation parameter (s_0)
-                    //
+        if(!token){
+            printf("Variable s_0 is invalid in the file \"%s\"\n", path);
+            exit(0);
+        } else beams[num_beams].s_0 = atof(token);
 
-                    token = strtok_r(rest, DELIM, &rest);
+        //
+        // Waist Radius
+        //
 
-                    if(!token){
-                        printf("Invalid s_0 in the beam id=%d in the file \"%s\"\n", beams_id[i], path);
-                        exit(0);
-                    } else {
-                        if(token[0] == '-') beams_setup.beams[beam_idx].s_0 = -atof((token + 1)); 
-                        else beams_setup.beams[beam_idx].s_0 = atof(token);
-                    }
+        token = strtok_r(rest, DELIM, &rest); // Value
 
-                    //
-                    // Waist radius (w)
-                    //
+        if(!token){
+            printf("Variable w is invalid in the file \"%s\"\n", path);
+            exit(0);
+        } else beams[num_beams].w = atof(token);
 
-                    token = strtok_r(rest, DELIM, &rest);
-
-                    if(!token){
-                        printf("Invalid w in the beam id=%d in the file \"%s\"\n", beams_id[i], path);
-                        exit(0);
-                    } else {
-                        if(token[0] == '-') beams_setup.beams[beam_idx].w = -atof((token + 1)); 
-                        else beams_setup.beams[beam_idx].w = atof(token);
-                    }
-
-                    // Stop looping
-                    beam_idx++;
-                    break;
-                }
-            }  
-        }      
-        
-        row_cter++;
+        num_beams++;
     }
 
-    // Check if there are added atoms in the file
-    if(row_cter < num_row_header) {
-        printf("Entry with atoms in the file \"%s\"\n", path);
-        exit(0);
-    }
+    c_beams = (beam_t *) malloc(num_beams * sizeof(beam_t));
+    for(n = 0; n < num_beams; n++) c_beams[n] = beams[n];
 
-    // Check if was found all beams
-    if(beam_idx != num_beams) {
-        printf("It was not found all beams in the file \"%s\"\n", path);
-        exit(0);
-    }
+    beams_setup.num = num_beams;
+    beams_setup.beams = c_beams;
 
+    fclose(fp);
     return beams_setup;
 }
 
-// Get initial conditions
-initial_conditions_t C_get_initial_conditions(int id){
+// Get physical constant from CSV files
+constants_t C_get_constants(){
     //
     // Variables
     //
 
-    initial_conditions_t initial_conditions;
-    int row_cter = 0, num_row_header = 7;
-    char row[STRING_BUFFER_SIZE];
-    //char path[] = "model/parameters/initial_conditions.csv";
-    char path[] = "../parameters/initial_conditions.csv";
-    char *token, *rest;
-    FILE *fp;
-
-    // Open file
-    fp = fopen(path, "r");
-
-    if (fp == NULL) {
-        printf("Error to access the file \"%s\".\n", path);
-        exit(0);
-    }
-
-    // Get initial conditions
-    while(!(fgets(row, STRING_BUFFER_SIZE, fp) == NULL)){
-        rest = row;
-        token = strtok_r(rest, DELIM, &rest);
-
-        // Skip head
-        if(row_cter >= num_row_header){
-            // Check line
-            if(atoi(token) == id){
-                //
-                // Initial temperature (T_0)
-                //
-
-                token = strtok_r(rest, DELIM, &rest);
-
-                if(!token){
-                    printf("Invalid T_0 in the initial conditions set with id=%d in the file \"%s\"\n", id, path);
-                    exit(0);
-                } else initial_conditions.T_0 = atoi(token);
-
-                //
-                // Gravity (g_bool)
-                //
-
-                token = strtok_r(rest, DELIM, &rest);
-
-                if(!token){
-                    printf("Invalid g_bool in the initial conditions set with id=%d in the file \"%s\"\n", id, path);
-                    exit(0);
-                } else initial_conditions.g_bool = atoi(token);
-
-                // Stop looping
-                break;
-            }  
-        }        
-        
-        row_cter++;
-    }
-
-    // Check if there are added atoms in the file
-    if(row_cter < num_row_header) {
-        printf("Entry with initial conditions set in the file \"%s\"\n", path);
-        exit(0);
-    }
-
-    return initial_conditions;
-}
-
-// Get settings
-settings_t C_get_settings(int id){
-    //
-    // Variables
-    //
-
-    settings_t settings;
-    int row_cter = 0, num_row_header = 9;
-    char row[STRING_BUFFER_SIZE];
-    //char path[] = "model/parameters/settings.csv";
-    char path[] = "../parameters/settings.csv";
-    char *token, *rest;
-    FILE *fp;
-
-    // Open file
-    fp = fopen(path, "r");
-
-    if (fp == NULL) {
-        printf("Error to access the file \"%s\".\n", path);
-        exit(0);
-    }
-
-    // Get initial conditions
-    while(!(fgets(row, STRING_BUFFER_SIZE, fp) == NULL)){
-        rest = row;
-        token = strtok_r(rest, DELIM, &rest);
-
-        // Skip head
-        if(row_cter >= num_row_header){
-            // Check line
-            if(atoi(token) == id){
-                //
-                // Maximum number of iteration (i_max)
-                //
-
-                token = strtok_r(rest, DELIM, &rest);
-
-                if(!token){
-                    printf("Invalid i_max in the settings id=%d in the file \"%s\"\n", id, path);
-                    exit(0);
-                } else settings.i_max = (int) atof(token);
-
-                //
-                // Maximum distance (r_max)
-                //
-
-                token = strtok_r(rest, DELIM, &rest);
-
-                if(!token){
-                    printf("Invalid r_max in the settings id=%d in the file \"%s\"\n", id, path);
-                    exit(0);
-                } else settings.r_max = atof(token);
-
-                //
-                // Number of simulations (num_sim)
-                //
-
-                token = strtok_r(rest, DELIM, &rest);
-                if(!token){
-                    printf("Invalid num_sim in the settings id=%d in the file \"%s\"\n", id, path);
-                    exit(0);
-                }
-
-                //
-                // Number of bins in the histogram (num_bins)
-                //
-
-                token = strtok_r(rest, DELIM, &rest);
-
-                if(!token){
-                    printf("Invalid num_bins in the settings id=%d in the file \"%s\"\n", id, path);
-                    exit(0);
-                } else settings.num_bins = atoi(token);
-
-                // Stop looping
-                break;
-            }  
-        }        
-        
-        row_cter++;
-    }
-
-    // Check if there are added atoms in the file
-    if(row_cter < num_row_header) {
-        printf("Entry with initial conditions set in the file \"%s\"\n", path);
-        exit(0);
-    }
-
-    return settings;
-}
-
-// Get active parameters
-int * C_get_active_params(){
-    //
-    // Variables
-    //
-
-    static int ids[NUM_ACTIVE_PARAMS];
+    constants_t cts;
     int row_cter = 0;
     char row[STRING_BUFFER_SIZE];
-    //char path[] = "model/parameters/active.csv";
-    char path[] = "../parameters/active.csv";
-    char *token;
+    char *path = concatenate_ROOT_PATH("parameters/constants.csv");
+    char *token, *rest;
     FILE *fp;
 
     // Open file
     fp = fopen(path, "r");
 
     if (fp == NULL) {
-        printf("Error to access the the file \"%s\".\n", path);
+        printf("Error to access the file \"%s\"\n", path);
         exit(0);
     }
 
-    // Read first line (header)
-    if(fgets(row, STRING_BUFFER_SIZE, fp) == NULL) {
-        printf("The file \"%s\" is empty.\n", path);
-        exit(0);
+    // Skip header
+    while(!(fgets(row, STRING_BUFFER_SIZE, fp) == NULL)){
+        if(row[0] == '#') row_cter++;
+        else break;
     }
 
-    // Read second line (active parameters IDs)
-    if(fgets(row, STRING_BUFFER_SIZE, fp) == NULL) {
-        printf("Entry with active parameters in the file \"%s\"!\n", path);
-        exit(0);
+    // Planck constant
+    if(!(fgets(row, STRING_BUFFER_SIZE, fp) == NULL)){
+        rest = row;
+        token = strtok_r(rest, DELIM, &rest); // Variable name
+        token = strtok_r(rest, DELIM, &rest); // Value
 
-    // Parse row
-    } else {
-        token = strtok(row, DELIM);
-
-        ids[0] = atoi(token);
-        row_cter = 1;
-
-        while(!(token == NULL) && (row_cter < NUM_ACTIVE_PARAMS)){
-            ids[row_cter] = atoi(token);
-            row_cter++;
-
-            token = strtok(NULL, DELIM);
-        }        
+        if(!token){
+            printf("Variable h is invalid in the file \"%s\"\n", path);
+            exit(0);
+        } else cts.h = atof(token);
     }
 
-    return ids;
+    // Elementary charge
+    if(!(fgets(row, STRING_BUFFER_SIZE, fp) == NULL)){
+        rest = row;
+        token = strtok_r(rest, DELIM, &rest); // Variable name
+        token = strtok_r(rest, DELIM, &rest); // Value
+
+        if(!token){
+            printf("Variable e is invalid in the file \"%s\"\n", path);
+            exit(0);
+        } else cts.e = atof(token);
+    }
+
+    // Speed of light
+    if(!(fgets(row, STRING_BUFFER_SIZE, fp) == NULL)){
+        rest = row;
+        token = strtok_r(rest, DELIM, &rest); // Variable name
+        token = strtok_r(rest, DELIM, &rest); // Value
+
+        if(!token){
+            printf("Variable c is invalid in the file \"%s\"\n", path);
+            exit(0);
+        } else cts.c = atof(token);
+    }
+
+    // Boltzmann constant
+    if(!(fgets(row, STRING_BUFFER_SIZE, fp) == NULL)){
+        rest = row;
+        token = strtok_r(rest, DELIM, &rest); // Variable name
+        token = strtok_r(rest, DELIM, &rest); // Value
+
+        if(!token){
+            printf("Variable k_B is invalid in the file \"%s\"\n", path);
+            exit(0);
+        } else cts.k_B = atof(token);
+    }
+
+    // Bohr magneton
+    if(!(fgets(row, STRING_BUFFER_SIZE, fp) == NULL)){
+        rest = row;
+        token = strtok_r(rest, DELIM, &rest); // Variable name
+        token = strtok_r(rest, DELIM, &rest); // Value
+
+        if(!token){
+            printf("Variable mu_B is invalid in the file \"%s\"\n", path);
+            exit(0);
+        } else cts.mu_B = atof(token);
+    }
+
+    fclose(fp);
+    return cts;
 }
 
-// Get int array from string in the format [i1 i2 ... in]
-int C_get_int_array(char *str, int max_size, int *arr){
+//
+// Utility functions
+//
+
+// Get int array (max 124 numbers) from string in the format [i1 i2 ... in]
+int *C_get_int_array(char *str, int *size){
     //
     // Variables
     //
-    int i, j;
+    int i, j, max_size = 124;
     char *token;
-    int aux_arr[max_size];
+    int aux_arr[124];
+    static int *arr;
 
     str = str + 1;
     str[strlen(str)-1] = '\0';
@@ -705,21 +595,23 @@ int C_get_int_array(char *str, int max_size, int *arr){
         i++;
     }
 
-    free(arr);
-    arr = (int *) malloc(i * sizeof(int));
+    *size = i;
+
+    arr = (int*) malloc(i * sizeof(int));
     for(j = 0; j < i; j++) arr[j] = aux_arr[j];
 
-    return i;
+    return arr;
 }
 
 // Get float array from string in the format [f1 f2 ... fn]
-int C_get_float_array(char *str, int max_size, float *arr){
+float *C_get_float_array(char *str, int *size){
     //
     // Variables
     //
-    int i, j;
+    int i, j, max_size = 124;
     char *token;
     float aux_arr[max_size];
+    static float *arr;
 
     str = str + 1;
     str[strlen(str)-1] = '\0';
@@ -738,9 +630,28 @@ int C_get_float_array(char *str, int max_size, float *arr){
         i++;
     }
 
-    free(arr);
     arr = (float *) malloc(i * sizeof(float));
     for(j = 0; j < i; j++) arr[j] = aux_arr[j];
 
-    return i;
+    return arr;
+}
+
+// Concatenate ROOT_PATH to a filename
+char *concatenate_ROOT_PATH(char *filename){
+    int i;
+    char aux_path[124];
+    static char *path;
+
+    aux_path[0] = '\0';
+
+    strcat(aux_path, ROOT_PATH);
+    strcat(aux_path, filename);
+
+    i = 1;
+    while((aux_path[i-1] != '\0') && (i < 124)) i++;
+
+    path = (char*) malloc(i*sizeof(char));
+    strcpy(path, aux_path);
+
+    return path;
 }

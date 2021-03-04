@@ -1,0 +1,16 @@
+# 
+# gamma		-> [float (kHz / (2*pi))] Transition rate
+# lambda	-> [float (nm)] Resonant wave length
+# J_gnd		-> [integer] Total angular momentum of the ground state
+# J_exc		-> [integer] Total angular momentum of the excited state
+# g_gnd		-> [float] Landè factor of the ground state
+# g_exc		-> [float] Landè factor of excited state
+#
+#
+transition
+gamma,136.0
+lambda,626.0
+J_gnd,8
+J_exc,9
+g_gnd,1.24
+g_exc,1.29
