@@ -6,81 +6,81 @@
 // --
 
 // Execute simulation for a single atom
-int C_run(){
+int simulate_atom(){
     //
     // Variables
     //
 
-    // Simple variables
-    //char *results_path = concatenate_ROOT_PATH("results/");
-    int i;
+    int i;              // Iterations
+    float r, v, dt;     // Dynamics
+    get_constants();    // Get constants variables from the CSV files
 
     // Parameters of the simulation
-    atom_t atom = C_get_atom();
-    transition_t transition = C_get_transition();
-    conditions_t conditions = C_get_conditions();
-    beams_setup_t beams_setup = C_get_beams();
-    constants_t cts = C_get_constants();
+    conditions_t conds = get_conditions();
+    beams_setup_t beams_setup = get_beams();
+    atom_t atom = get_atom(conds);
 
-    //
     // Show all parameters
-    //
+    //show_all_parameters(atom, conds, beams_setup);
 
-    /*
-    printf("\nAtom\n--\n");
-    printf("symbol = %s\n", atom.symbol);
-    printf("Z = %d\n", atom.Z);
-    printf("mass = %f\n", atom.mass);
+    // Position histogram
+    histogram_t pos_hist[3];
+    for(i = 0; i < 3; i++){
+        // Histogram
+        pos_hist[i].num_bins = conds.num_bins;
+        pos_hist[i].bin_size = 2 * conds.r_max / pos_hist[i].num_bins;
+        pos_hist[i].coord0 = - conds.r_max;
+        pos_hist[i].freqs = (int *) calloc(pos_hist[i].num_bins, sizeof(int));
 
-    printf("\nTransition\n--\n");
-    printf("gamma = %f\n", transition.gamma);
-    printf("J_gnd = %d\n", transition.J_gnd);
-    printf("J_exc = %d\n", transition.J_exc);
-    printf("g_gnd = %f\n", transition.g_gnd);
-    printf("g_exc = %f\n", transition.g_exc);
-
-    printf("\nConditions\n--\n");
-    printf("T_0 = %f\n", conditions.T_0);
-    printf("B_0 = %f\n", conditions.B_0);
-    printf("g_bool = %d\n", conditions.g_bool);
-    printf("i_max = %d\n", conditions.i_max);
-    printf("r_max = %f\n", conditions.r_max);
-    printf("num_bins = %d\n", conditions.num_bins);
-
-    printf("\nBeams setup\n--\n");
-    printf("num_beams = %d\n", beams_setup.num);
-
-    for(i = 0; i < beams_setup.num; i++){
-        printf("\nBeam %d\n--\n", (i+1));
-        printf("delta = %f\n", beams_setup.beams[i].delta);
-        printf("k_dic = [%f, %f]\n", beams_setup.beams[i].k_dic[0], beams_setup.beams[i].k_dic[1]);
-        printf("eps = [%f, %f, %f]\n", beams_setup.beams[i].eps[0], beams_setup.beams[i].eps[1], beams_setup.beams[i].eps[2]);
-        printf("s_0 = %f\n", beams_setup.beams[i].s_0);
-        printf("w = %f\n", beams_setup.beams[i].w);
+        // Insert initial position
+        update_hist(&pos_hist[i], atom.pos[i]);
     }
 
-    printf("\nConstants\n--\n");
-    printf("h = %f\n", cts.h);
-    printf("e = %f\n", cts.e);
-    printf("c = %f\n", cts.c);
-    printf("k_B = %f\n", cts.k_B);
-    printf("mu_B = %f\n", cts.mu_B);
-    */
+    // Results
+    results_t res;
+    res.pos_hist = pos_hist;
+    res.num_iters = 0;
+    res.flag = 2;
+
+    // Compute distance and speed of the atom
+    r = sqrt(r3_inner_product(atom.pos, atom.pos)); // Distance from centre
+    v = sqrt(r3_inner_product(atom.vel, atom.vel)); // Total speed
+
+    //  Iterations
+    res.num_iters = conds.i_max - 1; 
+    while((res.num_iters < conds.i_max) && (r < conds.r_max)){
+        // Compute the photonic recoil
+        dt = compute_photonic_recoil(atom, beams_setup, conds);
+
+        // Compute gravitational force
+        if(conds.g_bool) compute_gravitational_force(atom);
+
+        // Compute magnetic force
+        compute_magnetic_force(atom, conds.B_0);
+
+        res.num_iters++;
+    }
 
     return 0;
 }
 
 // Get atom
-atom_t C_get_atom(){
+atom_t get_atom(conditions_t conds){
     //
     // Variables
     //
 
     atom_t atom;
+
     int row_cter = 0;
+    int i;
+
     char row[STRING_BUFFER_SIZE];
     char *path = concatenate_ROOT_PATH("parameters/atom.csv");
     char *token, *rest;
+    
+    float std_dev;
+
     FILE *fp;
 
     // Open file
@@ -92,10 +92,7 @@ atom_t C_get_atom(){
     }
 
     // Skip header
-    while(!(fgets(row, STRING_BUFFER_SIZE, fp) == NULL)){
-        if(row[0] == '#') row_cter++;
-        else break;
-    }
+    fgets(row, STRING_BUFFER_SIZE, fp);
 
     // Symbol
     if(!(fgets(row, STRING_BUFFER_SIZE, fp) == NULL)){
@@ -104,7 +101,7 @@ atom_t C_get_atom(){
         token = strtok_r(rest, DELIM, &rest); // Value
 
         if(!token){
-            printf("Variable symbol is invalid in the file \"%s\"\n", path);
+            printf("Invalid parameter \"symbol\" in the file \"%s\"\n", path);
             exit(0);
         } else {
             if(token[2] == '\n') token[2] = '\0';
@@ -114,18 +111,6 @@ atom_t C_get_atom(){
         };
     }
 
-    // Name
-    if(!(fgets(row, STRING_BUFFER_SIZE, fp) == NULL)){
-        rest = row;
-        token = strtok_r(rest, DELIM, &rest); // Variable name
-        token = strtok_r(rest, DELIM, &rest); // Value
-
-        if(!token){
-            printf("Variable name is invalid in the file \"%s\"\n", path);
-            exit(0);
-        }
-    }
-
     // Atomic number
     if(!(fgets(row, STRING_BUFFER_SIZE, fp) == NULL)){
         rest = row;
@@ -133,7 +118,7 @@ atom_t C_get_atom(){
         token = strtok_r(rest, DELIM, &rest); // Value
 
         if(!token){
-            printf("Variable Z is invalid in the file \"%s\"\n", path);
+            printf("Invalid parameter \"Z\" in the file \"%s\"\n", path);
             exit(0);
         } else atom.Z = atoi(token);
     }
@@ -145,17 +130,36 @@ atom_t C_get_atom(){
         token = strtok_r(rest, DELIM, &rest); // Value
 
         if(!token){
-            printf("Variable mass is invalid in the file \"%s\"\n", path);
+            printf("Invalid parameter \"mass\" in the file \"%s\"\n", path);
             exit(0);
         } else atom.mass = atoi(token);
     }
+
+    //
+    // Initial position and velocity
+    //
+
+    atom.pos = (float *) calloc(3, sizeof(float));
+    atom.vel = (float *) calloc(3, sizeof(float));
+
+    for(i = 0; i < 3; i++){
+        // Position
+        atom.pos[i] = 0; // cm
+
+        // Velocity
+        std_dev = sqrt(k_B * conds.T_0 / (atom.mass * u)) * 10; // cm / s
+        atom.vel[i] = norm(0, std_dev); // cm / s
+    }
+
+    // Optical transition
+    atom.transition = get_transition();
 
     fclose(fp);
     return atom;
 }
 
 // Get transition
-transition_t C_get_transition(){
+transition_t get_transition(){
     //
     // Variables
     //
@@ -176,10 +180,7 @@ transition_t C_get_transition(){
     }
 
     // Skip header
-    while(!(fgets(row, STRING_BUFFER_SIZE, fp) == NULL)){
-        if(row[0] == '#') row_cter++;
-        else break;
-    }
+    fgets(row, STRING_BUFFER_SIZE, fp);
 
     // Transition rate
     if(!(fgets(row, STRING_BUFFER_SIZE, fp) == NULL)){
@@ -188,7 +189,7 @@ transition_t C_get_transition(){
         token = strtok_r(rest, DELIM, &rest); // Value
 
         if(!token){
-            printf("Variable gamma is invalid in the file \"%s\"\n", path);
+            printf("Invalid parameter \"gamma\" in the file \"%s\"\n", path);
             exit(0);
         } else transition.gamma = atof(token);
     }
@@ -200,7 +201,7 @@ transition_t C_get_transition(){
         token = strtok_r(rest, DELIM, &rest); // Value
 
         if(!token){
-            printf("Variable lambda is invalid in the file \"%s\"\n", path);
+            printf("Invalid parameter \"lambda\" in the file \"%s\"\n", path);
             exit(0);
         } else transition.lambda = atof(token);
     }
@@ -212,7 +213,7 @@ transition_t C_get_transition(){
         token = strtok_r(rest, DELIM, &rest); // Value
 
         if(!token){
-            printf("Variable J_gnd is invalid in the file \"%s\"\n", path);
+            printf("Invalid parameter \"J_gnd\" in the file \"%s\"\n", path);
             exit(0);
         } else transition.J_gnd = atoi(token);
     }
@@ -224,7 +225,7 @@ transition_t C_get_transition(){
         token = strtok_r(rest, DELIM, &rest); // Value
 
         if(!token){
-            printf("Variable J_exc is invalid in the file \"%s\"\n", path);
+            printf("Invalid parameter \"J_exc\" in the file \"%s\"\n", path);
             exit(0);
         } else transition.J_exc = atoi(token);
     }
@@ -236,7 +237,7 @@ transition_t C_get_transition(){
         token = strtok_r(rest, DELIM, &rest); // Value
 
         if(!token){
-            printf("Variable g_gnd is invalid in the file \"%s\"\n", path);
+            printf("Invalid parameter \"g_gnd\" in the file \"%s\"\n", path);
             exit(0);
         } else transition.g_gnd = atof(token);
     }
@@ -248,9 +249,21 @@ transition_t C_get_transition(){
         token = strtok_r(rest, DELIM, &rest); // Value
 
         if(!token){
-            printf("Variable g_exc is invalid in the file \"%s\"\n", path);
+            printf("Invalid parameter \"g_exc\" in the file \"%s\"\n", path);
             exit(0);
         } else transition.g_exc = atof(token);
+    }
+
+    //
+    // Check values
+    //
+
+    if((transition.J_exc - transition.J_gnd) < 0){
+        printf("J_exc must be grater than J_gnd.\n");
+        exit(0);
+    } else if(transition.J_exc < 0 || transition.J_gnd < 0){        
+        printf("J_exc and J_gnd must be positive values.\n");
+        exit(0);
     }
 
     fclose(fp);
@@ -258,7 +271,7 @@ transition_t C_get_transition(){
 }
 
 // Get conditions
-conditions_t C_get_conditions(){
+conditions_t get_conditions(){
     //
     // Variables
     //
@@ -279,10 +292,7 @@ conditions_t C_get_conditions(){
     }
 
     // Skip header
-    while(!(fgets(row, STRING_BUFFER_SIZE, fp) == NULL)){
-        if(row[0] == '#') row_cter++;
-        else break;
-    }
+    fgets(row, STRING_BUFFER_SIZE, fp);
 
     // Initial temperature 
     if(!(fgets(row, STRING_BUFFER_SIZE, fp) == NULL)){
@@ -291,7 +301,7 @@ conditions_t C_get_conditions(){
         token = strtok_r(rest, DELIM, &rest); // Value
 
         if(!token){
-            printf("Variable T_0 is invalid in the file \"%s\"\n", path);
+            printf("Invalid parameter \"T_0\" in the file \"%s\"\n", path);
             exit(0);
         } else conditions.T_0 = atof(token);
     }
@@ -303,7 +313,7 @@ conditions_t C_get_conditions(){
         token = strtok_r(rest, DELIM, &rest); // Value
 
         if(!token){
-            printf("Variable B_0 is invalid in the file \"%s\"\n", path);
+            printf("Invalid parameter \"B_0\" in the file \"%s\"\n", path);
             exit(0);
         } else conditions.B_0 = atof(token);
     }
@@ -315,7 +325,7 @@ conditions_t C_get_conditions(){
         token = strtok_r(rest, DELIM, &rest); // Value
 
         if(!token){
-            printf("Variable g_bool is invalid in the file \"%s\"\n", path);
+            printf("Invalid parameter \"g_bool\" in the file \"%s\"\n", path);
             exit(0);
         } else conditions.g_bool = atoi(token);
     }
@@ -327,7 +337,7 @@ conditions_t C_get_conditions(){
         token = strtok_r(rest, DELIM, &rest); // Value
 
         if(!token){
-            printf("Variable i_max is invalid in the file \"%s\"\n", path);
+            printf("Invalid parameter \"i_max\" in the file \"%s\"\n", path);
             exit(0);
         } else conditions.i_max = atoi(token);
     }
@@ -339,7 +349,7 @@ conditions_t C_get_conditions(){
         token = strtok_r(rest, DELIM, &rest); // Value
 
         if(!token){
-            printf("Variable r_max is invalid in the file \"%s\"\n", path);
+            printf("Invalid parameter \"r_max\" in the file \"%s\"\n", path);
             exit(0);
         } else conditions.r_max = atof(token);
     }
@@ -351,7 +361,7 @@ conditions_t C_get_conditions(){
         token = strtok_r(rest, DELIM, &rest); // Value
 
         if(!token){
-            printf("Variable num_sim is invalid in the file \"%s\"\n", path);
+            printf("Invalid parameter \"num_sim\" in the file \"%s\"\n", path);
             exit(0);
         }
     }
@@ -363,7 +373,7 @@ conditions_t C_get_conditions(){
         token = strtok_r(rest, DELIM, &rest); // Value
 
         if(!token){
-            printf("Variable num_bins is invalid in the file \"%s\"\n", path);
+            printf("Invalid parameter \"num_bins\" in the file \"%s\"\n", path);
             exit(0);
         } else conditions.num_bins = atoi(token);
     }
@@ -373,7 +383,7 @@ conditions_t C_get_conditions(){
 }
 
 // Get beams setup
-beams_setup_t C_get_beams(){
+beams_setup_t get_beams(){
     //
     // Variables
     //
@@ -397,10 +407,7 @@ beams_setup_t C_get_beams(){
     }
 
     // Skip header
-    while(!(fgets(row, STRING_BUFFER_SIZE, fp) == NULL)){
-        if(row[0] == '#') row_cter++;
-        else break;
-    }
+    fgets(row, STRING_BUFFER_SIZE, fp);
 
     // Get beams
     while(!(fgets(row, STRING_BUFFER_SIZE, fp) == NULL)){
@@ -412,7 +419,7 @@ beams_setup_t C_get_beams(){
         token = strtok_r(rest, DELIM, &rest); // Value
 
         if(!token){
-            printf("Variable num_bins is invalid in the file \"%s\"\n", path);
+            printf("Invalid parameter \"delta\" in the file \"%s\"\n", path);
             exit(0);
         } else beams[num_beams].delta = atof(token);
 
@@ -423,9 +430,9 @@ beams_setup_t C_get_beams(){
         token = strtok_r(rest, DELIM, &rest); // Value
 
         if(!token){
-            printf("Variable k_dic is invalid in the file \"%s\"\n", path);
+            printf("Invalid parameter \"k_dic\" in the file \"%s\"\n", path);
             exit(0);
-        } else beams[num_beams].k_dic = C_get_float_array(token, &n);
+        } else beams[num_beams].k_dic = r3_normalize(get_float_array(token, &n));
 
         //
         // Polarization vector
@@ -434,9 +441,9 @@ beams_setup_t C_get_beams(){
         token = strtok_r(rest, DELIM, &rest); // Value
 
         if(!token){
-            printf("Variable eps is invalid in the file \"%s\"\n", path);
+            printf("Invalid parameter \"eps\" in the file \"%s\"\n", path);
             exit(0);
-        } else beams[num_beams].eps = C_get_float_array(token, &n);
+        } else beams[num_beams].eps = r3_normalize(get_float_array(token, &n));
 
         //
         // Peak of the saturation parameter
@@ -445,7 +452,7 @@ beams_setup_t C_get_beams(){
         token = strtok_r(rest, DELIM, &rest); // Value
 
         if(!token){
-            printf("Variable s_0 is invalid in the file \"%s\"\n", path);
+            printf("Invalid parameter \"s_0\" in the file \"%s\"\n", path);
             exit(0);
         } else beams[num_beams].s_0 = atof(token);
 
@@ -456,7 +463,7 @@ beams_setup_t C_get_beams(){
         token = strtok_r(rest, DELIM, &rest); // Value
 
         if(!token){
-            printf("Variable w is invalid in the file \"%s\"\n", path);
+            printf("Invalid parameter \"w\" in the file \"%s\"\n", path);
             exit(0);
         } else beams[num_beams].w = atof(token);
 
@@ -474,12 +481,11 @@ beams_setup_t C_get_beams(){
 }
 
 // Get physical constant from CSV files
-constants_t C_get_constants(){
+int get_constants(){
     //
     // Variables
     //
 
-    constants_t cts;
     int row_cter = 0;
     char row[STRING_BUFFER_SIZE];
     char *path = concatenate_ROOT_PATH("parameters/constants.csv");
@@ -495,10 +501,7 @@ constants_t C_get_constants(){
     }
 
     // Skip header
-    while(!(fgets(row, STRING_BUFFER_SIZE, fp) == NULL)){
-        if(row[0] == '#') row_cter++;
-        else break;
-    }
+    fgets(row, STRING_BUFFER_SIZE, fp);
 
     // Planck constant
     if(!(fgets(row, STRING_BUFFER_SIZE, fp) == NULL)){
@@ -507,9 +510,9 @@ constants_t C_get_constants(){
         token = strtok_r(rest, DELIM, &rest); // Value
 
         if(!token){
-            printf("Variable h is invalid in the file \"%s\"\n", path);
+            printf("Invalid parameter \"h\" in the file \"%s\"\n", path);
             exit(0);
-        } else cts.h = atof(token);
+        } else h = atof(token);
     }
 
     // Elementary charge
@@ -519,9 +522,9 @@ constants_t C_get_constants(){
         token = strtok_r(rest, DELIM, &rest); // Value
 
         if(!token){
-            printf("Variable e is invalid in the file \"%s\"\n", path);
+            printf("Invalid parameter \"e\" in the file \"%s\"\n", path);
             exit(0);
-        } else cts.e = atof(token);
+        } else e = atof(token);
     }
 
     // Speed of light
@@ -531,9 +534,9 @@ constants_t C_get_constants(){
         token = strtok_r(rest, DELIM, &rest); // Value
 
         if(!token){
-            printf("Variable c is invalid in the file \"%s\"\n", path);
+            printf("Invalid parameter \"c\" in the file \"%s\"\n", path);
             exit(0);
-        } else cts.c = atof(token);
+        } else c = atof(token);
     }
 
     // Boltzmann constant
@@ -543,9 +546,9 @@ constants_t C_get_constants(){
         token = strtok_r(rest, DELIM, &rest); // Value
 
         if(!token){
-            printf("Variable k_B is invalid in the file \"%s\"\n", path);
+            printf("Invalid parameter \"k_B\" in the file \"%s\"\n", path);
             exit(0);
-        } else cts.k_B = atof(token);
+        } else k_B = atof(token);
     }
 
     // Bohr magneton
@@ -555,13 +558,139 @@ constants_t C_get_constants(){
         token = strtok_r(rest, DELIM, &rest); // Value
 
         if(!token){
-            printf("Variable mu_B is invalid in the file \"%s\"\n", path);
+            printf("Invalid parameter \"mu_B\" in the file \"%s\"\n", path);
             exit(0);
-        } else cts.mu_B = atof(token);
+        } else mu_B = atof(token);
+    }
+
+    // Atomic mass unit
+    if(!(fgets(row, STRING_BUFFER_SIZE, fp) == NULL)){
+        rest = row;
+        token = strtok_r(rest, DELIM, &rest); // Variable name
+        token = strtok_r(rest, DELIM, &rest); // Value
+
+        if(!token){
+            printf("Invalid parameter \"u\" in the file \"%s\"\n", path);
+            exit(0);
+        } else u = atof(token);
     }
 
     fclose(fp);
-    return cts;
+    return 1;
+}
+
+// Apply the photonic recoil in the atom returning the time interval of the process
+float compute_photonic_recoil(atom_t atom, beams_setup_t beams_setup, conditions_t conds){
+    //
+    // Variables
+    //
+
+    int i, j, k;                // Iterations variables
+    float aux_dt, dt = 0;       // Times variables
+    float *B, *eps;             // Electromagnetic fields
+
+    // Get Magnetic field
+    B = get_magnetic_field(conds.B_0, atom.pos);
+
+    //
+    // Check transitions
+    //
+
+    // Loop each beam
+    //for(i = 0; i < beams_setup.num; i++){
+    for(i = 0; i < 1; i++){
+        // Get the polarization vector on the basis with pi-transition parallel to the magnetic field
+        eps = get_polarization_vector(beams_setup.beams[i], B);
+        // Change basis matrix
+    }
+
+
+    return dt;
+}
+
+// Compute the momentum due to the gravitational force
+int compute_gravitational_force(atom_t atom){
+    return 1;
+}
+
+// Compute the momentum due the magnetic force
+int compute_magnetic_force(atom_t atom, float B_0){
+    return 1;
+}
+
+// Get magnetic field vector in the lab frame
+float *get_magnetic_field(float B_0, float *r){
+    //
+    // Variables
+    //
+    static float B[3];      // Magnetic field vector
+
+    B[0] = B_0 * r[0];
+    B[1] = B_0 * r[1];
+    B[2] = - 2 * B_0 * r[2];
+
+    return B;
+}
+
+// B1 -> {x, y, z} basis with z parallel to k
+// B2 -> {x, y, z} basis with z parallel to B
+// Get coordinates of a polarization vector on the basis B2 given the coordinates on the basis B1
+float *get_polarization_vector(beam_t beam, float *B){
+    //
+    // Variables
+    //
+
+    static float eps[3] = {0, 0, 0};
+    complex_t B1_eps[3];                // Polarization vector on B2 (modules)
+    complex_t B2_eps[3];                // Polarization vector on B2 (modules)
+    float **B1, **B2;                   // Basis
+    complex_t z;
+    int i, j;
+
+    // Check magnetic field
+    if(B[0] == 0.0 && B[1] == 0.0 && B[2] == 0.0) B[2] = 1;
+    else B = r3_normalize(B);
+
+    //
+    // Get orthonormal basis
+    //    
+    
+    B1 = get_orthonormal_basis(beam.k_dic);
+    B2 = get_orthonormal_basis(B);
+
+    // Define polarization on basis B2
+    z.re = (beam.eps[0] + beam.eps[2]) / sqrt(2);
+    z.im = 0;
+
+    B1_eps[0] = z;
+
+    z.im = (beam.eps[0] - beam.eps[2]) / sqrt(2);
+    z.re = 0;
+
+    B1_eps[1] = z;
+
+    z.re = beam.eps[1];
+    z.im = 0;
+
+    B1_eps[2] = z;
+
+    for(i = 0; i < 3; i++){
+        for(j = 0; j < 3; j++){
+            z.re = r3_inner_product(B1[j], B2[i]);
+            z.im = 0;
+
+            B2_eps[i] = c_sum(B2_eps[i], c_inner_product(B1_eps[j], z));
+        }
+    }
+
+    z.re = 0;
+    z.im = 1;
+
+    eps[0] = c_mod(c_sum(B2_eps[0], B2_eps[2])) / sqrt(2);
+    eps[1] = c_mod(B2_eps[1]);
+    eps[2] = c_mod(c_product(z, c_diff(B2_eps[0], B2_eps[2]))) / sqrt(2);
+
+    return eps;
 }
 
 //
@@ -569,7 +698,7 @@ constants_t C_get_constants(){
 //
 
 // Get int array (max 124 numbers) from string in the format [i1 i2 ... in]
-int *C_get_int_array(char *str, int *size){
+int *get_int_array(char *str, int *size){
     //
     // Variables
     //
@@ -604,7 +733,7 @@ int *C_get_int_array(char *str, int *size){
 }
 
 // Get float array from string in the format [f1 f2 ... fn]
-float *C_get_float_array(char *str, int *size){
+float *get_float_array(char *str, int *size){
     //
     // Variables
     //
@@ -654,4 +783,139 @@ char *concatenate_ROOT_PATH(char *filename){
     strcpy(path, aux_path);
 
     return path;
+}
+
+// Print all parameters of the simulation
+int show_all_parameters(atom_t atom, conditions_t conditions, beams_setup_t beams_setup){
+    //
+    // Variables
+    //
+
+    int i;
+
+    //
+    // Prints
+    //
+
+    printf("\nAtom\n--\n");
+    printf("symbol = %s\n", atom.symbol);
+    printf("Z = %d\n", atom.Z);
+    printf("mass = %f\n", atom.mass);
+
+    printf("\nTransition\n--\n");
+    printf("gamma = %f\n", atom.transition.gamma);
+    printf("J_gnd = %d\n", atom.transition.J_gnd);
+    printf("J_exc = %d\n", atom.transition.J_exc);
+    printf("g_gnd = %f\n", atom.transition.g_gnd);
+    printf("g_exc = %f\n", atom.transition.g_exc);
+
+    printf("\nConditions\n--\n");
+    printf("T_0 = %f\n", conditions.T_0);
+    printf("B_0 = %f\n", conditions.B_0);
+    printf("g_bool = %d\n", conditions.g_bool);
+    printf("i_max = %d\n", conditions.i_max);
+    printf("r_max = %f\n", conditions.r_max);
+    printf("num_bins = %d\n", conditions.num_bins);
+
+    printf("\nBeams setup\n--\n");
+    printf("num_beams = %d\n", beams_setup.num);
+
+    for(i = 0; i < beams_setup.num; i++){
+        printf("\nBeam %d\n--\n", (i+1));
+        printf("delta = %f\n", beams_setup.beams[i].delta);
+        printf("k_dic = [%f, %f, %f]\n", beams_setup.beams[i].k_dic[0], beams_setup.beams[i].k_dic[1], beams_setup.beams[i].k_dic[2]);
+        printf("eps = [%f, %f, %f]\n", beams_setup.beams[i].eps[0], beams_setup.beams[i].eps[1], beams_setup.beams[i].eps[2]);
+        printf("s_0 = %f\n", beams_setup.beams[i].s_0);
+        printf("w = %f\n", beams_setup.beams[i].w);
+    }
+}
+
+// Generate a float random number following a Gaussian distribution given a mean and a standard deviation
+float norm(float mean, float std_dev){
+    //
+    // Variables
+    //
+
+    int i;
+    float u[2], r, theta;   // Variables for Box-Muller method
+    float std_norm;         // Normal(0, 1)
+    float norm;             // Adjusted normal
+
+    //
+    // Box-Muller transform
+    //
+
+    // Generate uniform random numbers
+    srand(time(NULL)); // Seed used by the rand() function
+    for(i = 0; i < 2; i++) u[i] = ((float) rand()) / ((float) RAND_MAX);
+
+    // Compute r
+    r = sqrt(-2 * log(u[0]));
+
+    // Generate theta
+    theta = 0.0;
+    while(theta == 0.0) theta = 2.0 * PI * u[1];
+
+    // Generate std_norm value
+    std_norm = r * cos(theta);
+
+    // Adjust std_norm
+    norm = (std_norm * std_dev) + mean;
+
+    return norm;
+}
+
+// Update histogram
+int update_hist(histogram_t *hist, float val){
+    //
+    // Variables
+    //
+
+    int bin;
+    float lower_lim, upper_lim;
+
+    // Add frequency
+    for(bin = 0; bin < (*hist).num_bins; bin++){
+        lower_lim = (*hist).coord0 + bin * (*hist).bin_size;
+        upper_lim = lower_lim + (*hist).bin_size;
+
+        if((val >= lower_lim) && (val <= upper_lim)){
+            (*hist).freqs[bin]++;
+            break;
+        }
+    }
+
+    return 1;
+}
+
+// Get orthonormal basis with a defined v3
+float **get_orthonormal_basis(float *v3){
+    //
+    // Variables
+    //
+
+    int i;
+    float u[3], w[3];
+    float **A;
+    float a;
+
+    A = (float**) malloc(3 * sizeof(float*));
+    A[0] = (float *) malloc(3 * sizeof(float));
+    A[1] = (float *) malloc(3 * sizeof(float));
+    A[2] = r3_normalize(v3);
+
+    // Get random vector
+    srand(time(NULL)); // Seed used by the rand() function
+    for(i = 0; i < 3; i++) {
+        u[i] = ((float) rand()) / ((float) RAND_MAX);
+        w[i] = A[2][i];
+    }
+
+    a = r3_inner_product(u, A[2]);
+    for(i = 0; i < 3; i++) w[i] = w[i] * a;
+
+    A[0] = r3_normalize(r3_diff(u, w));
+    A[1] = r3_cross_product(A[2], A[0]);
+
+    return A;
 }

@@ -55,34 +55,30 @@ class Model:
     #
     def __load_parameters(self):
         #
-        # Active parameters
-        #active_parameters = pd.read_csv('model/parameters/active.csv', header=0, dtype='int').iloc[0]
-
-        #
         # Atom
         path = 'model/parameters/atom.csv'
-        self._atom = pd.read_csv(path, header=7, index_col=0, squeeze=True).astype(object)
+        self._atom = pd.read_csv(path, header=0, index_col=0, squeeze=True).astype(object)
 
         #
         # Transition
         path = 'model/parameters/transition.csv'
-        self._transition = pd.read_csv(path, header=9, index_col=0, squeeze=True).astype(object)
+        self._transition = pd.read_csv(path, header=0, index_col=0, squeeze=True).astype(object)
 
         #
         # Beams
         path = 'model/parameters/beams.csv'
-        self._beams = pd.read_csv(path, header=8)
+        self._beams = pd.read_csv(path, header=0)
         self._beams.index += 1
 
         #
         # Conditions
         path = 'model/parameters/conditions.csv'
-        self._conditions = pd.read_csv(path, header=10, index_col=0, squeeze=True).astype(object)
+        self._conditions = pd.read_csv(path, header=0, index_col=0, squeeze=True).astype(object)
 
         #
         # Constants
         path = 'model/parameters/constants.csv'
-        self._constants = pd.read_csv(path, header=8, index_col=0)
+        self._constants = pd.read_csv(path, header=0, index_col=0)
 
     #
     def run_simulation(self):
@@ -103,13 +99,13 @@ class Model:
         parameters_dir = results_dir_path + 'parameters/'
         os.mkdir(parameters_dir)
 
-        self.atom.to_csv(parameters_dir + 'atom.csv');
-        self.transition.to_csv(parameters_dir + 'transition.csv');
-        self.beams.to_csv(parameters_dir + 'beams.csv');
-        self.conditions.to_csv(parameters_dir + 'conditions.csv');
-        self.constants.to_csv(parameters_dir + 'constants.csv');
+        self.atom.to_csv(parameters_dir + 'atom.csv')
+        self.transition.to_csv(parameters_dir + 'transition.csv')
+        self.beams.to_csv(parameters_dir + 'beams.csv')
+        self.conditions.to_csv(parameters_dir + 'conditions.csv')
+        self.constants.to_csv(parameters_dir + 'constants.csv')
 
-        C_ext.run()
+        C_ext.simulate_atom()
 
     #
     # Utility methods

@@ -1,18 +1,8 @@
-# 
-# T_0       -> [float (uK)] Initial temperature 
-# B_0       -> [float (G / cm)] Magnetic field gradient
-# g_bool    -> [0 or 1] 1 - use gravity, 0 - do not use gravity
-# i_max     -> [positive integer] Maximum number of iteration (simulation of individual atoms)
-# r_max     -> [float (cm)] Maximum distance (threshold)
-# num_sim   -> [positive integer] Number of simulations (individual atoms) stopped by reach the maximum distance (r_max)
-# num_bins  -> [positive integer] Number of bins in the histogram
-#
-#
-conditions
+,conditions
 T_0,50.0
 B_0,5.6338264
 g_bool,1
-i_max,1.0e5
+i_max,100
 r_max,3.0
 num_sim,30
 num_bins,200

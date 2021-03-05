@@ -6,11 +6,15 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <ctype.h>
+#include <math.h>
+#include <time.h>
+#include "vectors.h"
 
 // 
 // Constants
 //
 
+#define PI 3.14159265
 #define STRING_BUFFER_SIZE 1024
 #define DELIM ","
 #define MAX_BEAMS 16
@@ -21,114 +25,155 @@
 // Structures
 //
 
-// Results
+// Transition
 typedef struct{
-    float trapping_time;
-    int num_iters; /* Number of iterations */
-    int flag; /* Status of the simulation */
-} results_t;
+    float gamma;    /* Transition rate */
+    float lambda;   /* Resonant wave length */
+    int J_gnd;      /* Total angular momentum of the ground state */
+    int J_exc;      /* Total angular momentum of the excited state */
+    float g_gnd;    /* Landè factor of the ground state */
+    float g_exc;    /* Landè factor of the excited state */
+} transition_t;
 
 // Atom
 typedef struct{
-    char *symbol; /* Atom symbol */
-    int Z; /* Atomic number */
-    float mass; /* [float (Da or u)] Atomic mass */
+    char *symbol;               /* Atom symbol */
+    int Z;                      /* Atomic number */
+    float mass;                 /* Atomic mass */
+    float *pos;                 /* Position */
+    float *vel;                 /* Velocity */
+    transition_t transition;    /* Optical transition */
 } atom_t;
-
-// Transition
-typedef struct{
-    float gamma; /* [float (kHz / (2*pi))] Transition rate */
-    float lambda; /* [float (nm)] Resonant wave length */
-    int J_gnd; /* [integer] Total angular momentum of the ground state */
-    int J_exc; /* [integer] Total angular momentum of the excited state */
-    float g_gnd; /* [float] Landè factor of the ground state */
-    float g_exc; /* [float] Landè factor of the excited state */
-} transition_t;
 
 // Conditions
 typedef struct{
-    float T_0; /* [float (uK)] Initial temperature  */
-    float B_0; /* Magnetic Field gradient */
-    int g_bool; /* [0 or 1] 1 - use gravity, 0 - do not use gravity */
-    int i_max; /* [positive integer] Maximum number of iteration (simulation of individual atoms) */
-    float r_max; /* [float (cm)] Maximum distance (threshold) */
-    int num_bins; /* [positive integer] Number of bins in the histogram */
+    float T_0;      /* Initial temperature  */
+    float B_0;      /* Magnetic Field gradient */
+    int g_bool;     /* Use gravity */
+    int i_max;      /* Maximum number of iteration */
+    float r_max;    /* Maximum distance (threshold) */
+    int num_bins;   /* Number of bins in each histogram */
 } conditions_t;
-
-// Constants
-typedef struct{
-    float h; /* Planck constant */
-    float e; /* Elementary charge */
-    float c; /* Speed of light */
-    float k_B; /* Boltzmann constant */
-    float mu_B; /* Bohr magneton */
-} constants_t;
 
 // Beam
 typedef struct {
-    float delta; /* [gamma] Laser detuning in units of the transition rate (gamma) related to the used transition */
-    float *k_dic; /* [2D-array] Azimuthal and polar angles of the wave vector on the lab frame */
-    float *eps; /* [3D-array] (sigma-, pi, sigma+) Polarization vector on the frame with pi parallel to the wave vector */
-    float s_0; /* [float] Peak of the saturation parameter (I_peak / I_sat) */
-    float w; /* [millimetre] "Waist Radius" */
+    float delta;    /* Laser detuning */
+    float *k_dic;   /* Wave vector direction */
+    float *eps;       /* Polarization vector */
+    float s_0;      /* Peak of the saturation parameter */
+    float w;        /* Waist radius */
 } beam_t;
 
 // Beams setup
 typedef struct {
-    int num; /* Number of beams */
-    beam_t *beams;
+    int num;        /* Number of beams */
+    beam_t *beams;  /* All beams */
 } beams_setup_t;
 
+// Histogram
+typedef struct {
+    float num_bins; /* Number of bins */
+    float bin_size; /* Bin size */
+    float coord0;   /* Initial value */
+    int *freqs;     /* Frequencies */
+} histogram_t;
+
+// Results
+typedef struct{
+    histogram_t *pos_hist;  /* Histogram of the position */
+    int num_iters;          /* Number of iterations */
+    int flag;               /* Status of the simulation */
+} results_t;
+
+/*
+    Flags:
+    0 - Simulations has stopped due an error
+    1 - Simulations has finished
+    2 - Simulation is running
+*/
+
 //
-// Variables
+// Constants
 //
 
-// [J * s] Planck constant
-float h;
+// Planck constant [10^{-34} J s]
+float h; 
 
-// [C] Elementary charge
+// Elementary charge [10^{-19} C]
 float e;
 
-// [m / s] Speed of light
+// Speed of light [10^{8} m / s]
 float c;
 
-// [J / K] Boltzmann constant
+// Boltzmann constant [10^{-23} J / K]
 float k_B;
 
-// [J / T] Bohr magneton
+// Bohr magneton [10^{-24} J / T]
 float mu_B;
+
+// Atomic mass unit [10^{-27} kg]
+float u;
 
 //
 // Main functions
 //
 
-// Execute simulation for a single atom
-int C_run();
+// Run simulation for a single atom
+int simulate_atom();
 
 // Get atom
-atom_t C_get_atom();
+atom_t get_atom();
 
 // Get transition
-transition_t C_get_transition();
+transition_t get_transition();
 
 // Get conditions
-conditions_t C_get_conditions();
+conditions_t get_conditions();
 
 // Get beams setup
-beams_setup_t C_get_beams();
+beams_setup_t get_beams();
 
 // Get physical constant from CSV files
-constants_t C_get_constants();
+int get_constants();
+
+// Apply the photonic recoil in the atom returning the time interval of the process
+float compute_photonic_recoil(atom_t atom, beams_setup_t beams, conditions_t conds);
+
+// Compute the momentum due to the gravitational force
+int compute_gravitational_force(atom_t atom);
+
+// Compute the momentum due the magnetic force
+int compute_magnetic_force(atom_t atom, float B_0);
+
+// Get magnetic field vector in the lab frame
+float *get_magnetic_field(float B_0, float *r);
 
 //
 // Utility functions
 //
 
+// Print all parameters of the simulation
+int show_all_parameters(atom_t atom, conditions_t conditions, beams_setup_t beams_setup);
+
 // Get int array from string in the format [i1 i2 ... in]
-int *C_get_int_array(char *str, int *size);
+int *get_int_array(char *str, int *size);
 
 // Get float array from string in the format [f1 f2 ... fn]
-float *C_get_float_array(char *str, int *size);
+float *get_float_array(char *str, int *size);
 
 // Concatenate ROOT_PATH to a filename
 char *concatenate_ROOT_PATH(char *filename);
+
+// Generate a float random number following a Gaussian distribution given a mean and a standard deviation
+float norm(float mean, float std_dev);
+
+// Update histogram
+int update_hist(histogram_t *hist, float val);
+
+// B1 -> {sigma-, pi, sigma+} basis with pi parallel to k
+// B1 -> {sigma-, pi, sigma+} basis with pi parallel to B
+// Get coordinates of a polarization vector on the basis B2 given the coordinates on the basis B1
+float *get_polarization_vector(beam_t beam, float *B);
+
+// Get orthonormal basis with a defined v3
+float **get_orthonormal_basis(float *v3);

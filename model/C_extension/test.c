@@ -5,7 +5,7 @@
 #include "mot_sim.h"
 
 int main () {
-    C_run();
+    simulate_atom();
 
     return 0;
 }

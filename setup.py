@@ -2,7 +2,7 @@ from distutils.core import setup, Extension
 
 mot_sim_module = Extension(
     'mot_sim',\
-    sources = ['model/C_extension/mot_sim.c', 'model/C_extension/Py_wrapper.c']
+    sources = ['model/C_extension/mot_sim.c', 'model/C_extension/vectors.c', 'model/C_extension/Py_wrapper.c']
 )
 
 setup(

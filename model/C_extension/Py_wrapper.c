@@ -9,14 +9,14 @@
 // Implementation of C Extension for Python
 //
 
-// Read the parameters from CSV files and generate the results
-static PyObject* run(PyObject *self, PyObject *args){
-    return Py_BuildValue("i", C_run());
+// Read simulation for a single atom
+static PyObject* C_simulate_atom(PyObject *self, PyObject *args){
+    return Py_BuildValue("i", simulate_atom());
 }
 
 // List methods
 static PyMethodDef mot_sim_methods[] = {
-    {"run", run, METH_NOARGS, "Read the parameters from CSV files and generate the results"},
+    {"simulate_atom", C_simulate_atom, METH_NOARGS, "Read the parameters from CSV files and generate the results"},
     {NULL, NULL, 0, NULL}
 };
 
