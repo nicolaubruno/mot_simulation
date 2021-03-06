@@ -5,7 +5,7 @@
 #include "vectors.h"
 
 //
-// Functions
+// Complex space
 //
 
 // Sum
@@ -54,6 +54,50 @@ float c_mod(complex_t z){
     return sqrt(c_inner_product(z, z).re);
 }
 
+// Sum between C3 vectors
+complex_t *c3_sum(complex_t *z1, complex_t *z2){
+    //
+    // Variables
+    //
+
+    int i;
+    static complex_t res[3];
+
+    // Compute dot product
+    for(i = 0; i < 3; i++) res[i] = c_sum(z1[i], z2[i]);
+
+    return res;
+}
+
+// Difference between C3 vectors
+complex_t *c3_diff(complex_t *z1, complex_t *z2){
+    //
+    // Variables
+    //
+
+    int i;
+    static complex_t res[3];
+
+    // Compute dot product
+    for(i = 0; i < 3; i++) res[i] = c_diff(z1[i], z2[i]);
+
+    return res;
+}
+
+// Product between a complex number and a real vector
+complex_t *c3_scalar_product(complex_t a, complex_t *v){
+    // Variables
+    int i;
+    static complex_t *w;
+
+    w = (complex_t*) calloc(3, sizeof(complex_t));
+
+    for(i = 0; i < 3; i++)
+        w[i] = c_product(a, v[i]);
+
+    return w;
+}
+
 // Inner product between C3 vectors
 complex_t c3_inner_product(complex_t *z1, complex_t *z2){
     int i;
@@ -74,11 +118,54 @@ float c3_mod(complex_t *z){
     return sqrt(c3_inner_product(z, z).re);
 }
 
+// View complex vector
+int c3_view(complex_t *z, char *name){
+    int i;
+
+    printf("%s = [", name);
+    for(i = 0; i < 2; i++) printf("(%f, %f), ", z[i].re, z[i].im);
+    printf("(%f, %f)]\n", z[i].re, z[i].im);
+}
+
+// Apply complex operator
+complex_t *c3_apply_operator(complex_t **A, complex_t *v){
+    int i,  j;
+    static complex_t *a;
+
+    a = (complex_t*) calloc(3, sizeof(complex_t));
+
+    for(i = 0; i < 3; i++){
+        for(j = 0; j < 3; j++){
+            a[i] = c_sum(a[i], c_product(A[i][j], v[j]));
+        }
+    }
+
+    return a;
+}
+
+// Convert a R3 vector to a C3 vector
+complex_t *r3_to_c3(float *v){
+    int i;
+    static complex_t *res;
+
+    res = (complex_t *) calloc(3, sizeof(complex_t));
+
+    for(i = 0; i < 3; i++){
+        res[i].re = v[i];
+        res[i].im = 0;
+    }
+
+    return res;
+}
+
+//
+// Real space
+//
+
 // Module
 float r3_mod(float *z){
     return sqrt(r3_inner_product(z, z));
 }
-
 
 // Inner product between R3 vectors
 float r3_inner_product(float *r1, float *r2){
@@ -90,7 +177,7 @@ float r3_inner_product(float *r1, float *r2){
     float res = 0;
 
     // Compute dot product
-    for(i = 0; i < 3; i++) res += (*(r1+i)) * (*(r2+i));
+    for(i = 0; i < 3; i++) res += r1[i] * r2[i];
 
     return res;
 }
@@ -102,7 +189,9 @@ float *r3_cross_product(float *r1, float *r2){
     //
 
     int i;
-    static float res[3];
+    static float *res;
+
+    res = (float*) calloc(3, sizeof(float));
 
     // Compute dot product
     res[0] = r1[1]*r2[2] - r1[2]*r2[1];
@@ -110,6 +199,18 @@ float *r3_cross_product(float *r1, float *r2){
     res[2] = r1[0]*r2[1] - r1[1]*r2[0];
 
     return res;
+}
+
+// Product between a real number and a real vector
+float *r3_scalar_product(float a, float *v){
+    // Variables
+    int i;
+    static float w[3];
+
+    for(i = 0; i < 3; i++)
+        w[i] = a * v[i];
+
+    return w;
 }
 
 // Sum between R3 vectors
@@ -166,4 +267,30 @@ float *r3_normalize(float *r){
     for(i = 0; i < 3; i++) new_r[i] = (r[i] / mod_r);
 
     return new_r;
+}
+
+// Apply real operator
+float *r3_apply_operator(float **A, float *v){
+    int i,  j;
+    static float *a;
+
+    a = (float*) calloc(3, sizeof(float));
+
+    for(i = 0; i < 3; i++){
+        for(j = 0; j < 3; j++){
+            a[i] += A[i][j]*v[j];
+        }
+    }
+
+    return a;
+}
+
+
+// View real vector
+int r3_view(float *z, char *name){
+    int i;
+
+    printf("%s = [", name);
+    for(i = 0; i < 2; i++) printf("%f, ", z[i]);
+    printf("%f]\n", z[i]);
 }

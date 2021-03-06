@@ -8,11 +8,11 @@
 
 # Beams
 
-	We going to use two bases to define the beams. The first one is the basis B1 = {e_x, e_y, e_z} related to the Cartesian vectors in lab frame. The second one is the basis B2 = {sigma+, pi, sigma-} related to the polarizations being pi a vector parallel to the wave vector (k_dic). The coordinates of the basis B1 are real numbers, whereas the coordinate of the basis B2 are 0 or 1 (there is or there is not polarization).
+	We going to consider three bases to handle with the beams. The first one is the basis A = {a1, a2, a3}, which is a real constant basis define on the lab frame. The second one is the basis B = {b1, b2, b3}, which b1, b2, and b3 are complex vectors related to the polarizations sigma+, sigma-, and pi on the beams frame. The last one is the basis C = {c1, c2, c3}, which c1, c2, and c3 are also complex vectors related to the polarizations sigma+, sigma-, and pi on the magnetic field frame (c3 is parellel to the magnetic field direction). We are not interested in both real and imaginary components of the vectors b and c, we only need its module, therefore we going to consider the non-unit vector eps = (e1, e2, e3) to define the polarization of each beam in the simulation. This vector is defined on the basis B and its components only can be 0 or 1.
 
 - delta		-> (float) 		Laser detuning in units of the transition rate (gamma)
-- k_dic		-> (float[3]) 	Proportional vector to the wave vector on the basis B1
-- eps		-> (int[3])		Polarization on the basis B2
+- k_dic		-> (float[3]) 	non-unit vector on the basis A parallel to the wave vector
+- eps		-> (int[3])		Polarizations on the basis B
 - s_0  		-> (float)		Peak of the saturation parameter (I_peak / I_sat)
 - w    		-> (float)		Waist Radius [mm]
 

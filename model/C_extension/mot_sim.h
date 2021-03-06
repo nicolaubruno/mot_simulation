@@ -18,8 +18,8 @@
 #define STRING_BUFFER_SIZE 1024
 #define DELIM ","
 #define MAX_BEAMS 16
-//#define ROOT_PATH "../"
-#define ROOT_PATH "model/"
+#define ROOT_PATH "../"
+//#define ROOT_PATH "model/"
 
 //
 // Structures
@@ -170,10 +170,8 @@ float norm(float mean, float std_dev);
 // Update histogram
 int update_hist(histogram_t *hist, float val);
 
-// B1 -> {sigma-, pi, sigma+} basis with pi parallel to k
-// B1 -> {sigma-, pi, sigma+} basis with pi parallel to B
-// Get coordinates of a polarization vector on the basis B2 given the coordinates on the basis B1
-float *get_polarization_vector(beam_t beam, float *B);
+// Get coordinates of a polarization vector on the basis with pi transition parallel to the magnetic field B
+float *update_polarization_vector(beam_t beam, float *B);
 
-// Get orthonormal basis with a defined v3
-float **get_orthonormal_basis(float *v3);
+// Generate a orthonormal basis given a vector
+float **orthonormal_basis(float *v3);

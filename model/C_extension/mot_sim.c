@@ -7,6 +7,9 @@
 
 // Execute simulation for a single atom
 int simulate_atom(){
+    // Seed used by the rand() function
+    srand(time(NULL));
+
     //
     // Variables
     //
@@ -597,11 +600,14 @@ float compute_photonic_recoil(atom_t atom, beams_setup_t beams_setup, conditions
     //
 
     // Loop each beam
-    //for(i = 0; i < beams_setup.num; i++){
-    for(i = 0; i < 1; i++){
-        // Get the polarization vector on the basis with pi-transition parallel to the magnetic field
-        eps = get_polarization_vector(beams_setup.beams[i], B);
-        // Change basis matrix
+    beams_setup.num = 1;
+    for(i = 0; i < beams_setup.num; i++){
+        B[0] = 0;
+        B[1] = 0;
+        B[2] = 1;
+        
+        // Get a R3 vector whose components are the module of the polarization vector components on the B frame
+        eps = update_polarization_vector(beams_setup.beams[i], B);
     }
 
 
@@ -618,7 +624,7 @@ int compute_magnetic_force(atom_t atom, float B_0){
     return 1;
 }
 
-// Get magnetic field vector in the lab frame
+// Get magnetic field vector on the lab frame in the position r = (x, y, z)
 float *get_magnetic_field(float B_0, float *r){
     //
     // Variables
@@ -632,16 +638,19 @@ float *get_magnetic_field(float B_0, float *r){
     return B;
 }
 
-// B1 -> {x, y, z} basis with z parallel to k
-// B2 -> {x, y, z} basis with z parallel to B
-// Get coordinates of a polarization vector on the basis B2 given the coordinates on the basis B1
+// Get coordinates of a polarization vector on the basis with pi transition parallel to the magnetic field B
+/*
 float *get_polarization_vector(beam_t beam, float *B){
     //
     // Variables
     //
 
-    static float eps[3] = {0, 0, 0};
-    complex_t B1_eps[3];                // Polarization vector on B2 (modules)
+    static float eps[3] = {0, 0, 0};    // Desired polarization vector  
+    complex_t B[3][3];                  // Polarization basis of the beam frame on the lab frame
+    complex_t C[3][3];                  // Polarization basis of the magnetic field frame on the lab frame
+
+
+    complex_t B1_eps[3];                // Polarization vector on B1 (modules)
     complex_t B2_eps[3];                // Polarization vector on B2 (modules)
     float **B1, **B2;                   // Basis
     complex_t z;
@@ -657,6 +666,10 @@ float *get_polarization_vector(beam_t beam, float *B){
     
     B1 = get_orthonormal_basis(beam.k_dic);
     B2 = get_orthonormal_basis(B);
+
+    printf("B1 = {\n");
+    for(i = 0; i < 3; i++) printf("\t[%f, %f, %f]\n", B1[i][0], B1[i][1], B1[i][2]);
+    printf("}\n");
 
     // Define polarization on basis B2
     z.re = (beam.eps[0] + beam.eps[2]) / sqrt(2);
@@ -689,6 +702,210 @@ float *get_polarization_vector(beam_t beam, float *B){
     eps[0] = c_mod(c_sum(B2_eps[0], B2_eps[2])) / sqrt(2);
     eps[1] = c_mod(B2_eps[1]);
     eps[2] = c_mod(c_product(z, c_diff(B2_eps[0], B2_eps[2]))) / sqrt(2);
+
+    return eps;
+}
+*/
+
+// Get coordinates of a polarization vector on the basis with pi transition parallel to the magnetic field B
+/*
+float *update_polarization_vector_v1(beam_t beam, float *B){
+    //
+    // Variables
+    //
+
+    int i, j;
+    static float *eps;                  // Desired polarization vector  
+    float **r3_C, **r3_D;               // R3 Bases
+    complex_t **c3_A, **c3_C, **c3_D;   // C3 Bases
+    complex_t *C_eps, *A_eps, *D_eps;   // Complex polarization vector
+
+    //
+    // Define basis 
+    //
+
+    // Real orthonormal bases
+    r3_C = orthonormal_basis(beam.k_dic);
+    r3_D = orthonormal_basis(B);
+
+    // Polarization basis of the magnetic field frame
+    c3_A = (complex_t **) malloc(3 * sizeof(complex_t *));
+    c3_C = (complex_t **) malloc(3 * sizeof(complex_t *));
+    c3_D = (complex_t **) malloc(3 * sizeof(complex_t *));
+
+    // Allocate memory
+    for(i = 0; i < 3; i++){
+        c3_A[i] = (complex_t *) calloc(3, sizeof(complex_t));
+        c3_C[i] = (complex_t *) calloc(3, sizeof(complex_t));
+        c3_D[i] = (complex_t *) calloc(3, sizeof(complex_t));
+    }
+
+    // Components on the lab frame
+    for(i = 0; i < 3; i++){
+        // sigma+
+        c3_D[0][i].re = r3_D[0][i] / sqrt(2);
+        c3_D[0][i].im = r3_D[1][i] / sqrt(2);
+
+        c3_C[0][i].re = r3_C[0][i] / sqrt(2);
+        c3_C[0][i].im = r3_C[1][i] / sqrt(2);
+
+        c3_A[0][i].re = 0;
+        c3_A[0][i].im = 0;
+
+        // sigma-
+        c3_D[1][i].re = r3_D[0][i] / sqrt(2);
+        c3_D[1][i].im = -r3_D[1][i] / sqrt(2);
+
+        c3_C[1][i].re = r3_C[0][i] / sqrt(2);
+        c3_C[1][i].im = -r3_C[1][i] / sqrt(2);
+
+        c3_A[1][i].re = 0;
+        c3_A[1][i].im = 0;
+
+        // pi
+        c3_D[2][i].re = r3_D[2][i];
+        c3_D[2][i].im = 0;
+
+        c3_C[2][i].re = r3_C[2][i];
+        c3_C[2][i].im = 0;
+
+        c3_A[2][i].re = 0;
+        c3_A[2][i].im = 0;
+    }
+
+    // Lab frame
+    c3_A[0][0].re = 1;
+    c3_A[1][1].re = 1;
+    c3_A[2][2].re = 1;
+
+    //
+    // Compute polarization on different bases
+    //
+
+    C_eps = (complex_t *) calloc(3, sizeof(complex_t));
+    for(i = 0; i < 3; i++){
+        C_eps[i].re = beam.eps[i];
+        C_eps[i].im = 0;
+    }
+
+    c3_view(C_eps, "C_eps");
+
+    D_eps = (complex_t *) calloc(3, sizeof(complex_t));
+    for(i = 0; i < 3; i++) {
+        D_eps[i].re = 0;
+        D_eps[i].im = 0;
+
+        for(j = 0; j < 3; j++){
+            D_eps[i] = c_sum(D_eps[i], c_product(C_eps[j], c3_inner_product(c3_D[i], c3_C[j])));
+        }
+    }
+
+    c3_view(D_eps, "D_eps");
+
+    eps = (float*) calloc(3, sizeof(float));
+    for(i = 0; i < 3; i++) eps[i] = c_mod(D_eps[i]); 
+    eps = r3_normalize(eps);
+
+    // Return
+    return eps;
+}
+*/
+
+// Get a R3 vector whose components are the module of the polarization vector components on the B frame
+float *update_polarization_vector(beam_t beam, float *B){
+    //
+    // Variables
+    //
+
+    int i, j;
+    float *eps;                         // Desired vector
+    complex_t *C_eps, *D_eps;           // Polarization vector on different Cartesian bases    
+    complex_t *Dp_eps, *Cp_eps, *aux;   // Polarization vector on different polarization bases
+    complex_t **A1, **A1_i, **A2;       // Change-of-basis matrices
+    float **r3_C, **r3_D;               // Real Bases
+    complex_t **c3_C, **c3_D;           // Complex Bases
+    complex_t im_p;
+
+    // Imaginary particle
+    im_p.re = 0;
+    im_p.im = 1;
+
+    //
+    // Change-of-basis matrix from the polarization basis to the Cartesian basis
+    //
+
+    A1 = (complex_t **) calloc(3, sizeof(complex_t*));
+    for(i = 0; i < 3; i++){ 
+        A1[i] = (complex_t *) calloc(3, sizeof(complex_t)); 
+
+        for(j = 0; j < 3; j++){
+            A1[i][j].re = 0;
+            A1[i][j].im = 0;
+        }
+    }
+
+    A1[0][0].re = 1 / sqrt(2);
+    A1[0][1].re = 1 / sqrt(2);
+    A1[1][0].im = 1 / sqrt(2);
+    A1[1][1].im = - 1 / sqrt(2);
+    A1[2][2].re = 1;
+    
+    
+    //
+    // Change-of-basis matrix from the Cartesian basis to the polarization basis
+    //
+
+    A1_i = (complex_t **) malloc(3 * sizeof(complex_t*));
+    for(i = 0; i < 3; i++){ 
+        A1_i[i] = (complex_t *) calloc(3, sizeof(complex_t)); 
+
+        for(j = 0; j < 3; j++){
+            A1_i[i][j].re = A1[j][i].re;
+            A1_i[i][j].im = -A1[j][i].im;
+        }
+    }
+
+    //
+    // Change-of-basis matrix from the Cartesian beam frame to the Cartesian B frame
+    //
+
+    // Real orthonormal bases
+    r3_C = orthonormal_basis(beam.k_dic);
+    r3_D = orthonormal_basis(B);
+
+    c3_C = (complex_t**) calloc(3, sizeof(complex_t *));
+    c3_D = (complex_t**) calloc(3, sizeof(complex_t *));
+    
+    for(i = 0; i < 3; i++){
+        c3_C[i] = r3_to_c3(r3_C[i]);
+        c3_D[i] = r3_to_c3(r3_D[i]);
+    }
+
+    A2 = (complex_t **) malloc(3 * sizeof(complex_t*));
+    for(i = 0; i < 3; i++){ 
+        A2[i] = (complex_t *) calloc(3, sizeof(complex_t)); 
+
+        for(j = 0; j < 3; j++){
+            A2[i][j] = c3_inner_product(c3_D[i], c3_C[j]);
+        }
+    }
+
+    //
+    // Polarization vector on the polarization beam frame
+    //
+
+    Cp_eps = r3_to_c3(beam.eps);
+    C_eps = c3_apply_operator(A1, Cp_eps);
+
+    // Polarization vector on the Cartesian B frame
+    D_eps = c3_apply_operator(A2, C_eps);
+
+    // Polarization vector on the polarization B frame
+    Dp_eps = c3_apply_operator(A1_i, D_eps);
+
+    // Compute desired vector
+    eps = (float*) calloc(3, sizeof(float));
+    for(i = 0; i < 3; i++) eps[i] = c_mod(Dp_eps[i]);
 
     return eps;
 }
@@ -846,7 +1063,6 @@ float norm(float mean, float std_dev){
     //
 
     // Generate uniform random numbers
-    srand(time(NULL)); // Seed used by the rand() function
     for(i = 0; i < 2; i++) u[i] = ((float) rand()) / ((float) RAND_MAX);
 
     // Compute r
@@ -888,34 +1104,36 @@ int update_hist(histogram_t *hist, float val){
     return 1;
 }
 
-// Get orthonormal basis with a defined v3
-float **get_orthonormal_basis(float *v3){
+// Generate a orthonormal basis given a vector
+float **orthonormal_basis(float *v3){
     //
     // Variables
     //
 
     int i;
-    float u[3], w[3];
-    float **A;
-    float a;
+    static float **B;   // Desired basis
+    float *v1, *v2;     // Auxiliary vectors
 
-    A = (float**) malloc(3 * sizeof(float*));
-    A[0] = (float *) malloc(3 * sizeof(float));
-    A[1] = (float *) malloc(3 * sizeof(float));
-    A[2] = r3_normalize(v3);
+    // Normalize vector v
+    v3 = r3_normalize(v3);
 
-    // Get random vector
-    srand(time(NULL)); // Seed used by the rand() function
-    for(i = 0; i < 3; i++) {
-        u[i] = ((float) rand()) / ((float) RAND_MAX);
-        w[i] = A[2][i];
-    }
+    // Generate a random vector  
+    v1 = (float*) calloc(3, sizeof(float));
+    for(i = 0; i < 3; i++) v1[i] = ((float) rand()) / ((float) RAND_MAX);
 
-    a = r3_inner_product(u, A[2]);
-    for(i = 0; i < 3; i++) w[i] = w[i] * a;
+    // Define a orthonormal vector
+    v2 = r3_scalar_product(r3_inner_product(v1, v3), v3);
+    v1 = r3_normalize(r3_diff(v1, v2));
 
-    A[0] = r3_normalize(r3_diff(u, w));
-    A[1] = r3_cross_product(A[2], A[0]);
+    // Define the last vector of the basis
+    v2 = r3_cross_product(v3, v1);
 
-    return A;
+    // Define basis
+    B = (float **) malloc(3 * sizeof(float *));
+    
+    B[0] = v1;
+    B[1] = v2;
+    B[2] = v3;
+
+    return B;
 }
