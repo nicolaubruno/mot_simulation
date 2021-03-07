@@ -8,13 +8,13 @@
 
 # Beams
 
-	We going to consider three bases to handle with the beams. The first one is the basis A = {a1, a2, a3}, which is a real constant basis define on the lab frame. The second one is the basis B = {b1, b2, b3}, which b1, b2, and b3 are complex vectors related to the polarizations sigma+, sigma-, and pi on the beams frame. The last one is the basis C = {c1, c2, c3}, which c1, c2, and c3 are also complex vectors related to the polarizations sigma+, sigma-, and pi on the magnetic field frame (c3 is parellel to the magnetic field direction). We are not interested in both real and imaginary components of the vectors b and c, we only need its module, therefore we going to consider the non-unit vector eps = (e1, e2, e3) to define the polarization of each beam in the simulation. This vector is defined on the basis B and its components only can be 0 or 1.
+	We going to consider two bases to handle with the beams. The first one is the basis C = {c1, c2, c3}, which c1, c2, and c3 are complex vectors related to the polarizations sigma+, sigma-, and pi on the beams frame. The second one is the basis D = {d1, d2, d3}, which d1, d2, and d3 are also complex vectors related to the polarizations sigma+, sigma-, and pi on the magnetic field frame (d3 is parallel to the magnetic field direction). We are not interested in both real and imaginary components of the vectors b and c, we only need its module, therefore we going to consider the non-unit vector eps = (e1, e2, e3) to define the polarization of each beam in the simulation. This vector is defined on the basis C and its components only can be 0 or 1.
 
 - delta		-> (float) 		Laser detuning in units of the transition rate (gamma)
 - k_dic		-> (float[3]) 	non-unit vector on the basis A parallel to the wave vector
-- eps		-> (int[3])		Polarizations on the basis B
+- eps		-> (int[3])		Polarizations on the basis C
 - s_0  		-> (float)		Peak of the saturation parameter (I_peak / I_sat)
-- w    		-> (float)		Waist Radius [mm]
+- w    		-> (float)		Waist Radius [cm]
 
 # Conditions
 

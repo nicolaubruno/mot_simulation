@@ -15,8 +15,7 @@ int simulate_atom(){
     //
 
     int i;              // Iterations
-    float r, v, dt;     // Dynamics
-    get_constants();    // Get constants variables from the CSV files
+    double r, v, dt;     // Dynamics
 
     // Parameters of the simulation
     conditions_t conds = get_conditions();
@@ -82,7 +81,7 @@ atom_t get_atom(conditions_t conds){
     char *path = concatenate_ROOT_PATH("parameters/atom.csv");
     char *token, *rest;
     
-    float std_dev;
+    double std_dev;
 
     FILE *fp;
 
@@ -142,8 +141,8 @@ atom_t get_atom(conditions_t conds){
     // Initial position and velocity
     //
 
-    atom.pos = (float *) calloc(3, sizeof(float));
-    atom.vel = (float *) calloc(3, sizeof(float));
+    atom.pos = (double *) calloc(3, sizeof(double));
+    atom.vel = (double *) calloc(3, sizeof(double));
 
     for(i = 0; i < 3; i++){
         // Position
@@ -194,7 +193,7 @@ transition_t get_transition(){
         if(!token){
             printf("Invalid parameter \"gamma\" in the file \"%s\"\n", path);
             exit(0);
-        } else transition.gamma = atof(token);
+        } else transition.gamma = atof(token) * 2 * PI;
     }
 
     // Resonant wave length
@@ -435,7 +434,7 @@ beams_setup_t get_beams(){
         if(!token){
             printf("Invalid parameter \"k_dic\" in the file \"%s\"\n", path);
             exit(0);
-        } else beams[num_beams].k_dic = r3_normalize(get_float_array(token, &n));
+        } else beams[num_beams].k_dic = r3_normalize(get_double_array(token, &n));
 
         //
         // Polarization vector
@@ -446,7 +445,7 @@ beams_setup_t get_beams(){
         if(!token){
             printf("Invalid parameter \"eps\" in the file \"%s\"\n", path);
             exit(0);
-        } else beams[num_beams].eps = r3_normalize(get_float_array(token, &n));
+        } else beams[num_beams].eps = r3_normalize(get_double_array(token, &n));
 
         //
         // Peak of the saturation parameter
@@ -483,114 +482,17 @@ beams_setup_t get_beams(){
     return beams_setup;
 }
 
-// Get physical constant from CSV files
-int get_constants(){
-    //
-    // Variables
-    //
-
-    int row_cter = 0;
-    char row[STRING_BUFFER_SIZE];
-    char *path = concatenate_ROOT_PATH("parameters/constants.csv");
-    char *token, *rest;
-    FILE *fp;
-
-    // Open file
-    fp = fopen(path, "r");
-
-    if (fp == NULL) {
-        printf("Error to access the file \"%s\"\n", path);
-        exit(0);
-    }
-
-    // Skip header
-    fgets(row, STRING_BUFFER_SIZE, fp);
-
-    // Planck constant
-    if(!(fgets(row, STRING_BUFFER_SIZE, fp) == NULL)){
-        rest = row;
-        token = strtok_r(rest, DELIM, &rest); // Variable name
-        token = strtok_r(rest, DELIM, &rest); // Value
-
-        if(!token){
-            printf("Invalid parameter \"h\" in the file \"%s\"\n", path);
-            exit(0);
-        } else h = atof(token);
-    }
-
-    // Elementary charge
-    if(!(fgets(row, STRING_BUFFER_SIZE, fp) == NULL)){
-        rest = row;
-        token = strtok_r(rest, DELIM, &rest); // Variable name
-        token = strtok_r(rest, DELIM, &rest); // Value
-
-        if(!token){
-            printf("Invalid parameter \"e\" in the file \"%s\"\n", path);
-            exit(0);
-        } else e = atof(token);
-    }
-
-    // Speed of light
-    if(!(fgets(row, STRING_BUFFER_SIZE, fp) == NULL)){
-        rest = row;
-        token = strtok_r(rest, DELIM, &rest); // Variable name
-        token = strtok_r(rest, DELIM, &rest); // Value
-
-        if(!token){
-            printf("Invalid parameter \"c\" in the file \"%s\"\n", path);
-            exit(0);
-        } else c = atof(token);
-    }
-
-    // Boltzmann constant
-    if(!(fgets(row, STRING_BUFFER_SIZE, fp) == NULL)){
-        rest = row;
-        token = strtok_r(rest, DELIM, &rest); // Variable name
-        token = strtok_r(rest, DELIM, &rest); // Value
-
-        if(!token){
-            printf("Invalid parameter \"k_B\" in the file \"%s\"\n", path);
-            exit(0);
-        } else k_B = atof(token);
-    }
-
-    // Bohr magneton
-    if(!(fgets(row, STRING_BUFFER_SIZE, fp) == NULL)){
-        rest = row;
-        token = strtok_r(rest, DELIM, &rest); // Variable name
-        token = strtok_r(rest, DELIM, &rest); // Value
-
-        if(!token){
-            printf("Invalid parameter \"mu_B\" in the file \"%s\"\n", path);
-            exit(0);
-        } else mu_B = atof(token);
-    }
-
-    // Atomic mass unit
-    if(!(fgets(row, STRING_BUFFER_SIZE, fp) == NULL)){
-        rest = row;
-        token = strtok_r(rest, DELIM, &rest); // Variable name
-        token = strtok_r(rest, DELIM, &rest); // Value
-
-        if(!token){
-            printf("Invalid parameter \"u\" in the file \"%s\"\n", path);
-            exit(0);
-        } else u = atof(token);
-    }
-
-    fclose(fp);
-    return 1;
-}
-
 // Apply the photonic recoil in the atom returning the time interval of the process
-float compute_photonic_recoil(atom_t atom, beams_setup_t beams_setup, conditions_t conds){
+double compute_photonic_recoil(atom_t atom, beams_setup_t beams_setup, conditions_t conds){
     //
     // Variables
     //
 
     int i, j, k;                // Iterations variables
-    float aux_dt, dt = 0;       // Times variables
-    float *B, *eps;             // Electromagnetic fields
+    double aux_dt, dt;           // Times variables
+    double *B, *eps, *eB;        // Electromagnetic fields
+    double R, s, r_square, delta, lifetime;
+    double **C, **D;
 
     // Get Magnetic field
     B = get_magnetic_field(conds.B_0, atom.pos);
@@ -599,15 +501,37 @@ float compute_photonic_recoil(atom_t atom, beams_setup_t beams_setup, conditions
     // Check transitions
     //
 
+    dt = 0;
+    atom.pos[0] = 1;
+
     // Loop each beam
-    beams_setup.num = 1;
+    beams_setup.num = 2;
     for(i = 0; i < beams_setup.num; i++){
-        B[0] = 0;
-        B[1] = 0;
-        B[2] = 1;
-        
-        // Get a R3 vector whose components are the module of the polarization vector components on the B frame
-        eps = update_polarization_vector(beams_setup.beams[i], B);
+        // Get basis
+        if(r3_mod(B) == 0){
+            eB = (double*) calloc(3, sizeof(double));
+            eB[2] = 1.0;
+        } else eB = r3_normalize(B);
+
+        C = orthonormal_basis(beams_setup.beams[i].k_dic);
+        D = orthonormal_basis(eB);
+
+        // Update polarization vector
+        eps = update_polarization_vector(beams_setup.beams[i].eps, C, D);
+
+        // Loop each transition
+        for(j = 0; j < 3; j++){
+
+            // Scattering rate of the transition
+            R = get_scattering_rate(atom, beams_setup.beams[i], B, eps[j], C, D);
+            lifetime = 1 / R;
+
+            if(lifetime < dt || dt == 0) dt = lifetime;
+
+            r3_print(beams_setup.beams[i].k_dic, "k");
+            printf("eps[%d] = %f\n", j+1, eps[j]);
+            printf("\n");
+        }
     }
 
 
@@ -620,16 +544,16 @@ int compute_gravitational_force(atom_t atom){
 }
 
 // Compute the momentum due the magnetic force
-int compute_magnetic_force(atom_t atom, float B_0){
+int compute_magnetic_force(atom_t atom, double B_0){
     return 1;
 }
 
 // Get magnetic field vector on the lab frame in the position r = (x, y, z)
-float *get_magnetic_field(float B_0, float *r){
+double *get_magnetic_field(double B_0, double *r){
     //
     // Variables
     //
-    static float B[3];      // Magnetic field vector
+    static double B[3];      // Magnetic field vector
 
     B[0] = B_0 * r[0];
     B[1] = B_0 * r[1];
@@ -638,197 +562,18 @@ float *get_magnetic_field(float B_0, float *r){
     return B;
 }
 
-// Get coordinates of a polarization vector on the basis with pi transition parallel to the magnetic field B
-/*
-float *get_polarization_vector(beam_t beam, float *B){
-    //
-    // Variables
-    //
-
-    static float eps[3] = {0, 0, 0};    // Desired polarization vector  
-    complex_t B[3][3];                  // Polarization basis of the beam frame on the lab frame
-    complex_t C[3][3];                  // Polarization basis of the magnetic field frame on the lab frame
-
-
-    complex_t B1_eps[3];                // Polarization vector on B1 (modules)
-    complex_t B2_eps[3];                // Polarization vector on B2 (modules)
-    float **B1, **B2;                   // Basis
-    complex_t z;
-    int i, j;
-
-    // Check magnetic field
-    if(B[0] == 0.0 && B[1] == 0.0 && B[2] == 0.0) B[2] = 1;
-    else B = r3_normalize(B);
-
-    //
-    // Get orthonormal basis
-    //    
-    
-    B1 = get_orthonormal_basis(beam.k_dic);
-    B2 = get_orthonormal_basis(B);
-
-    printf("B1 = {\n");
-    for(i = 0; i < 3; i++) printf("\t[%f, %f, %f]\n", B1[i][0], B1[i][1], B1[i][2]);
-    printf("}\n");
-
-    // Define polarization on basis B2
-    z.re = (beam.eps[0] + beam.eps[2]) / sqrt(2);
-    z.im = 0;
-
-    B1_eps[0] = z;
-
-    z.im = (beam.eps[0] - beam.eps[2]) / sqrt(2);
-    z.re = 0;
-
-    B1_eps[1] = z;
-
-    z.re = beam.eps[1];
-    z.im = 0;
-
-    B1_eps[2] = z;
-
-    for(i = 0; i < 3; i++){
-        for(j = 0; j < 3; j++){
-            z.re = r3_inner_product(B1[j], B2[i]);
-            z.im = 0;
-
-            B2_eps[i] = c_sum(B2_eps[i], c_inner_product(B1_eps[j], z));
-        }
-    }
-
-    z.re = 0;
-    z.im = 1;
-
-    eps[0] = c_mod(c_sum(B2_eps[0], B2_eps[2])) / sqrt(2);
-    eps[1] = c_mod(B2_eps[1]);
-    eps[2] = c_mod(c_product(z, c_diff(B2_eps[0], B2_eps[2]))) / sqrt(2);
-
-    return eps;
-}
-*/
-
-// Get coordinates of a polarization vector on the basis with pi transition parallel to the magnetic field B
-/*
-float *update_polarization_vector_v1(beam_t beam, float *B){
+// Convert the components (module) of a polarization vector on the basis C to a basis D
+double *update_polarization_vector(double *eps, double **r3_C, double **r3_D){
     //
     // Variables
     //
 
     int i, j;
-    static float *eps;                  // Desired polarization vector  
-    float **r3_C, **r3_D;               // R3 Bases
-    complex_t **c3_A, **c3_C, **c3_D;   // C3 Bases
-    complex_t *C_eps, *A_eps, *D_eps;   // Complex polarization vector
-
-    //
-    // Define basis 
-    //
-
-    // Real orthonormal bases
-    r3_C = orthonormal_basis(beam.k_dic);
-    r3_D = orthonormal_basis(B);
-
-    // Polarization basis of the magnetic field frame
-    c3_A = (complex_t **) malloc(3 * sizeof(complex_t *));
-    c3_C = (complex_t **) malloc(3 * sizeof(complex_t *));
-    c3_D = (complex_t **) malloc(3 * sizeof(complex_t *));
-
-    // Allocate memory
-    for(i = 0; i < 3; i++){
-        c3_A[i] = (complex_t *) calloc(3, sizeof(complex_t));
-        c3_C[i] = (complex_t *) calloc(3, sizeof(complex_t));
-        c3_D[i] = (complex_t *) calloc(3, sizeof(complex_t));
-    }
-
-    // Components on the lab frame
-    for(i = 0; i < 3; i++){
-        // sigma+
-        c3_D[0][i].re = r3_D[0][i] / sqrt(2);
-        c3_D[0][i].im = r3_D[1][i] / sqrt(2);
-
-        c3_C[0][i].re = r3_C[0][i] / sqrt(2);
-        c3_C[0][i].im = r3_C[1][i] / sqrt(2);
-
-        c3_A[0][i].re = 0;
-        c3_A[0][i].im = 0;
-
-        // sigma-
-        c3_D[1][i].re = r3_D[0][i] / sqrt(2);
-        c3_D[1][i].im = -r3_D[1][i] / sqrt(2);
-
-        c3_C[1][i].re = r3_C[0][i] / sqrt(2);
-        c3_C[1][i].im = -r3_C[1][i] / sqrt(2);
-
-        c3_A[1][i].re = 0;
-        c3_A[1][i].im = 0;
-
-        // pi
-        c3_D[2][i].re = r3_D[2][i];
-        c3_D[2][i].im = 0;
-
-        c3_C[2][i].re = r3_C[2][i];
-        c3_C[2][i].im = 0;
-
-        c3_A[2][i].re = 0;
-        c3_A[2][i].im = 0;
-    }
-
-    // Lab frame
-    c3_A[0][0].re = 1;
-    c3_A[1][1].re = 1;
-    c3_A[2][2].re = 1;
-
-    //
-    // Compute polarization on different bases
-    //
-
-    C_eps = (complex_t *) calloc(3, sizeof(complex_t));
-    for(i = 0; i < 3; i++){
-        C_eps[i].re = beam.eps[i];
-        C_eps[i].im = 0;
-    }
-
-    c3_view(C_eps, "C_eps");
-
-    D_eps = (complex_t *) calloc(3, sizeof(complex_t));
-    for(i = 0; i < 3; i++) {
-        D_eps[i].re = 0;
-        D_eps[i].im = 0;
-
-        for(j = 0; j < 3; j++){
-            D_eps[i] = c_sum(D_eps[i], c_product(C_eps[j], c3_inner_product(c3_D[i], c3_C[j])));
-        }
-    }
-
-    c3_view(D_eps, "D_eps");
-
-    eps = (float*) calloc(3, sizeof(float));
-    for(i = 0; i < 3; i++) eps[i] = c_mod(D_eps[i]); 
-    eps = r3_normalize(eps);
-
-    // Return
-    return eps;
-}
-*/
-
-// Get a R3 vector whose components are the module of the polarization vector components on the B frame
-float *update_polarization_vector(beam_t beam, float *B){
-    //
-    // Variables
-    //
-
-    int i, j;
-    float *eps;                         // Desired vector
+    double *new_eps;                    
     complex_t *C_eps, *D_eps;           // Polarization vector on different Cartesian bases    
     complex_t *Dp_eps, *Cp_eps, *aux;   // Polarization vector on different polarization bases
     complex_t **A1, **A1_i, **A2;       // Change-of-basis matrices
-    float **r3_C, **r3_D;               // Real Bases
     complex_t **c3_C, **c3_D;           // Complex Bases
-    complex_t im_p;
-
-    // Imaginary particle
-    im_p.re = 0;
-    im_p.im = 1;
 
     //
     // Change-of-basis matrix from the polarization basis to the Cartesian basis
@@ -846,10 +591,11 @@ float *update_polarization_vector(beam_t beam, float *B){
 
     A1[0][0].re = 1 / sqrt(2);
     A1[0][1].re = 1 / sqrt(2);
+
     A1[1][0].im = 1 / sqrt(2);
     A1[1][1].im = - 1 / sqrt(2);
+
     A1[2][2].re = 1;
-    
     
     //
     // Change-of-basis matrix from the Cartesian basis to the polarization basis
@@ -869,10 +615,7 @@ float *update_polarization_vector(beam_t beam, float *B){
     // Change-of-basis matrix from the Cartesian beam frame to the Cartesian B frame
     //
 
-    // Real orthonormal bases
-    r3_C = orthonormal_basis(beam.k_dic);
-    r3_D = orthonormal_basis(B);
-
+    // Complex orthonormal bases
     c3_C = (complex_t**) calloc(3, sizeof(complex_t *));
     c3_D = (complex_t**) calloc(3, sizeof(complex_t *));
     
@@ -886,7 +629,7 @@ float *update_polarization_vector(beam_t beam, float *B){
         A2[i] = (complex_t *) calloc(3, sizeof(complex_t)); 
 
         for(j = 0; j < 3; j++){
-            A2[i][j] = c3_inner_product(c3_D[i], c3_C[j]);
+            A2[i][j] = c3_inner_product(c3_C[i], c3_D[j]);
         }
     }
 
@@ -894,7 +637,7 @@ float *update_polarization_vector(beam_t beam, float *B){
     // Polarization vector on the polarization beam frame
     //
 
-    Cp_eps = r3_to_c3(beam.eps);
+    Cp_eps = r3_to_c3(eps);
     C_eps = c3_apply_operator(A1, Cp_eps);
 
     // Polarization vector on the Cartesian B frame
@@ -904,10 +647,46 @@ float *update_polarization_vector(beam_t beam, float *B){
     Dp_eps = c3_apply_operator(A1_i, D_eps);
 
     // Compute desired vector
-    eps = (float*) calloc(3, sizeof(float));
-    for(i = 0; i < 3; i++) eps[i] = c_mod(Dp_eps[i]);
+    new_eps = (double*) calloc(3, sizeof(double));
+    for(i = 0; i < 3; i++) new_eps[i] = c_mod(Dp_eps[i]);
 
-    return eps;
+    return new_eps;
+}
+
+// Get scattering rate of a given transition
+double get_scattering_rate(atom_t atom, beam_t beam, double *B, double transition, double **C, double **D){
+    //
+    // Variables
+    //
+
+    double r_square, s, R, delta, nu;
+
+    //
+    // Saturation parameter
+    //
+
+    r_square = pow(r3_inner_product(C[0], atom.pos), 2);
+    r_square += pow(r3_inner_product(C[1], atom.pos), 2);
+
+    s = beam.s_0;
+    s *= exp(-2 * r_square / pow(beam.w, 2));
+    s = s * transition;
+
+    //
+    // Detuning (delta / gamma)
+    //
+
+    delta = 0;
+
+    // Laser detuning in
+    delta += beam.delta;
+
+    // Doppler shift
+    delta += 1e4 * r3_inner_product(atom.vel, C[2]) / (atom.transition.lambda * atom.transition.gamma);
+
+    // Zeeman shift
+
+    return R;
 }
 
 //
@@ -949,15 +728,15 @@ int *get_int_array(char *str, int *size){
     return arr;
 }
 
-// Get float array from string in the format [f1 f2 ... fn]
-float *get_float_array(char *str, int *size){
+// Get double array from string in the format [f1 f2 ... fn]
+double *get_double_array(char *str, int *size){
     //
     // Variables
     //
     int i, j, max_size = 124;
     char *token;
-    float aux_arr[max_size];
-    static float *arr;
+    double aux_arr[max_size];
+    static double *arr;
 
     str = str + 1;
     str[strlen(str)-1] = '\0';
@@ -976,7 +755,7 @@ float *get_float_array(char *str, int *size){
         i++;
     }
 
-    arr = (float *) malloc(i * sizeof(float));
+    arr = (double *) malloc(i * sizeof(double));
     for(j = 0; j < i; j++) arr[j] = aux_arr[j];
 
     return arr;
@@ -1047,30 +826,30 @@ int show_all_parameters(atom_t atom, conditions_t conditions, beams_setup_t beam
     }
 }
 
-// Generate a float random number following a Gaussian distribution given a mean and a standard deviation
-float norm(float mean, float std_dev){
+// Generate a double random number following a Gaussian distribution given a mean and a standard deviation
+double norm(double mean, double std_dev){
     //
     // Variables
     //
 
     int i;
-    float u[2], r, theta;   // Variables for Box-Muller method
-    float std_norm;         // Normal(0, 1)
-    float norm;             // Adjusted normal
+    double v[2], r, theta;   // Variables for Box-Muller method
+    double std_norm;         // Normal(0, 1)
+    double norm;             // Adjusted normal
 
     //
     // Box-Muller transform
     //
 
     // Generate uniform random numbers
-    for(i = 0; i < 2; i++) u[i] = ((float) rand()) / ((float) RAND_MAX);
+    for(i = 0; i < 2; i++) v[i] = ((double) rand()) / ((double) RAND_MAX);
 
     // Compute r
-    r = sqrt(-2 * log(u[0]));
+    r = sqrt(-2 * log(v[0]));
 
     // Generate theta
     theta = 0.0;
-    while(theta == 0.0) theta = 2.0 * PI * u[1];
+    while(theta == 0.0) theta = 2.0 * PI * v[1];
 
     // Generate std_norm value
     std_norm = r * cos(theta);
@@ -1082,13 +861,13 @@ float norm(float mean, float std_dev){
 }
 
 // Update histogram
-int update_hist(histogram_t *hist, float val){
+int update_hist(histogram_t *hist, double val){
     //
     // Variables
     //
 
     int bin;
-    float lower_lim, upper_lim;
+    double lower_lim, upper_lim;
 
     // Add frequency
     for(bin = 0; bin < (*hist).num_bins; bin++){
@@ -1105,21 +884,21 @@ int update_hist(histogram_t *hist, float val){
 }
 
 // Generate a orthonormal basis given a vector
-float **orthonormal_basis(float *v3){
+double **orthonormal_basis(double *v){
     //
     // Variables
     //
 
     int i;
-    static float **B;   // Desired basis
-    float *v1, *v2;     // Auxiliary vectors
+    double **B;       // Desired basis
+    double *v1, *v2, *v3;    // Auxiliary vectors
 
     // Normalize vector v
-    v3 = r3_normalize(v3);
+    v3 = r3_normalize(v);
 
     // Generate a random vector  
-    v1 = (float*) calloc(3, sizeof(float));
-    for(i = 0; i < 3; i++) v1[i] = ((float) rand()) / ((float) RAND_MAX);
+    v1 = (double*) calloc(3, sizeof(double));
+    for(i = 0; i < 3; i++) v1[i] = ((double) rand()) / ((double) RAND_MAX);
 
     // Define a orthonormal vector
     v2 = r3_scalar_product(r3_inner_product(v1, v3), v3);
@@ -1129,7 +908,7 @@ float **orthonormal_basis(float *v3){
     v2 = r3_cross_product(v3, v1);
 
     // Define basis
-    B = (float **) malloc(3 * sizeof(float *));
+    B = (double **) malloc(3 * sizeof(double *));
     
     B[0] = v1;
     B[1] = v2;

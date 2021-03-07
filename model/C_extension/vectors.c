@@ -50,7 +50,7 @@ complex_t c_inner_product(complex_t z1, complex_t z2){
 }
 
 // Module
-float c_mod(complex_t z){
+double c_mod(complex_t z){
     return sqrt(c_inner_product(z, z).re);
 }
 
@@ -114,12 +114,12 @@ complex_t c3_inner_product(complex_t *z1, complex_t *z2){
 }
 
 // Module
-float c3_mod(complex_t *z){
+double c3_mod(complex_t *z){
     return sqrt(c3_inner_product(z, z).re);
 }
 
-// View complex vector
-int c3_view(complex_t *z, char *name){
+// Print complex vector
+int c3_print(complex_t *z, char *name){
     int i;
 
     printf("%s = [", name);
@@ -130,11 +130,14 @@ int c3_view(complex_t *z, char *name){
 // Apply complex operator
 complex_t *c3_apply_operator(complex_t **A, complex_t *v){
     int i,  j;
-    static complex_t *a;
+    complex_t *a;
 
     a = (complex_t*) calloc(3, sizeof(complex_t));
 
     for(i = 0; i < 3; i++){
+        a[i].re = 0;
+        a[i].im = 0;
+
         for(j = 0; j < 3; j++){
             a[i] = c_sum(a[i], c_product(A[i][j], v[j]));
         }
@@ -143,8 +146,21 @@ complex_t *c3_apply_operator(complex_t **A, complex_t *v){
     return a;
 }
 
+// Print C3 operator
+int c3_operator_print(complex_t **A, char *name){
+    int i, j;
+
+    printf("%s = [\n", name);
+    for(i = 0; i < 3; i++) {
+        printf("\t(%f, %f) ", A[i][0].re, A[i][0].im);
+        printf("(%f, %f) ", A[i][1].re, A[i][1].im);
+        printf("(%f, %f)\n", A[i][2].re, A[i][2].im);
+    }
+    printf("]\n");
+}
+
 // Convert a R3 vector to a C3 vector
-complex_t *r3_to_c3(float *v){
+complex_t *r3_to_c3(double *v){
     int i;
     static complex_t *res;
 
@@ -163,18 +179,18 @@ complex_t *r3_to_c3(float *v){
 //
 
 // Module
-float r3_mod(float *z){
+double r3_mod(double *z){
     return sqrt(r3_inner_product(z, z));
 }
 
 // Inner product between R3 vectors
-float r3_inner_product(float *r1, float *r2){
+double r3_inner_product(double *r1, double *r2){
     //
     // Variables
     //
 
     int i;
-    float res = 0;
+    double res = 0;
 
     // Compute dot product
     for(i = 0; i < 3; i++) res += r1[i] * r2[i];
@@ -183,15 +199,15 @@ float r3_inner_product(float *r1, float *r2){
 }
 
 // Cross product between R3 vectors
-float *r3_cross_product(float *r1, float *r2){
+double *r3_cross_product(double *r1, double *r2){
     //
     // Variables
     //
 
     int i;
-    static float *res;
+    static double *res;
 
-    res = (float*) calloc(3, sizeof(float));
+    res = (double*) calloc(3, sizeof(double));
 
     // Compute dot product
     res[0] = r1[1]*r2[2] - r1[2]*r2[1];
@@ -202,10 +218,10 @@ float *r3_cross_product(float *r1, float *r2){
 }
 
 // Product between a real number and a real vector
-float *r3_scalar_product(float a, float *v){
+double *r3_scalar_product(double a, double *v){
     // Variables
     int i;
-    static float w[3];
+    static double w[3];
 
     for(i = 0; i < 3; i++)
         w[i] = a * v[i];
@@ -214,13 +230,13 @@ float *r3_scalar_product(float a, float *v){
 }
 
 // Sum between R3 vectors
-float *r3_sum(float *r1, float *r2){
+double *r3_sum(double *r1, double *r2){
     //
     // Variables
     //
 
     int i;
-    static float res[3];
+    static double res[3];
 
     // Compute dot product
     for(i = 0; i < 3; i++) res[i] = r1[i] + r2[i];
@@ -229,13 +245,13 @@ float *r3_sum(float *r1, float *r2){
 }
 
 // Subtraction between R3 vectors
-float *r3_diff(float *r1, float *r2){
+double *r3_diff(double *r1, double *r2){
     //
     // Variables
     //
 
     int i;
-    static float res[3];
+    static double res[3];
 
     // Compute dot product
     for(i = 0; i < 3; i++) res[i] = r1[i] - r2[i];
@@ -244,16 +260,16 @@ float *r3_diff(float *r1, float *r2){
 }
 
 // Normalize a R3 vector
-float *r3_normalize(float *r){
+double *r3_normalize(double *r){
     //
     // Variables
     //
 
-    static float *new_r;
-    float mod_r;
+    static double *new_r;
+    double mod_r;
     int i;
 
-    new_r = (float*) calloc(3, sizeof(float));
+    new_r = (double*) calloc(3, sizeof(double));
 
     //
     // Normalization
@@ -270,11 +286,11 @@ float *r3_normalize(float *r){
 }
 
 // Apply real operator
-float *r3_apply_operator(float **A, float *v){
+double *r3_apply_operator(double **A, double *v){
     int i,  j;
-    static float *a;
+    static double *a;
 
-    a = (float*) calloc(3, sizeof(float));
+    a = (double*) calloc(3, sizeof(double));
 
     for(i = 0; i < 3; i++){
         for(j = 0; j < 3; j++){
@@ -285,12 +301,23 @@ float *r3_apply_operator(float **A, float *v){
     return a;
 }
 
-
-// View real vector
-int r3_view(float *z, char *name){
+// Print R3 vector
+int r3_print(double *z, char *name){
     int i;
 
     printf("%s = [", name);
     for(i = 0; i < 2; i++) printf("%f, ", z[i]);
     printf("%f]\n", z[i]);
+}
+
+// Print R3 operator
+int r3_operator_print(double **A, char *name){
+    int i, j;
+
+    printf("%s \n--\n", name);
+    for(i = 0; i < 3; i++) {
+        for(j = 0; j < 2; j++) printf("%f ", A[i][j]);
+        printf("%f\n", A[i][2]);
+    }
+    printf("\n");
 }
