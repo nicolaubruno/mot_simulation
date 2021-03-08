@@ -8,7 +8,6 @@
 // Complex space
 //
 
-// Sum
 complex_t c_sum(complex_t z1, complex_t z2){
     complex_t z;
 
@@ -18,7 +17,6 @@ complex_t c_sum(complex_t z1, complex_t z2){
     return z;
 }
 
-// Difference
 complex_t c_diff(complex_t z1, complex_t z2){
     complex_t z;
 
@@ -28,7 +26,6 @@ complex_t c_diff(complex_t z1, complex_t z2){
     return c_sum(z1, z);
 }
 
-// Product
 complex_t c_product(complex_t z1, complex_t z2){
     complex_t z;
 
@@ -38,23 +35,23 @@ complex_t c_product(complex_t z1, complex_t z2){
     return z; 
 }
 
-// Conjugate
 complex_t c_conj(complex_t z){
     z.im = -z.im;
     return z;
 }
 
-// Inner product
 complex_t c_inner_product(complex_t z1, complex_t z2){
     return c_product(z1, c_conj(z2));
 }
 
-// Module
 double c_mod(complex_t z){
     return sqrt(c_inner_product(z, z).re);
 }
 
-// Sum between C3 vectors
+//
+// C3 space
+//
+
 complex_t *c3_sum(complex_t *z1, complex_t *z2){
     //
     // Variables
@@ -71,7 +68,6 @@ complex_t *c3_sum(complex_t *z1, complex_t *z2){
     return res;
 }
 
-// Difference between C3 vectors
 complex_t *c3_diff(complex_t *z1, complex_t *z2){
     //
     // Variables
@@ -88,7 +84,6 @@ complex_t *c3_diff(complex_t *z1, complex_t *z2){
     return res;
 }
 
-// Product between a complex number and a real vector
 complex_t *c3_scalar_product(complex_t a, complex_t *v){
     // Variables
     int i;
@@ -102,7 +97,6 @@ complex_t *c3_scalar_product(complex_t a, complex_t *v){
     return w;
 }
 
-// Inner product between C3 vectors
 complex_t c3_inner_product(complex_t *z1, complex_t *z2){
     int i;
     complex_t z;
@@ -117,12 +111,10 @@ complex_t c3_inner_product(complex_t *z1, complex_t *z2){
     return z;
 }
 
-// Module
 double c3_mod(complex_t *z){
     return sqrt(c3_inner_product(z, z).re);
 }
 
-// Print complex vector
 int c3_print(complex_t *z, char *name){
     int i;
 
@@ -133,7 +125,6 @@ int c3_print(complex_t *z, char *name){
     return 1;
 }
 
-// Apply complex operator
 complex_t *c3_apply_operator(complex_t **A, complex_t *v){
     int i,  j;
     complex_t *a;
@@ -152,7 +143,6 @@ complex_t *c3_apply_operator(complex_t **A, complex_t *v){
     return a;
 }
 
-// Print C3 operator
 int c3_operator_print(complex_t **A, char *name){
     int i;
 
@@ -167,7 +157,6 @@ int c3_operator_print(complex_t **A, char *name){
     return 1;
 }
 
-// Convert a R3 vector to a C3 vector
 complex_t *r3_to_c3(double *v){
     int i;
     complex_t *res;
@@ -183,15 +172,13 @@ complex_t *r3_to_c3(double *v){
 }
 
 //
-// Real space
+// R3 space
 //
 
-// Module
 double r3_mod(double *z){
     return sqrt(r3_inner_product(z, z));
 }
 
-// Inner product between R3 vectors
 double r3_inner_product(double *r1, double *r2){
     //
     // Variables
@@ -206,7 +193,6 @@ double r3_inner_product(double *r1, double *r2){
     return res;
 }
 
-// Cross product between R3 vectors
 double *r3_cross_product(double *r1, double *r2){
     //
     // Variables
@@ -224,7 +210,6 @@ double *r3_cross_product(double *r1, double *r2){
     return res;
 }
 
-// Product between a real number and a real vector
 double *r3_scalar_product(double a, double *v){
     // Variables
     int i;
@@ -238,7 +223,6 @@ double *r3_scalar_product(double a, double *v){
     return w;
 }
 
-// Sum between R3 vectors
 double *r3_sum(double *r1, double *r2){
     //
     // Variables
@@ -255,7 +239,6 @@ double *r3_sum(double *r1, double *r2){
     return res;
 }
 
-// Subtraction between R3 vectors
 double *r3_diff(double *r1, double *r2){
     //
     // Variables
@@ -272,7 +255,6 @@ double *r3_diff(double *r1, double *r2){
     return res;
 }
 
-// Normalize a R3 vector
 double *r3_normalize(double *r){
     //
     // Variables
@@ -298,7 +280,6 @@ double *r3_normalize(double *r){
     return new_r;
 }
 
-// Apply real operator
 double *r3_apply_operator(double **A, double *v){
     int i,  j;
     double *a;
@@ -314,7 +295,6 @@ double *r3_apply_operator(double **A, double *v){
     return a;
 }
 
-// Print R3 vector
 int r3_print(double *z, char *name){
     int i;
 
@@ -325,7 +305,6 @@ int r3_print(double *z, char *name){
     return 1;
 }
 
-// Print R3 operator
 int r3_operator_print(double **A, char *name){
     int i, j;
 

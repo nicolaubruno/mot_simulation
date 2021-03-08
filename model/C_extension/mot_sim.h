@@ -90,6 +90,7 @@ typedef struct {
 typedef struct {
     double *vel;    /* Velocity gain */
     double R;       /* Scattering rate */
+    double dt;      /* Process time */
 } scattering_t;
 
 // Results

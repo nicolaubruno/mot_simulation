@@ -1,3 +1,8 @@
+/**
+ * Monte Carlos simulation of a single atom in a Magneto-Optical Trap (MOT)
+ * Bruno N. Santos <nicolau.bruno@gmail.com>
+ * Version 2.0
+ */
 
 //  Header
 
@@ -5,7 +10,6 @@
 
 // --
 
-// Execute simulation for a single atom
 int simulate_atom(char *dir_code){
     // Seed used by the rand() function
     srand(time(NULL));
@@ -14,8 +18,9 @@ int simulate_atom(char *dir_code){
     // Variables
     //
 
-    int i;                                  // Iterations
-    double r, v, dt, rd_dt, lifetime;       // Dynamics
+    int i;                  // Iterations
+    double r, dt;           // Dynamics
+    results_t res;          // Results
 
     // Parameters of the simulation
     conditions_t conds = get_conditions();
@@ -26,27 +31,21 @@ int simulate_atom(char *dir_code){
     scattering_t scatt;
 
     // Position histogram
-    histogram_t pos_hist[3];
+    res.pos_hist = (histogram_t*) calloc(3, sizeof(histogram_t));
+
     for(i = 0; i < 3; i++){
         // Histogram
-        pos_hist[i].num_bins = conds.num_bins;
-        pos_hist[i].bin_size = 2 * conds.r_max / pos_hist[i].num_bins;
-        pos_hist[i].coord0 = - conds.r_max;
-        pos_hist[i].freqs = (int *) calloc(pos_hist[i].num_bins, sizeof(int));
+        res.pos_hist[i].num_bins = conds.num_bins;
+        res.pos_hist[i].bin_size = 2 * conds.r_max / res.pos_hist[i].num_bins;
+        res.pos_hist[i].coord0 = - conds.r_max;
+        res.pos_hist[i].freqs = (int *) calloc(res.pos_hist[i].num_bins, sizeof(int));
 
         // Insert initial position
-        update_hist(&pos_hist[i], atom.pos[i]);
+        update_hist(&res.pos_hist[i], atom.pos[i]);
     }
-
-    // Results
-    results_t res;
-    res.pos_hist = pos_hist;
-    res.num_iters = 0;
-
 
     // Compute distance and speed of the atom
     r = sqrt(r3_inner_product(atom.pos, atom.pos)); // Distance from centre
-    v = sqrt(r3_inner_product(atom.vel, atom.vel)); // Total speed
 
     //
     //  Iterations
@@ -56,8 +55,6 @@ int simulate_atom(char *dir_code){
     dt = 0;
     res.time = 0;
 
-    //atom.pos[2] = 1;
-    //conds.i_max = 2;
     while((res.num_iters < conds.i_max) && (r < conds.r_max)){
         // Compute the photonic recoil
         scatt = photonic_recoil(atom, beams_setup, conds);
@@ -69,13 +66,8 @@ int simulate_atom(char *dir_code){
         compute_magnetic_force(atom, conds.B_0);
 
         // Update time
-        dt = 1 / atom.transition.gamma;
-        if(scatt.R > 0){
-            lifetime = 1 / scatt.R;
-            rd_dt = random_exp(lifetime);
-            if(rd_dt < MAX_dt) dt = rd_dt;
-        }
-
+        if(scatt.dt > 0 && scatt.dt < MAX_dt) dt = scatt.dt;
+        else dt = 1 / atom.transition.gamma;
         res.time += dt;
 
         // Update position
@@ -83,22 +75,26 @@ int simulate_atom(char *dir_code){
 
         // Update velocity
         for(i = 0; i < 3; i++){
-            //if(rd_dt < MAX_dt) atom.vel[i] += scatt.vel[i];
+            if(scatt.dt > 0 && scatt.dt < MAX_dt) atom.vel[i] += scatt.vel[i];
         }
 
         // Update results
-        update_hist(&res.pos_hist[i], atom.pos[i]);
+        for(i = 0; i < 3; i++) update_hist(&res.pos_hist[i], atom.pos[i]);
 
         r = r3_mod(atom.pos);
-        v = r3_mod(atom.vel);
         res.num_iters++;
 
         // Print status
         //if(res.num_iters % 1000 == 0) print_status(atom, res);
+
+        //r3_print(atom.pos, "pos (cm)");
+        //r3_print(atom.vel, "vel (cm/s)");
+        //r3_print(scatt.vel, "gain_vel (cm/s)");
+        //printf("\n");
     }
 
     // Print status
-    print_status(atom, res);
+    //print_status(atom, res);
 
     // Write result in a CSV file
     write_results(dir_code, res);
@@ -106,7 +102,6 @@ int simulate_atom(char *dir_code){
     return 0;
 }
 
-// Get atom
 atom_t get_atom(conditions_t conds){
     //
     // Variables
@@ -199,7 +194,6 @@ atom_t get_atom(conditions_t conds){
     return atom;
 }
 
-// Get transition
 transition_t get_transition(){
     //
     // Variables
@@ -310,7 +304,6 @@ transition_t get_transition(){
     return transition;
 }
 
-// Get conditions
 conditions_t get_conditions(){
     //
     // Variables
@@ -421,7 +414,6 @@ conditions_t get_conditions(){
     return conditions;
 }
 
-// Get beams setup
 beams_setup_t get_beams(){
     //
     // Variables
@@ -519,7 +511,6 @@ beams_setup_t get_beams(){
     return beams_setup;
 }
 
-// Compute scattering variables (scattering_t) in a photon-atom scattering eventt
 scattering_t photonic_recoil(atom_t atom, beams_setup_t beams_setup, conditions_t conds){
     //
     // Variables
@@ -528,8 +519,8 @@ scattering_t photonic_recoil(atom_t atom, beams_setup_t beams_setup, conditions_
     int i, j;                                   // Iterations variables
     double *B, *eps_probs, *eB, *eK, lambda;    // Electromagnetic fields
     scattering_t *scatt_opt;                    // Scattering options
-    double vel_mod, *rd_v, *probs;              // Auxiliary variables
-    int *pol_opt, pol, *indexes;                // Polarization
+    double vel_mod, *rd_v;                      // Auxiliary variables
+    int *pol_opt, pol;                          // Polarization
 
     // Get Magnetic field
     B = get_magnetic_field(conds.B_0, atom.pos);
@@ -539,8 +530,6 @@ scattering_t photonic_recoil(atom_t atom, beams_setup_t beams_setup, conditions_
     //
 
     scatt_opt = (scattering_t*) calloc(beams_setup.num, sizeof(scattering_t));
-    probs = (double*) calloc(beams_setup.num, sizeof(double)); // Probability of choosing a transition
-    indexes = (int*) calloc(beams_setup.num, sizeof(int));
 
     // Loop each beam
     for(i = 0; i < beams_setup.num; i++){
@@ -570,8 +559,8 @@ scattering_t photonic_recoil(atom_t atom, beams_setup_t beams_setup, conditions_
 
         // Compute scattering
         scatt_opt[i].R = scattering_rate(atom, beams_setup.beams[i], B, pol); // Hz
-        probs[i] = scatt_opt[i].R;
-        indexes[i] = i;
+        if(scatt_opt[i].R > 0) scatt_opt[i].dt = (1 / scatt_opt[i].R); // s
+        else scatt_opt[i].dt = 0;
 
         // Absorption event
         vel_mod = 1e4 * h / (lambda * atom.mass * u); // cm / s
@@ -579,10 +568,13 @@ scattering_t photonic_recoil(atom_t atom, beams_setup_t beams_setup, conditions_
 
         // Emission event
         rd_v = (double*) calloc(3, sizeof(double));  // Random vector
-        for(j = 0; j < 3; j++) rd_v[j] = ((double) rand()) / ((double) RAND_MAX);
+        for(j = 0; j < 3; j++) {
+            rd_v[j] = ((double) rand()) / ((double) RAND_MAX);
+            if((((double) rand()) / ((double) RAND_MAX)) < 0.5) rd_v[j] = -rd_v[j];
+        }
         rd_v = r3_normalize(rd_v); // Normalization
         rd_v = r3_scalar_product(vel_mod, rd_v); // cm / s
-        scatt_opt[i].vel = r3_diff(scatt_opt[i].vel, rd_v); // cm / s
+        scatt_opt[i].vel = r3_sum(scatt_opt[i].vel, rd_v); // cm / s
 
         //r3_print(eK, "k");
         //r3_print(eps_probs, "probs");
@@ -592,21 +584,28 @@ scattering_t photonic_recoil(atom_t atom, beams_setup_t beams_setup, conditions_
         //printf("\n");
     }
 
+    //
     // Pick scattering option
-    return scatt_opt[random_pick(indexes, probs, beams_setup.num)];
+    //
+
+    j = 0; 
+
+    for(i = 0; i < beams_setup.num; i++){
+        if(scatt_opt[i].dt > 0 && scatt_opt[i].dt < scatt_opt[j].dt)
+            j = i; 
+    }
+
+    return scatt_opt[j];
 }
 
-// Compute the momentum due to the gravitational force
 int compute_gravitational_force(atom_t atom){
     return 1;
 }
 
-// Compute the momentum due the magnetic force
 int compute_magnetic_force(atom_t atom, double B_0){
     return 1;
 }
 
-// Get magnetic field vector on the lab frame in the position r = (x, y, z)
 double *get_magnetic_field(double B_0, double *r){
     //
     // Variables
@@ -622,7 +621,6 @@ double *get_magnetic_field(double B_0, double *r){
     return B;
 }
 
-// Get polarization probabilities given the magnetic field direction
 double *polarization_probs(beam_t beam, double *eB){
     //
     // Variables
@@ -723,7 +721,6 @@ double *polarization_probs(beam_t beam, double *eB){
     return eps_probs;
 }
 
-// Get scattering rate
 double scattering_rate(atom_t atom, beam_t beam, double *B, int pol){
     //
     // Variables
@@ -790,7 +787,6 @@ double scattering_rate(atom_t atom, beam_t beam, double *B, int pol){
     return R;
 }
 
-// Print simulation status
 int print_status(atom_t atom, results_t res){
     printf("Simulation status\n--\n");
     printf("number of iterations = %d\n", res.num_iters);
@@ -804,13 +800,23 @@ int print_status(atom_t atom, results_t res){
     return 1;
 }
 
-// Write results in a CSV file
 int write_results(char *dir_code, results_t res){
     //
-    //
+    // Variables
     //
 
-    
+    int i;
+    double x_min, x_max;
+
+    printf("Histogram (x, y ,z)\n -- \n");
+
+    for(i = 0; i < res.pos_hist[0].num_bins; i++){
+        x_min = res.pos_hist[0].coord0 + (i*res.pos_hist[0].bin_size);
+        x_max = x_min + res.pos_hist[0].bin_size;
+        printf("[%f, %f] ", x_min, x_max);
+        printf("%d %d %d\n", res.pos_hist[0].freqs[i], res.pos_hist[1].freqs[i], res.pos_hist[2].freqs[i]);
+    }
+
 
     return 1;
 }
@@ -819,7 +825,6 @@ int write_results(char *dir_code, results_t res){
 // Utility functions
 //
 
-// Get int array (max 124 numbers) from string in the format [i1 i2 ... in]
 int *get_int_array(char *str, int *size){
     //
     // Variables
@@ -854,7 +859,6 @@ int *get_int_array(char *str, int *size){
     return arr;
 }
 
-// Get double array from string in the format [f1 f2 ... fn]
 double *get_double_array(char *str, int *size){
     //
     // Variables
@@ -887,7 +891,6 @@ double *get_double_array(char *str, int *size){
     return arr;
 }
 
-// Concatenate ROOT_PATH to a filename
 char *concatenate_ROOT_PATH(char *filename){
     int i;
     char aux_path[124];
@@ -907,7 +910,6 @@ char *concatenate_ROOT_PATH(char *filename){
     return path;
 }
 
-// Generate a double random number following a Gaussian distribution given a mean and a standard deviation
 double random_norm(double mean, double std_dev){
     //
     // Variables
@@ -941,12 +943,10 @@ double random_norm(double mean, double std_dev){
     return norm;
 }
 
-// Generate a double random number following a Exponential distribution given a mean
 double random_exp(double mean){
     return - mean * log(1 - ((double) rand()) / ((double) RAND_MAX));
 }
 
-// Update histogram
 int update_hist(histogram_t *hist, double val){
     //
     // Variables
@@ -960,8 +960,8 @@ int update_hist(histogram_t *hist, double val){
         lower_lim = (*hist).coord0 + bin * (*hist).bin_size;
         upper_lim = lower_lim + (*hist).bin_size;
 
-        if((val >= lower_lim) && (val <= upper_lim)){
-            (*hist).freqs[bin]++;
+        if((val >= lower_lim) && (val < upper_lim)){
+            (*hist).freqs[bin] += 1;
             break;
         }
     }
@@ -969,7 +969,6 @@ int update_hist(histogram_t *hist, double val){
     return 1;
 }
 
-// Generate a orthonormal basis given a vector
 double **orthonormal_basis(double *v){
     //
     // Variables
@@ -1003,7 +1002,6 @@ double **orthonormal_basis(double *v){
     return B;
 }
 
-// Pick randomly a element of an integer array given an array of probabilities
 int random_pick(int *arr, double *probs, int size){
     //
     // Variables
