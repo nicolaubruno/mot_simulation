@@ -105,7 +105,7 @@ class Model:
         self.conditions.to_csv(parameters_dir + 'conditions.csv')
         self.constants.to_csv(parameters_dir + 'constants.csv')
 
-        C_ext.simulate_atom()
+        C_ext.simulate_atom(code)
 
     #
     # Utility methods

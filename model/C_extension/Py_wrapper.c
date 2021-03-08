@@ -11,12 +11,20 @@
 
 // Read simulation for a single atom
 static PyObject* C_simulate_atom(PyObject *self, PyObject *args){
-    return Py_BuildValue("i", simulate_atom());
+    //
+    // Variables
+    //
+    char *dir_code;
+
+    // Parse arguments
+    if(!PyArg_ParseTuple(args, "s", &dir_code)) return NULL;
+
+    return Py_BuildValue("i", simulate_atom(dir_code));
 }
 
 // List methods
 static PyMethodDef mot_sim_methods[] = {
-    {"simulate_atom", C_simulate_atom, METH_NOARGS, "Read the parameters from CSV files and generate the results"},
+    {"simulate_atom", C_simulate_atom, METH_VARARGS, "Read the parameters from CSV files and generate the results"},
     {NULL, NULL, 0, NULL}
 };
 

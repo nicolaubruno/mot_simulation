@@ -6,7 +6,7 @@
 // --
 
 // Execute simulation for a single atom
-int simulate_atom(){
+int simulate_atom(char *dir_code){
     // Seed used by the rand() function
     srand(time(NULL));
 
@@ -14,16 +14,16 @@ int simulate_atom(){
     // Variables
     //
 
-    int i;              // Iterations
-    double r, v, dt;     // Dynamics
+    int i;                                  // Iterations
+    double r, v, dt, rd_dt, lifetime;       // Dynamics
 
     // Parameters of the simulation
     conditions_t conds = get_conditions();
     beams_setup_t beams_setup = get_beams();
     atom_t atom = get_atom(conds);
 
-    // Show all parameters
-    //show_all_parameters(atom, conds, beams_setup);
+    // Scattering process
+    scattering_t scatt;
 
     // Position histogram
     histogram_t pos_hist[3];
@@ -42,17 +42,25 @@ int simulate_atom(){
     results_t res;
     res.pos_hist = pos_hist;
     res.num_iters = 0;
-    res.flag = 2;
+
 
     // Compute distance and speed of the atom
     r = sqrt(r3_inner_product(atom.pos, atom.pos)); // Distance from centre
     v = sqrt(r3_inner_product(atom.vel, atom.vel)); // Total speed
 
+    //
     //  Iterations
-    res.num_iters = conds.i_max - 1; 
+    //
+
+    res.num_iters = 0; 
+    dt = 0;
+    res.time = 0;
+
+    //atom.pos[2] = 1;
+    //conds.i_max = 2;
     while((res.num_iters < conds.i_max) && (r < conds.r_max)){
         // Compute the photonic recoil
-        dt = compute_photonic_recoil(atom, beams_setup, conds);
+        scatt = photonic_recoil(atom, beams_setup, conds);
 
         // Compute gravitational force
         if(conds.g_bool) compute_gravitational_force(atom);
@@ -60,8 +68,40 @@ int simulate_atom(){
         // Compute magnetic force
         compute_magnetic_force(atom, conds.B_0);
 
+        // Update time
+        dt = 1 / atom.transition.gamma;
+        if(scatt.R > 0){
+            lifetime = 1 / scatt.R;
+            rd_dt = random_exp(lifetime);
+            if(rd_dt < MAX_dt) dt = rd_dt;
+        }
+
+        res.time += dt;
+
+        // Update position
+        for(i = 0; i < 3; i++) atom.pos[i] += atom.vel[i] * dt;
+
+        // Update velocity
+        for(i = 0; i < 3; i++){
+            //if(rd_dt < MAX_dt) atom.vel[i] += scatt.vel[i];
+        }
+
+        // Update results
+        update_hist(&res.pos_hist[i], atom.pos[i]);
+
+        r = r3_mod(atom.pos);
+        v = r3_mod(atom.vel);
         res.num_iters++;
+
+        // Print status
+        //if(res.num_iters % 1000 == 0) print_status(atom, res);
     }
+
+    // Print status
+    print_status(atom, res);
+
+    // Write result in a CSV file
+    write_results(dir_code, res);
 
     return 0;
 }
@@ -74,7 +114,6 @@ atom_t get_atom(conditions_t conds){
 
     atom_t atom;
 
-    int row_cter = 0;
     int i;
 
     char row[STRING_BUFFER_SIZE];
@@ -150,7 +189,7 @@ atom_t get_atom(conditions_t conds){
 
         // Velocity
         std_dev = sqrt(k_B * conds.T_0 / (atom.mass * u)) * 10; // cm / s
-        atom.vel[i] = norm(0, std_dev); // cm / s
+        atom.vel[i] = random_norm(0, std_dev); // cm / s
     }
 
     // Optical transition
@@ -167,7 +206,6 @@ transition_t get_transition(){
     //
 
     transition_t transition;
-    int row_cter = 0;
     char row[STRING_BUFFER_SIZE];
     char *path = concatenate_ROOT_PATH("parameters/transition.csv");
     char *token, *rest;
@@ -279,7 +317,6 @@ conditions_t get_conditions(){
     //
 
     conditions_t conditions;
-    int row_cter = 0;
     char row[STRING_BUFFER_SIZE];
     char *path = concatenate_ROOT_PATH("parameters/conditions.csv");
     char *token, *rest;
@@ -341,7 +378,7 @@ conditions_t get_conditions(){
         if(!token){
             printf("Invalid parameter \"i_max\" in the file \"%s\"\n", path);
             exit(0);
-        } else conditions.i_max = atoi(token);
+        } else conditions.i_max = (int) atof(token);
     }
 
     // Maximum distance
@@ -394,7 +431,7 @@ beams_setup_t get_beams(){
     beam_t *beams = (beam_t*) malloc(MAX_BEAMS * sizeof(beam_t));
     beam_t *c_beams;
 
-    int row_cter = 0, num_beams = 0, n;
+    int num_beams = 0, n;
     char row[STRING_BUFFER_SIZE];
     char *path = concatenate_ROOT_PATH("parameters/beams.csv");
     char *token, *rest;
@@ -482,60 +519,81 @@ beams_setup_t get_beams(){
     return beams_setup;
 }
 
-// Apply the photonic recoil in the atom returning the time interval of the process
-double compute_photonic_recoil(atom_t atom, beams_setup_t beams_setup, conditions_t conds){
+// Compute scattering variables (scattering_t) in a photon-atom scattering eventt
+scattering_t photonic_recoil(atom_t atom, beams_setup_t beams_setup, conditions_t conds){
     //
     // Variables
     //
 
-    int i, j, k;                // Iterations variables
-    double aux_dt, dt;           // Times variables
-    double *B, *eps, *eB;        // Electromagnetic fields
-    double R, s, r_square, delta, lifetime;
-    double **C, **D;
+    int i, j;                                   // Iterations variables
+    double *B, *eps_probs, *eB, *eK, lambda;    // Electromagnetic fields
+    scattering_t *scatt_opt;                    // Scattering options
+    double vel_mod, *rd_v, *probs;              // Auxiliary variables
+    int *pol_opt, pol, *indexes;                // Polarization
 
     // Get Magnetic field
     B = get_magnetic_field(conds.B_0, atom.pos);
 
     //
-    // Check transitions
+    // Get scattering length
     //
 
-    dt = 0;
-    atom.pos[0] = 1;
+    scatt_opt = (scattering_t*) calloc(beams_setup.num, sizeof(scattering_t));
+    probs = (double*) calloc(beams_setup.num, sizeof(double)); // Probability of choosing a transition
+    indexes = (int*) calloc(beams_setup.num, sizeof(int));
 
     // Loop each beam
-    beams_setup.num = 2;
     for(i = 0; i < beams_setup.num; i++){
-        // Get basis
+        // Get wave length
+        lambda = atom.transition.lambda; // nm
+
+        // Directions
         if(r3_mod(B) == 0){
             eB = (double*) calloc(3, sizeof(double));
             eB[2] = 1.0;
         } else eB = r3_normalize(B);
+        eK = r3_normalize(beams_setup.beams[i].k_dic);
 
-        C = orthonormal_basis(beams_setup.beams[i].k_dic);
-        D = orthonormal_basis(eB);
+        //
+        // Polarization
+        //
 
-        // Update polarization vector
-        eps = update_polarization_vector(beams_setup.beams[i].eps, C, D);
+        pol_opt = (int*) calloc(3, sizeof(int));
 
-        // Loop each transition
-        for(j = 0; j < 3; j++){
+        pol_opt[0] = +1;
+        pol_opt[1] = -1;
+        pol_opt[2] = 0;
 
-            // Scattering rate of the transition
-            R = get_scattering_rate(atom, beams_setup.beams[i], B, eps[j], C, D);
-            lifetime = 1 / R;
+        // Get polarization probabilities
+        eps_probs = polarization_probs(beams_setup.beams[i], eB);
+        pol = random_pick(pol_opt, eps_probs, 3);
 
-            if(lifetime < dt || dt == 0) dt = lifetime;
+        // Compute scattering
+        scatt_opt[i].R = scattering_rate(atom, beams_setup.beams[i], B, pol); // Hz
+        probs[i] = scatt_opt[i].R;
+        indexes[i] = i;
 
-            r3_print(beams_setup.beams[i].k_dic, "k");
-            printf("eps[%d] = %f\n", j+1, eps[j]);
-            printf("\n");
-        }
+        // Absorption event
+        vel_mod = 1e4 * h / (lambda * atom.mass * u); // cm / s
+        scatt_opt[i].vel = r3_scalar_product(vel_mod, eK); // cm / s
+
+        // Emission event
+        rd_v = (double*) calloc(3, sizeof(double));  // Random vector
+        for(j = 0; j < 3; j++) rd_v[j] = ((double) rand()) / ((double) RAND_MAX);
+        rd_v = r3_normalize(rd_v); // Normalization
+        rd_v = r3_scalar_product(vel_mod, rd_v); // cm / s
+        scatt_opt[i].vel = r3_diff(scatt_opt[i].vel, rd_v); // cm / s
+
+        //r3_print(eK, "k");
+        //r3_print(eps_probs, "probs");
+        //r3_print(atom.pos, "pos (cm)");
+        //r3_print(atom.vel, "vel");
+        //printf("|r| (cm) = %f\n", r3_mod(atom.pos));
+        //printf("\n");
     }
 
-
-    return dt;
+    // Pick scattering option
+    return scatt_opt[random_pick(indexes, probs, beams_setup.num)];
 }
 
 // Compute the momentum due to the gravitational force
@@ -553,7 +611,9 @@ double *get_magnetic_field(double B_0, double *r){
     //
     // Variables
     //
-    static double B[3];      // Magnetic field vector
+    double *B;      // Magnetic field vector
+
+    B = (double*) calloc(3, sizeof(double));
 
     B[0] = B_0 * r[0];
     B[1] = B_0 * r[1];
@@ -562,18 +622,28 @@ double *get_magnetic_field(double B_0, double *r){
     return B;
 }
 
-// Convert the components (module) of a polarization vector on the basis C to a basis D
-double *update_polarization_vector(double *eps, double **r3_C, double **r3_D){
+// Get polarization probabilities given the magnetic field direction
+double *polarization_probs(beam_t beam, double *eB){
     //
     // Variables
     //
 
     int i, j;
-    double *new_eps;                    
+    double *eps_probs, *eK;             // Polarization probabilities and wave vector direction
+    double **r3_C,  **r3_D;             // Real bases
+    complex_t **c3_C, **c3_D;           // Complex Bases                   
     complex_t *C_eps, *D_eps;           // Polarization vector on different Cartesian bases    
-    complex_t *Dp_eps, *Cp_eps, *aux;   // Polarization vector on different polarization bases
+    complex_t *Dp_eps, *Cp_eps;         // Polarization vector on different polarization bases
     complex_t **A1, **A1_i, **A2;       // Change-of-basis matrices
-    complex_t **c3_C, **c3_D;           // Complex Bases
+
+    //
+    // Bases
+    //
+
+    eB = r3_normalize(eB);
+    eK = r3_normalize(beam.k_dic);
+    r3_C = orthonormal_basis(eK);
+    r3_D = orthonormal_basis(eB);
 
     //
     // Change-of-basis matrix from the polarization basis to the Cartesian basis
@@ -612,7 +682,7 @@ double *update_polarization_vector(double *eps, double **r3_C, double **r3_D){
     }
 
     //
-    // Change-of-basis matrix from the Cartesian beam frame to the Cartesian B frame
+    // Change-of-basis matrix from the Cartesian beam frame to the Cartesian magnetic field frame
     //
 
     // Complex orthonormal bases
@@ -637,7 +707,7 @@ double *update_polarization_vector(double *eps, double **r3_C, double **r3_D){
     // Polarization vector on the polarization beam frame
     //
 
-    Cp_eps = r3_to_c3(eps);
+    Cp_eps = r3_to_c3(beam.eps);
     C_eps = c3_apply_operator(A1, Cp_eps);
 
     // Polarization vector on the Cartesian B frame
@@ -647,46 +717,102 @@ double *update_polarization_vector(double *eps, double **r3_C, double **r3_D){
     Dp_eps = c3_apply_operator(A1_i, D_eps);
 
     // Compute desired vector
-    new_eps = (double*) calloc(3, sizeof(double));
-    for(i = 0; i < 3; i++) new_eps[i] = c_mod(Dp_eps[i]);
+    eps_probs = (double*) calloc(3, sizeof(double));
+    for(i = 0; i < 3; i++) eps_probs[i] = pow(c_mod(Dp_eps[i]), 2);
 
-    return new_eps;
+    return eps_probs;
 }
 
-// Get scattering rate of a given transition
-double get_scattering_rate(atom_t atom, beam_t beam, double *B, double transition, double **C, double **D){
+// Get scattering rate
+double scattering_rate(atom_t atom, beam_t beam, double *B, int pol){
     //
     // Variables
     //
 
-    double r_square, s, R, delta, nu;
+    double R;                                           // Scattering rate
+    double r, s;                                        // Saturation parameter variables
+    double delta, gamma, doppler_shift, zeeman_shift;   // Detuning and Transition rate
+    double lambda;                                      // Resonant wave length
+    int mj_gnd, mj_exc;                                 // Zeeman shift
+    double g_gnd, g_exc;                                // Zeeman shift
+    double **C;                                         // Basis of the beam frame
+
+    // Basis of the beam frame
+    C = orthonormal_basis(r3_normalize(beam.k_dic));
 
     //
     // Saturation parameter
     //
 
-    r_square = pow(r3_inner_product(C[0], atom.pos), 2);
-    r_square += pow(r3_inner_product(C[1], atom.pos), 2);
+    // Distance from the propagation axis
+    r = pow(r3_inner_product(C[0], atom.pos), 2);
+    r += pow(r3_inner_product(C[1], atom.pos), 2);
 
     s = beam.s_0;
-    s *= exp(-2 * r_square / pow(beam.w, 2));
-    s = s * transition;
+    s = s * exp(-2 * pow((r / beam.w), 2));
 
     //
     // Detuning (delta / gamma)
     //
 
     delta = 0;
+    gamma = atom.transition.gamma;      // kHz
+    lambda = atom.transition.lambda;    // nm
 
-    // Laser detuning in
+    // Laser detuning
     delta += beam.delta;
 
     // Doppler shift
-    delta += 1e4 * r3_inner_product(atom.vel, C[2]) / (atom.transition.lambda * atom.transition.gamma);
+    doppler_shift = -1e4 * r3_inner_product(atom.vel, C[2]) / (lambda * gamma); // Hz
+    delta += doppler_shift;
 
     // Zeeman shift
+    mj_gnd = -atom.transition.J_gnd;        // Ground state
+    mj_exc = mj_gnd + pol;                  // Excited state
+    g_gnd = atom.transition.g_gnd;          // Landè factor of the ground state
+    g_exc = atom.transition.g_exc;          // Landè factor of the excited state
 
+    zeeman_shift = 1e4 * (mu_B / h) * r3_mod(B) * (g_gnd * mj_gnd - g_exc * mj_exc) / gamma;  // Hz
+    delta += zeeman_shift;
+
+    // Scattering rate
+    R = ((1e3 * gamma)/2) * s / (1 + s + 4*delta*delta); // Hz
+
+    //printf("R = %f\n", R);
+    //printf("mj_gnd = %d\n", mj_gnd);
+    //printf("mj_exc = %d\n", mj_exc);
+    //printf("s = %f\n", s);
+    //printf("doppler_shift = %f\n", doppler_shift);
+    //printf("zeeman_shift = %f\n", zeeman_shift);
+    //printf("|B| (G / cm) = %f\n", r3_mod(B));
+
+    // Return
     return R;
+}
+
+// Print simulation status
+int print_status(atom_t atom, results_t res){
+    printf("Simulation status\n--\n");
+    printf("number of iterations = %d\n", res.num_iters);
+    printf("total time (ms) = %f\n", 1e3*res.time);
+    r3_print(atom.pos, "atom position (cm)");
+    r3_print(atom.vel, "atom velocity (cm / s)");
+    printf("distance from origin (cm) = %f\n", r3_mod(atom.pos));
+    printf("atom speed (m / s) = %f\n", 1e-2 * r3_mod(atom.vel));
+    printf("\n");
+
+    return 1;
+}
+
+// Write results in a CSV file
+int write_results(char *dir_code, results_t res){
+    //
+    //
+    //
+
+    
+
+    return 1;
 }
 
 //
@@ -701,7 +827,7 @@ int *get_int_array(char *str, int *size){
     int i, j, max_size = 124;
     char *token;
     int aux_arr[124];
-    static int *arr;
+    int *arr;
 
     str = str + 1;
     str[strlen(str)-1] = '\0';
@@ -736,7 +862,7 @@ double *get_double_array(char *str, int *size){
     int i, j, max_size = 124;
     char *token;
     double aux_arr[max_size];
-    static double *arr;
+    double *arr;
 
     str = str + 1;
     str[strlen(str)-1] = '\0';
@@ -765,7 +891,7 @@ double *get_double_array(char *str, int *size){
 char *concatenate_ROOT_PATH(char *filename){
     int i;
     char aux_path[124];
-    static char *path;
+    char *path;
 
     aux_path[0] = '\0';
 
@@ -781,53 +907,8 @@ char *concatenate_ROOT_PATH(char *filename){
     return path;
 }
 
-// Print all parameters of the simulation
-int show_all_parameters(atom_t atom, conditions_t conditions, beams_setup_t beams_setup){
-    //
-    // Variables
-    //
-
-    int i;
-
-    //
-    // Prints
-    //
-
-    printf("\nAtom\n--\n");
-    printf("symbol = %s\n", atom.symbol);
-    printf("Z = %d\n", atom.Z);
-    printf("mass = %f\n", atom.mass);
-
-    printf("\nTransition\n--\n");
-    printf("gamma = %f\n", atom.transition.gamma);
-    printf("J_gnd = %d\n", atom.transition.J_gnd);
-    printf("J_exc = %d\n", atom.transition.J_exc);
-    printf("g_gnd = %f\n", atom.transition.g_gnd);
-    printf("g_exc = %f\n", atom.transition.g_exc);
-
-    printf("\nConditions\n--\n");
-    printf("T_0 = %f\n", conditions.T_0);
-    printf("B_0 = %f\n", conditions.B_0);
-    printf("g_bool = %d\n", conditions.g_bool);
-    printf("i_max = %d\n", conditions.i_max);
-    printf("r_max = %f\n", conditions.r_max);
-    printf("num_bins = %d\n", conditions.num_bins);
-
-    printf("\nBeams setup\n--\n");
-    printf("num_beams = %d\n", beams_setup.num);
-
-    for(i = 0; i < beams_setup.num; i++){
-        printf("\nBeam %d\n--\n", (i+1));
-        printf("delta = %f\n", beams_setup.beams[i].delta);
-        printf("k_dic = [%f, %f, %f]\n", beams_setup.beams[i].k_dic[0], beams_setup.beams[i].k_dic[1], beams_setup.beams[i].k_dic[2]);
-        printf("eps = [%f, %f, %f]\n", beams_setup.beams[i].eps[0], beams_setup.beams[i].eps[1], beams_setup.beams[i].eps[2]);
-        printf("s_0 = %f\n", beams_setup.beams[i].s_0);
-        printf("w = %f\n", beams_setup.beams[i].w);
-    }
-}
-
 // Generate a double random number following a Gaussian distribution given a mean and a standard deviation
-double norm(double mean, double std_dev){
+double random_norm(double mean, double std_dev){
     //
     // Variables
     //
@@ -858,6 +939,11 @@ double norm(double mean, double std_dev){
     norm = (std_norm * std_dev) + mean;
 
     return norm;
+}
+
+// Generate a double random number following a Exponential distribution given a mean
+double random_exp(double mean){
+    return - mean * log(1 - ((double) rand()) / ((double) RAND_MAX));
 }
 
 // Update histogram
@@ -915,4 +1001,41 @@ double **orthonormal_basis(double *v){
     B[2] = v3;
 
     return B;
+}
+
+// Pick randomly a element of an integer array given an array of probabilities
+int random_pick(int *arr, double *probs, int size){
+    //
+    // Variables
+    //
+
+    int i, picked = 0;
+    double module;
+    double rd_n;          // Random number
+    double *cum_probs;    // Cumulative probabilities
+
+    // Normalize probabilities
+    module = 0;
+    for(i = 0; i < size; i++) module += probs[i];
+    for(i = 0; i < size; i++) probs[i] = probs[i] / module;
+
+    // Generate a random number  
+    rd_n = ((double) rand()) / ((double) RAND_MAX);
+
+    // Cumulative probabilities
+    cum_probs = (double*) calloc(size, sizeof(double));
+    cum_probs[0] = probs[0];
+    for(i = 1; i < size; i++){
+        cum_probs[i] += cum_probs[i-1] + probs[i];
+    }
+
+    // Pick
+    for(i = 0; i < size; i++){
+        if(rd_n < cum_probs[i]){
+            picked = arr[i];
+            break;
+        }
+    }
+
+    return picked;
 }
