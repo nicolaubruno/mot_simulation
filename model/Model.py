@@ -1,10 +1,9 @@
 #
 # Libraries and modules
-import sys, os, hashlib
+import sys, os, gc
 import numpy as np
 import pandas as pd
 from datetime import datetime as dt
-import mot_sim as C_ext
 
 #
 class Model:
@@ -16,41 +15,82 @@ class Model:
     #
 
     #
-    # Series
+    # (Series)
     @property
     def atom(self):
         return self._atom
     
     #
-    # Series
+    # (Series)
     @property
     def transition(self):
         return self._transition
 
     #
-    # Series
+    # (Series)
     @property
-    def conditions(self):
-        return self._conditions
+    def conds(self):
+        return self._conds
 
     #
-    # Dataframe
+    # (Dataframe)
     @property
     def beams(self):
         return self._beams
 
     #
-    # Dataframe
+    # Constants
     @property
-    def constants(self):
-        return self._constants
+    def cts(self):
+        return self._cts
+    
+    #
+    # Simulation identification code
+    @property
+    def sim_code(self):
+        return self._sim_code
+    
+    #
+    # (DataFrame) Position histogram
+    @property
+    def pos_hist(self):
+        return self._pos_hist
+    
+    #
+    # (DataFrame) Position histogram array
+    @property
+    def pos_hist_arr(self):
+        return self._pos_hist_arr
+    
+    #
+    # Atoms simulated
+    @property
+    def atoms_simulated(self):
+        return self._atoms_simulated
     
 
     ''' Methods '''
 
     #
     def __init__(self):
-        self.__load_parameters()        
+        #
+        # Constants
+        self._cts = {
+            'h' :   6.62607004,  # Planck constant [10^{-34} J s]
+            'e' :   1.60217662,  # Elementary charge [10^{-19} C]s
+            'c' :   2.99792458,  # Speed of light [10^{8} m / s]
+            'k_B':  1.38064852,  # Boltzmann constant [10^{-23} J / K]
+            'mu_B': 9.274009994, # Bohr magneton [10^{-24} J / T]
+            'u':    1.660539040 # Atomic mass unit [10^{-27} kg]
+        }
+
+        #
+        # Get parameters
+        self.__load_parameters()
+
+        #
+        # Atoms simulated
+        self._atoms_simulated = -1
 
     #
     def __load_parameters(self):
@@ -73,15 +113,12 @@ class Model:
         #
         # Conditions
         path = 'model/parameters/conditions.csv'
-        self._conditions = pd.read_csv(path, header=0, index_col=0, squeeze=True).astype(object)
-
-        #
-        # Constants
-        path = 'model/parameters/constants.csv'
-        self._constants = pd.read_csv(path, header=0, index_col=0)
+        self._conds = pd.read_csv(path, header=0, index_col=0, squeeze=True).astype(object)
+        self._conds['num_sim'] = int(self._conds['num_sim'])
+        self._conds['num_bins'] = int(self._conds['num_bins'])
 
     #
-    def run_simulation(self):
+    def start_simulation(self):
         #
         # Check if results directory exists
         results_dir_path = "model/results/"
@@ -90,8 +127,8 @@ class Model:
 
         #
         # Create a directory to store the results of the simulations
-        code = str(int(dt.now().timestamp()))
-        results_dir_path += code + '/'
+        self._sim_code = str(int(dt.now().timestamp()))
+        results_dir_path += self._sim_code + '/'
         os.mkdir(results_dir_path)
 
         #
@@ -102,10 +139,62 @@ class Model:
         self.atom.to_csv(parameters_dir + 'atom.csv')
         self.transition.to_csv(parameters_dir + 'transition.csv')
         self.beams.to_csv(parameters_dir + 'beams.csv')
-        self.conditions.to_csv(parameters_dir + 'conditions.csv')
-        self.constants.to_csv(parameters_dir + 'constants.csv')
+        self.conds.to_csv(parameters_dir + 'conditions.csv')
 
-        C_ext.simulate_atom(code)
+        #
+        # Create position histogram data
+        '''
+        columns_name = ["x", "y", "z"]
+        indexes = [i+1 for i in range(self.conds['num_bins'])]
+        self._pos_hist = pd.DataFrame(columns=columns_name, index=indexes)
+        self._pos_hist.fillna(0, inplace=True)
+        '''
+
+        self._pos_hist_arr = np.zeros((3, self.conds['num_bins']))
+        self._atoms_simulated = 0
+
+    #
+    def simulate_atom(self):
+        #
+        # C Extension
+        import mot_sim as C_ext
+
+        #
+        # Simulate atoms
+        x_bins, y_bins, z_bins, iters, time = C_ext.simulate_atom()
+
+        self._pos_hist_arr[0] += np.array(x_bins)
+        self._pos_hist_arr[1] += np.array(y_bins)
+        self._pos_hist_arr[2] += np.array(z_bins)
+
+        self._atoms_simulated += 1
+
+        del x_bins, y_bins, z_bins
+
+    #
+    def finish_simulation(self):
+        #
+        # Check file
+        path = "model/results/" + self.sim_code + "/positions.csv"
+        if os.path.exists(path):
+            os.remove(path)
+
+        #
+        # Create position histogram data
+        columns_name = ["x", "y", "z"]
+        indexes = [i+1 for i in range(self.conds['num_bins'])]
+        pos_hist = pd.DataFrame(columns=columns_name, index=indexes)
+        pos_hist.fillna(0, inplace=True)
+
+        pos_hist["x"] += self.pos_hist_arr[0]
+        pos_hist["y"] += self.pos_hist_arr[1]
+        pos_hist["z"] += self.pos_hist_arr[2]
+
+        pos_hist["x"] = pos_hist["x"].astype("int32")
+        pos_hist["y"] = pos_hist["y"].astype("int32")
+        pos_hist["z"] = pos_hist["z"].astype("int32")
+
+        pos_hist.to_csv(path)
 
     #
     # Utility methods

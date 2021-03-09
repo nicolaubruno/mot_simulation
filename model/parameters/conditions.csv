@@ -2,7 +2,7 @@
 T_0,50.0
 B_0,2.26
 g_bool,1
-i_max,1e5
+i_max,10000
 r_max,3.0
-num_sim,30
-num_bins,10
+num_sim,500
+num_bins,64

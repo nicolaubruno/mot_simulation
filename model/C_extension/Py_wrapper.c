@@ -6,25 +6,25 @@
 #include "mot_sim.h"
 
 //
-// Implementation of C Extension for Python
+// Prototypes
 //
 
 // Read simulation for a single atom
-static PyObject* C_simulate_atom(PyObject *self, PyObject *args){
-    //
-    // Variables
-    //
-    char *dir_code;
+static PyObject* C_simulate_atom(PyObject *self, PyObject *args);
 
-    // Parse arguments
-    if(!PyArg_ParseTuple(args, "s", &dir_code)) return NULL;
+// Initialize module
+PyMODINIT_FUNC PyInit_mot_sim(void);
 
-    return Py_BuildValue("i", simulate_atom(dir_code));
-}
+// Convert a int array in C to PyObject list
+PyObject *build_list(int *arr, int size);
+
+//
+// Structures
+//
 
 // List methods
 static PyMethodDef mot_sim_methods[] = {
-    {"simulate_atom", C_simulate_atom, METH_VARARGS, "Read the parameters from CSV files and generate the results"},
+    {"simulate_atom", C_simulate_atom, METH_NOARGS, "Read the parameters from CSV files and generate the results"},
     {NULL, NULL, 0, NULL}
 };
 
@@ -37,7 +37,52 @@ static struct PyModuleDef mot_sim_module = {
     mot_sim_methods
 };
 
+//
+// Implementation
+//
+
+// Read simulation for a single atom
+static PyObject* C_simulate_atom(PyObject *self, PyObject *args){
+    //
+    // Results
+    //
+
+    results_t res = simulate_atom();
+
+    return Py_BuildValue(
+        "OOOid", 
+        build_list(res.pos_hist[0].freqs, res.pos_hist[0].num_bins), 
+        build_list(res.pos_hist[1].freqs, res.pos_hist[1].num_bins),
+        build_list(res.pos_hist[2].freqs, res.pos_hist[2].num_bins),
+        res.num_iters,
+        res.time
+    );
+}
+
 // Initialize module
-PyMODINIT_FUNC PyInit_mot_sim(void) {
+PyMODINIT_FUNC PyInit_mot_sim(void){
     return PyModule_Create(&mot_sim_module);
+}
+
+// Convert a int array in C to PyObject list
+PyObject *build_list(int *arr, int size){
+    //
+    // Variables
+    //
+
+    int i;
+    PyObject *list;
+
+    //
+    // Build list
+    //
+
+    list = PyList_New(size);
+
+    for(i = 0; i < size; i++){
+        PyList_SetItem(list, i, Py_BuildValue("i", arr[i]));
+    }
+
+    // Return
+    return list;
 }

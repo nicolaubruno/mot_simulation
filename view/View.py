@@ -1,6 +1,7 @@
 #
 # Libraries and modules
-import os
+import os, sys
+import pandas as pd
 
 #
 class View:
@@ -11,6 +12,12 @@ class View:
     @property
     def separator(self):
         return self._separator
+    
+
+    #
+    @property
+    def time_update(self):
+        return self._time_update
     
 
     ''' Methods '''
@@ -85,52 +92,21 @@ class View:
         return option_code
 
     #
-    def initial_menu(self):
-        header = '\nMonte Carlo simulation of ultracold atoms in a Magneto-Optical Trap\n'
-        header += 'Version 2.0, Authors: Bruno N. Santos, MSc; Ramon G. T. Rosa, PhD;'
+    # Print the status of the simulation
+    def print_simulation_status(self):
+        #
+        # Clear screen
+        if os.name == 'nt':
+            os.system('cls')
 
-        options = {\
-            1:"Run Simulation",\
-            2:"Parameters",\
-            3:"Results"
-        }
+        else:
+            os.system('clear')
 
-        return self.terminal_menu(options, header)
+        print('')
+        if self.__model.atoms_simulated == -1:
+            print('Starting simulation ...\n')
 
-    #
-    def parameters(self):
-        call_menu = True
-        header = '\nParameters of the simulation'
-
-        options = {\
-            1 : 'Atom',\
-            2 : 'Transition',\
-            3 : 'Beams setup',\
-            4 : 'Conditions',\
-            5 : 'Constants',\
-            6 : 'Initial Menu'
-        }
-
-        while call_menu:
-            option_code = self.terminal_menu(options, header)
-
-            if option_code == 1:
-                header = '\nAtom\n\n' + self.__model.atom.to_string()
-
-            elif option_code == 2:
-                header = '\nTransition\n\n' + self.__model.transition.to_string()
-
-            elif option_code == 3:
-                header = '\nBeams setup\n\n' + self.__model.beams.to_string()
-
-            elif option_code == 4:
-                header = '\nConditions\n\n' + self.__model.conditions.to_string()
-
-            elif option_code == 5:
-                header = '\nConstants\n\n' + self.__model.constants.to_string()
-
-            elif option_code == 6:
-                option_code = -1;
-                call_menu = False
-
-        return option_code
+        else:
+            print('Simulating ...\n')
+            print('Atoms simulated: %d / %d' % (self.__model.atoms_simulated, self.__model.conds['num_sim']))
+            print('')

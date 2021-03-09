@@ -112,7 +112,7 @@ typedef struct{
 //
 
 // Run simulation for a single atom
-int simulate_atom();
+results_t simulate_atom();
 
 // Get atom
 atom_t get_atom();
@@ -165,6 +165,9 @@ double *get_double_array(char *str, int *size);
 
 // Concatenate ROOT_PATH to a filename
 char *concatenate_ROOT_PATH(char *filename);
+
+// Concatenate strings
+char *str_concatenate(char *str1, char *str2);
 
 // Generate a double random number following a Gaussian distribution given a mean and a standard deviation
 double random_norm(double mean, double std_dev);

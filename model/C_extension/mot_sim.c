@@ -10,7 +10,7 @@
 
 // --
 
-int simulate_atom(char *dir_code){
+results_t simulate_atom(){
     // Seed used by the rand() function
     srand(time(NULL));
 
@@ -85,21 +85,13 @@ int simulate_atom(char *dir_code){
         res.num_iters++;
 
         // Print status
-        //if(res.num_iters % 1000 == 0) print_status(atom, res);
-
-        //r3_print(atom.pos, "pos (cm)");
-        //r3_print(atom.vel, "vel (cm/s)");
-        //r3_print(scatt.vel, "gain_vel (cm/s)");
-        //printf("\n");
+        //if(res.num_iters % 500 == 0) print_status(atom, res);
     }
 
     // Print status
     //print_status(atom, res);
 
-    // Write result in a CSV file
-    write_results(dir_code, res);
-
-    return 0;
+    return res;
 }
 
 atom_t get_atom(conditions_t conds){
@@ -190,7 +182,9 @@ atom_t get_atom(conditions_t conds){
     // Optical transition
     atom.transition = get_transition();
 
+    // Close file
     fclose(fp);
+
     return atom;
 }
 
@@ -295,12 +289,17 @@ transition_t get_transition(){
     if((transition.J_exc - transition.J_gnd) < 0){
         printf("J_exc must be grater than J_gnd.\n");
         exit(0);
-    } else if(transition.J_exc < 0 || transition.J_gnd < 0){        
+    } else if(transition.J_exc < 0 || transition.J_gnd < 0){
         printf("J_exc and J_gnd must be positive values.\n");
         exit(0);
     }
 
+    // Close file
     fclose(fp);
+
+    // Release memory
+
+    // Return
     return transition;
 }
 
@@ -507,7 +506,13 @@ beams_setup_t get_beams(){
     beams_setup.num = num_beams;
     beams_setup.beams = c_beams;
 
+    // Release memory
+    free(beams);
+
+    // Close file
     fclose(fp);
+
+    // Return
     return beams_setup;
 }
 
@@ -575,13 +580,6 @@ scattering_t photonic_recoil(atom_t atom, beams_setup_t beams_setup, conditions_
         rd_v = r3_normalize(rd_v); // Normalization
         rd_v = r3_scalar_product(vel_mod, rd_v); // cm / s
         scatt_opt[i].vel = r3_sum(scatt_opt[i].vel, rd_v); // cm / s
-
-        //r3_print(eK, "k");
-        //r3_print(eps_probs, "probs");
-        //r3_print(atom.pos, "pos (cm)");
-        //r3_print(atom.vel, "vel");
-        //printf("|r| (cm) = %f\n", r3_mod(atom.pos));
-        //printf("\n");
     }
 
     //
@@ -595,6 +593,12 @@ scattering_t photonic_recoil(atom_t atom, beams_setup_t beams_setup, conditions_
             j = i; 
     }
 
+    // Release memory
+    free(eB);
+    free(pol_opt);
+    free(rd_v);
+
+    // Return
     return scatt_opt[j];
 }
 
@@ -618,6 +622,7 @@ double *get_magnetic_field(double B_0, double *r){
     B[1] = B_0 * r[1];
     B[2] = - 2 * B_0 * r[2];
 
+    // Return
     return B;
 }
 
@@ -718,6 +723,14 @@ double *polarization_probs(beam_t beam, double *eB){
     eps_probs = (double*) calloc(3, sizeof(double));
     for(i = 0; i < 3; i++) eps_probs[i] = pow(c_mod(Dp_eps[i]), 2);
 
+    // Release memory
+    free(A1);
+    free(A1_i);
+    free(A2);
+    free(c3_C);
+    free(c3_D);
+
+    // Return
     return eps_probs;
 }
 
@@ -783,6 +796,8 @@ double scattering_rate(atom_t atom, beam_t beam, double *B, int pol){
     //printf("zeeman_shift = %f\n", zeeman_shift);
     //printf("|B| (G / cm) = %f\n", r3_mod(B));
 
+    // Release memory
+
     // Return
     return R;
 }
@@ -790,7 +805,7 @@ double scattering_rate(atom_t atom, beam_t beam, double *B, int pol){
 int print_status(atom_t atom, results_t res){
     printf("Simulation status\n--\n");
     printf("number of iterations = %d\n", res.num_iters);
-    printf("total time (ms) = %f\n", 1e3*res.time);
+    printf("total time (s) = %f\n", res.time);
     r3_print(atom.pos, "atom position (cm)");
     r3_print(atom.vel, "atom velocity (cm / s)");
     printf("distance from origin (cm) = %f\n", r3_mod(atom.pos));
@@ -805,18 +820,33 @@ int write_results(char *dir_code, results_t res){
     // Variables
     //
 
-    int i;
-    double x_min, x_max;
+    int i, size;                // Auxiliary variables
+    char *path;                 // File stream
+    FILE *fp;                   // File stream
 
-    printf("Histogram (x, y ,z)\n -- \n");
+    // Open file
+    path = str_concatenate(str_concatenate(concatenate_ROOT_PATH("results/"), dir_code), "/position.csv");
 
-    for(i = 0; i < res.pos_hist[0].num_bins; i++){
-        x_min = res.pos_hist[0].coord0 + (i*res.pos_hist[0].bin_size);
-        x_max = x_min + res.pos_hist[0].bin_size;
-        printf("[%f, %f] ", x_min, x_max);
-        printf("%d %d %d\n", res.pos_hist[0].freqs[i], res.pos_hist[1].freqs[i], res.pos_hist[2].freqs[i]);
+    fp = fopen(path, "w");
+    
+    if(fp == NULL){
+        printf("Error to open file \"%s\"", path);
+        exit(0);
     }
 
+    // Write file
+    fprintf(fp, "id,x,y,z\n");
+
+    size = res.pos_hist[0].num_bins;
+    for(i = 0; i < size; i++){
+        fprintf(fp, "%d,", i+1);
+        fprintf(fp, "%d,", res.pos_hist[0].freqs[i]);
+        fprintf(fp, "%d,", res.pos_hist[1].freqs[i]);
+        fprintf(fp, "%d\n", res.pos_hist[2].freqs[i]);
+    }
+
+    // Close file
+    fclose(fp);
 
     return 1;
 }
@@ -889,6 +919,30 @@ double *get_double_array(char *str, int *size){
     for(j = 0; j < i; j++) arr[j] = aux_arr[j];
 
     return arr;
+}
+
+// Concatenate strings
+char *str_concatenate(char *str1, char *str2){
+    // Variables    
+    int i, j, size;
+    char *str;
+
+    //
+    // Concatenation
+    //
+
+    size = (int) (strlen(str1) + strlen(str2) - 1);
+    str = (char*) malloc(size * sizeof(char));
+    
+    for(i = 0; i < ((int) strlen(str1)); i++)
+        str[i] = str1[i];
+
+    for(j = 0; j < ((int) strlen(str2)); j++)
+        str[i + j] = str2[j];
+
+    str[size+1] = '\0';
+
+    return str;
 }
 
 char *concatenate_ROOT_PATH(char *filename){
@@ -999,6 +1053,10 @@ double **orthonormal_basis(double *v){
     B[1] = v2;
     B[2] = v3;
 
+    // Release memory
+    free(v1);
+
+    // Return
     return B;
 }
 
@@ -1035,5 +1093,9 @@ int random_pick(int *arr, double *probs, int size){
         }
     }
 
+    // Release memory
+    free(cum_probs);
+
+    // Return
     return picked;
 }
