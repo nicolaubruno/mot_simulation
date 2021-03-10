@@ -21,6 +21,7 @@ results_t simulate_atom(){
     int i;                  // Iterations
     double r, dt;           // Dynamics
     results_t res;          // Results
+    double *a_B;            // Magnetic acceleration
 
     // Parameters of the simulation
     conditions_t conds = get_conditions();
@@ -59,11 +60,8 @@ results_t simulate_atom(){
         // Compute the photonic recoil
         scatt = photonic_recoil(atom, beams_setup, conds);
 
-        // Compute gravitational force
-        if(conds.g_bool) compute_gravitational_force(atom);
-
-        // Compute magnetic force
-        compute_magnetic_force(atom, conds.B_0);
+        // Magnetic acceleration
+        a_B = magnetic_acceleration(atom, conds.B_0);
 
         // Update time
         if(scatt.dt > 0 && scatt.dt < MAX_dt) dt = scatt.dt;
@@ -71,11 +69,22 @@ results_t simulate_atom(){
         res.time += dt;
 
         // Update position
-        for(i = 0; i < 3; i++) atom.pos[i] += atom.vel[i] * dt;
+        atom.vel[2] += - (g * dt*dt) / 2;
+        for(i = 0; i < 3; i++) atom.pos[i] += atom.vel[i] * dt + (a_B[i] * dt*dt) / 2;
 
+        //
         // Update velocity
+        //
+
+        // Gravitational acceleration
+        if(conds.g_bool) atom.vel[2] += - g * dt;
+
         for(i = 0; i < 3; i++){
+            // Photonic recoil
             if(scatt.dt > 0 && scatt.dt < MAX_dt) atom.vel[i] += scatt.vel[i];
+
+            // Magnetic acceleration
+            atom.vel[i] += a_B[i] * dt;
         }
 
         // Update results
@@ -85,11 +94,14 @@ results_t simulate_atom(){
         res.num_iters++;
 
         // Print status
-        //if(res.num_iters % 500 == 0) print_status(atom, res);
+        //if(res.num_iters % 1 == 0) print_status(atom, res);
     }
 
     // Print status
     //print_status(atom, res);
+
+    // Release memory
+    free(a_B);
 
     return res;
 }
@@ -602,12 +614,38 @@ scattering_t photonic_recoil(atom_t atom, beams_setup_t beams_setup, conditions_
     return scatt_opt[j];
 }
 
-int compute_gravitational_force(atom_t atom){
-    return 1;
-}
+double *magnetic_acceleration(atom_t atom, double B_0){
+    // Variables
+    int i;
+    double *a_B, *del_B, norm;  // Magnetic field
+    double g_gnd, mJ_gnd;       // Transition
 
-int compute_magnetic_force(atom_t atom, double B_0){
-    return 1;
+    // Magnetic field gradient
+    if(r3_mod(atom.pos) > 0){
+        del_B = (double*) calloc(3, sizeof(double)); // G / cm
+        norm = sqrt(pow(atom.pos[0], 2) * pow(atom.pos[1], 2) + 4 * pow(atom.pos[2], 2));
+        
+        del_B[0] = (B_0 * atom.pos[0]) / (2 * norm); // G / cm
+        del_B[1] = (B_0 * atom.pos[1]) / (2 * norm); // G / cm
+        del_B[2] = (2 * B_0 * atom.pos[2]) / norm; // G / cm
+
+        // Magnetic acceleration
+        a_B = (double*) calloc(3, sizeof(double)); // cm / s^2
+
+        g_gnd = atom.transition.g_gnd;
+        mJ_gnd = -atom.transition.J_gnd;
+
+        for(i = 0; i < 3; i++)
+            a_B[i] = - mu_B * g_gnd * mJ_gnd * del_B[i] / (atom.mass * u) * 1e3; // cm / s^2
+
+        // Release memory
+        free(del_B);
+    } else {
+        a_B = (double*) calloc(3, sizeof(double)); // cm / s^2
+        for(i = 0; i < 3; i++) a_B[i] = 0;
+    }
+
+    return a_B;
 }
 
 double *get_magnetic_field(double B_0, double *r){
@@ -618,9 +656,9 @@ double *get_magnetic_field(double B_0, double *r){
 
     B = (double*) calloc(3, sizeof(double));
 
-    B[0] = B_0 * r[0];
-    B[1] = B_0 * r[1];
-    B[2] = - 2 * B_0 * r[2];
+    B[0] = B_0 * r[0] / 2; // Radial magnetic field
+    B[1] = B_0 * r[1] / 2; // Radial magnetic field
+    B[2] = - B_0 * r[2]; // Axial magnetic field
 
     // Return
     return B;

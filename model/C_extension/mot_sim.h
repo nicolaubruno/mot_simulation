@@ -27,6 +27,7 @@
 #define k_B 1.38064852      // Boltzmann constant [10^{-23} J / K]
 #define mu_B 9.274009994    // Bohr magneton [10^{-24} J / T]
 #define u 1.660539040       // Atomic mass unit [10^{-27} kg]
+#define g 980.665           // Gravitational acceleration [cm / s^2]
 #define PI 3.14159265358
 
 //
@@ -97,7 +98,7 @@ typedef struct {
 typedef struct{
     histogram_t *pos_hist;  /* Histogram of the position */
     int num_iters;          /* Number of iterations */
-    float time;             /* Total time [s] */
+    double time;            /* Total time [s] */
 } results_t;
 
 /*
@@ -129,11 +130,8 @@ beams_setup_t get_beams();
 // Compute scattering variables (scattering_t) in a photon-atom scattering event
 scattering_t photonic_recoil(atom_t atom, beams_setup_t beams_setup, conditions_t conds);
 
-// Compute the momentum due to the gravitational force
-int compute_gravitational_force(atom_t atom);
-
-// Compute the momentum due the magnetic force
-int compute_magnetic_force(atom_t atom, double B_0);
+// Get magnetic acceleration
+double *magnetic_acceleration(atom_t atom, double B_0);
 
 // Get magnetic field vector in the lab frame
 double *get_magnetic_field(double B_0, double *r);

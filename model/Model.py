@@ -98,6 +98,7 @@ class Model:
         self._iters = -1
         self._sim_code = -1
         self._sim_name = ''
+        self._pos_freqs_arr = []
 
     #
     def __load_parameters(self):

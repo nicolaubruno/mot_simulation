@@ -28,7 +28,7 @@
 # Conditions (conditions.csv)
 
 - T_0       -> (float) 		Initial temperature [uK]
-- B_0       -> (float) 		Magnetic field gradient [G / cm]
+- B_0       -> (float) 		Axial magnetic field gradient [G / cm]
 - g_bool    -> (int)		1- use gravity, 0 - do not use gravity
 - i_max     -> (int)		Maximum number of iteration (simulation of individual atoms)
 - r_max     -> (float)		Maximum distance (threshold) [cm]
