@@ -1,0 +1,8 @@
+,conditions
+T_0,50.0
+B_0,2.26
+g_bool,1.0
+i_max,10000.0
+r_max,3.0
+num_sim,500
+num_bins,128

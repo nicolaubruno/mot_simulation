@@ -176,7 +176,7 @@ const int NumVel = 30;
 // numer of initial velocities (TRAP_DEPTH_ROUTINE())
 const double MaxVel_TrapDepth = 7;
 // maximum velocity for trap depth routine [m/s]
-const int NumAvg = 50;
+const int NumAvg = 200;
 // averages per configuration
 const double DetuningRange[] = {-0,-200};
 // detuning range in units of gamma;

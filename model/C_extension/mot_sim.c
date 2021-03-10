@@ -724,6 +724,14 @@ double *polarization_probs(beam_t beam, double *eB){
     for(i = 0; i < 3; i++) eps_probs[i] = pow(c_mod(Dp_eps[i]), 2);
 
     // Release memory
+    for(i = 0; i < 3; i++){
+        free(A1[i]);
+        free(A1_i[i]);
+        free(A2[i]);
+        free(c3_C[i]);
+        free(c3_D[i]);
+    }
+
     free(A1);
     free(A1_i);
     free(A2);
@@ -796,7 +804,8 @@ double scattering_rate(atom_t atom, beam_t beam, double *B, int pol){
     //printf("zeeman_shift = %f\n", zeeman_shift);
     //printf("|B| (G / cm) = %f\n", r3_mod(B));
 
-    // Release memory
+    // Release memory    
+    free(C);
 
     // Return
     return R;
@@ -1054,7 +1063,10 @@ double **orthonormal_basis(double *v){
     B[2] = v3;
 
     // Release memory
+    free(v);
     free(v1);
+    free(v2);
+    free(v3);
 
     // Return
     return B;

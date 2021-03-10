@@ -1,9 +1,9 @@
 #
 # Libraries and modules
-from model import Model
+from model import Model, Result
 from view import View
-import gc
 from datetime import datetime as dt
+import gc
 
 #
 # Controller class
@@ -24,12 +24,7 @@ class Controller:
     def main(self):
         #
         # Header
-        header = '\nMonte Carlo simulation of ultracold atoms in a Magneto-Optical Trap\n'
-        header += 'Version 2.0, Authors: Bruno N. Santos, MSc; Ramon G. T. Rosa, PhD;'
-
-        #
-        # Footer
-        footer = ''
+        header = "Initial menu"
 
         #
         # Options
@@ -43,87 +38,75 @@ class Controller:
         # Call menu
         call_menu = True
         while call_menu:
-            #
-            # Get option
-            option_code = self.__view.terminal_menu(options, header, footer)
+            opt = self.__call_menu(options, header)
             call_menu = False
 
             #
-            # Check option code
-            if type(option_code) == int:
-                option_code = int(option_code)
+            # Call menu again
+            if opt == -1:
+                call_menu = True
 
-                #
-                # Exit
-                if option_code == 0:
-                    print('Exiting ...', end='\n\n')
-                    exit()
+            #
+            # Run Simulation
+            if opt == 1:
+                call_menu = self.run_simulation()
 
-                #
-                # Valid options
-                elif option_code in options.keys(): 
-                    #
-                    # Run Simulation
-                    if option_code == 1:
-                        atoms_simulated = self.run_simulation()
-                        footer = 'Simulation finished\n'
-                        footer += "Atoms simulated: " + str(atoms_simulated) + '\n'
-                        call_menu = True
+            #
+            # Show parameters of the simulation
+            elif opt == 2:
+                call_menu = self.view_parameters()
 
-                    #
-                    # Show parameters of the simulation
-                    elif option_code == 2:
-                        call_menu = self.view_parameters()
-
-                    #
-                    # Show results
-                    elif option_code == 3:
-                        pass
-
-                #
-                # Invalid options
-                else: call_menu = True
-            else: call_menu = True
+            #
+            # Show results
+            elif opt == 3:
+                call_menu = self.view_results()
 
     #
     def run_simulation(self):
         #
-        # Time update
-        time = dt.now().timestamp()
+        # Call initial menu
+        call_initial_menu = False
 
         #
-        # Start simulation
-        self.__model.start_simulation()
-        self.__view.print_simulation_status()
+        # Ask for shortname
+        shortname = self.__call_input("Insert a short name for the simulation")
 
         #
-        # Simulate atoms
-        for i in range(self.__model.conds.num_sim):
-            self.__model.simulate_atom()
+        # Check shortname
+        if shortname == '-1':
+            call_initial_menu = True
 
-            if (dt.now().timestamp() - time) > 0.5:
-                self.__view.print_simulation_status()
-                time = dt.now().timestamp()
+        else:
+            #
+            # Time update
+            time = dt.now().timestamp()
 
-        #
-        # Finish simulation
-        self.__model.finish_simulation()
-        self.__view.print_simulation_status()
+            #
+            # Start simulation
+            self.__model.start_simulation(shortname)
+            self.__view.print_simulation_status()
 
-        # Clear memory
-        del self.__model
-        del self.__view
-        self.__model = Model()
-        self.__view = View(self.__model)
+            #
+            # Simulate atoms
+            for i in range(self.__model.conds.num_sim):
+                self.__model.simulate_atom()
 
-        # Return simulated atoms
-        return i+1
+                if (dt.now().timestamp() - time) > 0.5:
+                    self.__view.print_simulation_status()
+                    time = dt.now().timestamp()
+
+            #
+            # Finish simulation
+            self.__model.finish_simulation()
+            self.__view.print_simulation_status()
+
+        return call_initial_menu
 
     #
     def view_parameters(self):
         #
         # Header
-        header = '\nParameters of the simulation'
+        header = 'Parameters of the simulation'
 
         #
         # Options
@@ -131,55 +114,154 @@ class Controller:
             1 : 'Atom',\
             2 : 'Transition',\
             3 : 'Beams setup',\
-            4 : 'Conditions',\
-            5 : 'Initial Menu'
+            4 : 'Conditions'
         }
 
         #
-        # Call menu
+        # Get option
         call_menu = True
         call_initial_menu = False
+
         while call_menu:
-            option_code = self.__view.terminal_menu(options, header)
-            call_menu = False
+            opt = self.__call_menu(options, header)
+
+            if opt == 1:
+                header = 'Atom\n\n' + self.__model.atom.to_string() + '\n'
+
+            elif opt == 2:
+                header = 'Transition\n\n' + self.__model.transition.to_string() + '\n'
+
+            elif opt == 3:
+                header = 'Beams setup\n\n' + self.__model.beams.to_string() + '\n'
+
+            elif opt == 4:
+                header = 'Conditions\n\n' + self.__model.conds.to_string() + '\n'
+
+            elif opt == -1:
+                call_initial_menu = True
+                call_menu = False
+
+        return call_initial_menu
+
+    #
+    def view_results(self):
+        #
+        # Call terminal
+        msg = ''
+        call_term = True
+        back = False
+
+        while call_term:
+            call_term = False
+
+            #
+            # Show the first results
+            self.__view.print_results()
+
+            #
+            # Get code
+            code = self.__call_input(msg + "Insert simulation code", header=False, clear_screen=False)
+
+            #
+            # Check code
+            if code.isdigit() or (code[0] == "-" and code[1:].isdigit()): 
+                code = int(code)
+
+                if code == -1:
+                    back = True
+                    call_term = False
+
+                #
+                # Call results menu
+                elif self.__model.check_sim_code(code):
+                    #
+                    # Result
+                    res = Result(code)
+
+                    #
+                    # Options
+                    options = {
+                        1 : "Position histogram",\
+                        2 : "Heat map"
+                    }
+
+                    header = "Simulation " + str(res.sim_code) + " " + res.sim_name
+                    
+                    opt = self.__call_menu(options, header)
+
+                    if opt == -1:
+                        call_term = False
+
+                    elif opt == 1 or opt == 2:
+                        call_axis = True
+                        while call_axis:
+                            opts = {
+                                1 : 'x-axis',\
+                                2 : 'y-axis',\
+                                3 : 'z-axis'
+                            }
+
+                            opt = self.__call_menu(opts, "Choose the axis")
+                            
+                            if opt == -1:
+                                call_term = True
+                                call_axis = False
+
+                            else:
+                                self.__view.position_histogram(res, opt-1)
+
+                else:
+                    msg = "Code %d invalid!\n" % code
+                    call_term = True
+
+            else:
+                msg = "Invalid code!\n" 
+                call_term = True
+
+        return back
+
+    #
+    def __call_menu(self, options, header = ''):
+        #
+        # Variables
+        call = True
+        msg = ''
+
+        #
+        # Call menu
+        while call:
+            #
+            # Get option
+            opt = self.__view.terminal_menu(options, header=header, footer=msg)
+            msg = "Invalid code! "
 
             #
             # Check option code
-            if type(option_code) == int:
-                option_code = int(option_code)
+            if len(opt) > 0 and (opt.isdigit() or (opt[0] == "-" and opt[1:].isdigit())):
+                opt = int(opt)
 
                 #
                 # Exit
-                if option_code == 0:
-                    print('Exiting ...', end='\n\n')
+                if opt == 0:
+                    print('\nExiting ...', end='\n\n')
                     exit()
 
-                #
-                # Valid options
-                elif option_code in options.keys(): 
+                elif opt in options.keys():
+                    call = False
 
-                    if option_code == 1:
-                        header = '\nAtom\n\n' + self.__model.atom.to_string()
+                elif opt == -1:
+                    call = False
 
-                    elif option_code == 2:
-                        header = '\nTransition\n\n' + self.__model.transition.to_string()
+        return opt
 
-                    elif option_code == 3:
-                        header = '\nBeams setup\n\n' + self.__model.beams.to_string()
+    #
+    def __call_input(self, description, header = True, clear_screen=True):
+        opt = self.__view.terminal_input(description, header=header, clear_screen=clear_screen)
 
-                    elif option_code == 4:
-                        header = '\nConditions\n\n' + self.__model.conds.to_string()
+        #
+        # Check return
+        if opt == '0':
+            print('\nExiting ...\n')
+            exit(0)
 
-                    elif option_code == 5:
-                        call_initial_menu = True
-
-                #
-                # Invalid options
-                else: call_menu = True
-            else: call_menu = True
-
-            if (not 
-                call_menu) and (not call_initial_menu):
-                call_menu = True
-
-        return call_initial_menu
+        return opt

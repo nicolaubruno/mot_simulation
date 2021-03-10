@@ -48,15 +48,28 @@ static PyObject* C_simulate_atom(PyObject *self, PyObject *args){
     //
 
     results_t res = simulate_atom();
+    PyObject *x_bins, *y_bins, *z_bins, *ret;
 
-    return Py_BuildValue(
+    // Build PyLists
+    x_bins = build_list(res.pos_hist[0].freqs, res.pos_hist[0].num_bins);
+    y_bins = build_list(res.pos_hist[1].freqs, res.pos_hist[1].num_bins);
+    z_bins = build_list(res.pos_hist[2].freqs, res.pos_hist[2].num_bins);
+
+    // Return
+    ret = Py_BuildValue(
         "OOOid", 
-        build_list(res.pos_hist[0].freqs, res.pos_hist[0].num_bins), 
-        build_list(res.pos_hist[1].freqs, res.pos_hist[1].num_bins),
-        build_list(res.pos_hist[2].freqs, res.pos_hist[2].num_bins),
+        x_bins, 
+        y_bins,
+        z_bins,
         res.num_iters,
         res.time
     );
+
+    Py_DECREF(x_bins);
+    Py_DECREF(y_bins);
+    Py_DECREF(z_bins);
+
+    return ret;
 }
 
 // Initialize module

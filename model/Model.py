@@ -4,6 +4,7 @@ import sys, os, gc
 import numpy as np
 import pandas as pd
 from datetime import datetime as dt
+import mot_sim as C_ext
 
 #
 class Model:
@@ -19,7 +20,7 @@ class Model:
     @property
     def atom(self):
         return self._atom
-    
+
     #
     # (Series)
     @property
@@ -43,24 +44,24 @@ class Model:
     @property
     def cts(self):
         return self._cts
-    
+
     #
     # Simulation identification code
     @property
     def sim_code(self):
         return self._sim_code
-    
+
     #
-    # (DataFrame) Position histogram
+    # Simulation short name
     @property
-    def pos_hist(self):
-        return self._pos_hist
-    
+    def sim_name(self):
+        return self._sim_name
+
     #
-    # (DataFrame) Position histogram array
+    # (Array) Position histogram array
     @property
-    def pos_hist_arr(self):
-        return self._pos_hist_arr
+    def pos_freqs_arr(self):
+        return self._pos_freqs_arr
     
     #
     # Atoms simulated
@@ -68,6 +69,12 @@ class Model:
     def atoms_simulated(self):
         return self._atoms_simulated
     
+    #
+    # Iterations
+    @property
+    def iters(self):
+        return self._iters
+
 
     ''' Methods '''
 
@@ -87,10 +94,10 @@ class Model:
         #
         # Get parameters
         self.__load_parameters()
-
-        #
-        # Atoms simulated
         self._atoms_simulated = -1
+        self._iters = -1
+        self._sim_code = -1
+        self._sim_name = ''
 
     #
     def __load_parameters(self):
@@ -118,7 +125,7 @@ class Model:
         self._conds['num_bins'] = int(self._conds['num_bins'])
 
     #
-    def start_simulation(self):
+    def start_simulation(self, shortname = ''):
         #
         # Check if results directory exists
         results_dir_path = "model/results/"
@@ -127,8 +134,10 @@ class Model:
 
         #
         # Create a directory to store the results of the simulations
-        self._sim_code = str(int(dt.now().timestamp()))
-        results_dir_path += self._sim_code + '/'
+        self._sim_code = int(dt.now().timestamp())
+        self._sim_name = shortname
+        results_dir_path += str(self.sim_code)
+        if len(self.sim_name) > 0: results_dir_path += '_' +  self.sim_name + '/'
         os.mkdir(results_dir_path)
 
         #
@@ -141,41 +150,36 @@ class Model:
         self.beams.to_csv(parameters_dir + 'beams.csv')
         self.conds.to_csv(parameters_dir + 'conditions.csv')
 
-        #
-        # Create position histogram data
-        '''
-        columns_name = ["x", "y", "z"]
-        indexes = [i+1 for i in range(self.conds['num_bins'])]
-        self._pos_hist = pd.DataFrame(columns=columns_name, index=indexes)
-        self._pos_hist.fillna(0, inplace=True)
-        '''
-
-        self._pos_hist_arr = np.zeros((3, self.conds['num_bins']))
+        self._pos_freqs_arr = np.zeros((3, self.conds['num_bins']))
         self._atoms_simulated = 0
+        self._iters = 0
 
     #
     def simulate_atom(self):
         #
-        # C Extension
-        import mot_sim as C_ext
-
-        #
         # Simulate atoms
         x_bins, y_bins, z_bins, iters, time = C_ext.simulate_atom()
 
-        self._pos_hist_arr[0] += np.array(x_bins)
-        self._pos_hist_arr[1] += np.array(y_bins)
-        self._pos_hist_arr[2] += np.array(z_bins)
+        self._pos_freqs_arr[0] += np.array(x_bins)
+        self._pos_freqs_arr[1] += np.array(y_bins)
+        self._pos_freqs_arr[2] += np.array(z_bins)
 
         self._atoms_simulated += 1
+        self._iters += iters
 
-        del x_bins, y_bins, z_bins
+        del x_bins
+        del y_bins
+        del z_bins
+        gc.collect()
 
     #
     def finish_simulation(self):
         #
         # Check file
-        path = "model/results/" + self.sim_code + "/positions.csv"
+        path = "model/results/" + str(self.sim_code) 
+        if len(self.sim_name) > 0: path += '_' + self.sim_name + '/'
+        path += "/positions.csv"
+
         if os.path.exists(path):
             os.remove(path)
 
@@ -183,18 +187,68 @@ class Model:
         # Create position histogram data
         columns_name = ["x", "y", "z"]
         indexes = [i+1 for i in range(self.conds['num_bins'])]
-        pos_hist = pd.DataFrame(columns=columns_name, index=indexes)
-        pos_hist.fillna(0, inplace=True)
+        pos_freqs = pd.DataFrame(columns=columns_name, index=indexes)
+        pos_freqs.fillna(0, inplace=True)
 
-        pos_hist["x"] += self.pos_hist_arr[0]
-        pos_hist["y"] += self.pos_hist_arr[1]
-        pos_hist["z"] += self.pos_hist_arr[2]
+        pos_freqs["x"] += self.pos_freqs_arr[0]
+        pos_freqs["y"] += self.pos_freqs_arr[1]
+        pos_freqs["z"] += self.pos_freqs_arr[2]
 
-        pos_hist["x"] = pos_hist["x"].astype("int32")
-        pos_hist["y"] = pos_hist["y"].astype("int32")
-        pos_hist["z"] = pos_hist["z"].astype("int32")
+        pos_freqs["x"] = pos_freqs["x"].astype("int32")
+        pos_freqs["y"] = pos_freqs["y"].astype("int32")
+        pos_freqs["z"] = pos_freqs["z"].astype("int32")
 
-        pos_hist.to_csv(path)
+        pos_freqs.to_csv(path)
+
+    #
+    def get_results(self, num=10):
+        #
+        # Variables
+        dir_path = "model/results/"
+        res = []
+        obj_scandir = os.scandir(dir_path)
+        i = 0
+
+        for path in obj_scandir:
+            str_splited = path.name.split("_")
+
+            code = int(str_splited[0])
+            name = ""
+            for j in range(1, len(str_splited)):
+                if j == 1: name += str_splited[j]
+                else: name += '_' + str_splited[j]
+
+            res.append([code, name])
+            i += 1
+
+            if i > num - 1:
+                break
+
+        return sorted(res, key=lambda x: x[0])[::-1]
+
+    #
+    # Check if simulation code exists
+    def check_sim_code(self, code):
+        #
+        # Variables
+        dir_path = "model/results/"
+        obj_scandir = os.scandir(dir_path)
+        ret = False
+
+        for path in obj_scandir:
+            str_splited = path.name.split("_")
+
+            sim_code = int(str_splited[0])
+            name = ""
+            for j in range(1, len(str_splited)):
+                if j == 1: name += str_splited[j]
+                else: name += '_' + str_splited[j]
+
+            if int(sim_code) == code:
+                ret = True
+                break
+
+        return ret  
 
     #
     # Utility methods
