@@ -114,7 +114,7 @@ class View:
         elif self.__model.atoms_simulated < self.__model.conds['num_sim']:
             print('Simulating ...\n')
             print('Atoms simulated: %d / %d' % (self.__model.atoms_simulated, self.__model.conds['num_sim']))
-            print('Loop counter: %d / %d' % (self.__model.loop_counter, len(self.__model.loop_values)))
+            print('Loop counter: %d / %d' % (self.__model.loop["counter"]+1, len(self.__model.loop["values"])))
             print('')
 
         else:
@@ -122,7 +122,7 @@ class View:
             print('Simulation code: %d' % self.__model.sim_code)
             print("Simulation name: " + self.__model.sim_name)
             print('Atoms simulated: %d / %d' % (self.__model.atoms_simulated, self.__model.conds['num_sim']))
-            print('Loop counter: %d / %d' % (self.__model.loop_counter + 1, len(self.__model.loop_values)))
+            print('Loop counter: %d / %d' % (self.__model.loop["counter"] + 1, len(self.__model.loop["values"])))
             print('')
 
     #
@@ -149,8 +149,8 @@ class View:
             print(str(i + 1) + " - (" + str(val[0]) + ") " + str(dt.fromtimestamp(val[0])) + " " + val[1])
 
     #
-    # View position histogram
-    def position_marginal_histogram(self, res, axis=0):
+    # View position marginal histogram
+    def pos_marg_hist(self, res, axis=0):
         #
         # Clear stored plots
         plt.clf()
@@ -176,7 +176,7 @@ class View:
         # Plot
         style={}
 
-        plt.bar(res.position_marginal_histogram[axis]["bins"], height=res.position_marginal_histogram[axis]["dens"], **style)
+        plt.bar(res.pos_hist["margs"][axis]["bins"], height=res.pos_hist["margs"][axis]["dens"], **style)
 
         #
         # Set plot

@@ -76,29 +76,17 @@ class Model:
         return self._sim_end
 
     #
-    # Looping counter
+    # Looping status
     @property
-    def loop_counter(self):
-        return self._loop_counter
-
-    #
-    # Looping values
-    @property
-    def loop_values(self):
-        return self._loop_values
-
-    #
-    # Looping variable
-    @property
-    def loop_var(self):
-        return self._loop_var
+    def loop(self):
+        return self._loop
 
     #
     # Results dirs
     @property
     def results_dir(self):
         return self._results_dir
-    
+
 
     ''' Methods '''
 
@@ -123,6 +111,13 @@ class Model:
         self._sim_end = False
         self._loop_counter = 0
         self._loop_values = []
+        self._loop_dir = []
+        self._loop = {
+            "var": '',\
+            "values": [],\
+            "counter": 0,\
+            "dirs": []
+        }
 
         #
         # Get parameters
@@ -157,8 +152,8 @@ class Model:
         # Check loop variables
         values = self.__get_loop_values(str(self.conds["delta"]))
         if len(values) > 0:
-            self._loop_var = "delta"
-            self._loop_values = values.copy()
+            self._loop["var"] = "delta"
+            self._loop["values"] = values.copy()
 
     #
     def start_simulation(self, shortname = ''):
@@ -180,17 +175,17 @@ class Model:
 
         #
         # Loop values
-        if len(self.loop_values) > 0:
-            for i, loop_val in enumerate(self.loop_values):
-                loop_dir = results_dir + "loop" + str(i) + '/'
-                os.mkdir(loop_dir)
+        if len(self.loop["values"]) > 0:
+            for i, loop_val in enumerate(self.loop["values"]):
+                self._loop["dirs"].append(results_dir + "loop" + str(i+1) + '_' + self.loop["var"] + '/')
+                os.mkdir(self.loop["dirs"][-1])
 
                 #
                 # Save the parameters of the simulation
-                params_dir = loop_dir + "parameters/"
+                params_dir = self.loop["dirs"][-1] + "parameters/"
                 os.mkdir(params_dir)
 
-                if self.loop_var == "delta":
+                if self.loop["var"] == "delta":
                     self.conds["delta"] = float(loop_val)
 
                     self.atom.to_csv(params_dir + "atom.csv")
@@ -205,7 +200,7 @@ class Model:
         else:
             #
             # Save the parameters of the simulation
-            loop_dir = results_dir + "loop0/"
+            loop_dir = results_dir + "loop1/"
             os.mkdir(loop_dir)
 
             params_dir = loop_dir + "parameters/"
@@ -218,13 +213,14 @@ class Model:
 
         self._pos_freqs_arr = np.zeros(self.conds['num_bins']**3)
         self._atoms_simulated = 0
+        self._loop_counter = 0
 
     #
     def simulate(self):
         #
         # Simulate atoms
         if not self.sim_end:
-            params_dir = self.results_dir + "loop" + str(self.loop_counter) + "/parameters/"
+            params_dir = self.loop["dirs"][self.loop["counter"]] + "parameters/"
             freqs = C_ext.simulate_atom(params_dir, int((1000 * (dt.now().timestamp())) % 1000 + 1e3*self.atoms_simulated))
 
             self._atoms_simulated += 1
@@ -233,11 +229,11 @@ class Model:
             if self.atoms_simulated == self.conds["num_sim"]:
                 self.finish_simulation()
 
-                if self.loop_counter == (len(self.loop_values) - 1):
+                if self.loop["counter"] == (len(self.loop["values"]) - 1):
                     self._sim_end = True
 
                 else:
-                    self._loop_counter += 1
+                    self._loop["counter"] += 1
                     self._atoms_simulated = 0
                     self._pos_freqs_arr = np.zeros(self.conds['num_bins']**3)
 
@@ -248,7 +244,7 @@ class Model:
     def finish_simulation(self):
         #
         # Check file
-        path = self.results_dir + "loop" + str(self.loop_counter) + "/positions.csv"
+        path = self.loop["dirs"][self.loop["counter"]] + "/positions.csv"
 
         if os.path.exists(path):
             os.remove(path)
@@ -267,7 +263,6 @@ class Model:
 
         pos_freqs = pd.Series(np.array(values), index=indexes).astype("int32")
         pos_freqs.fillna(0, inplace=True)
-
         pos_freqs.to_csv(path)
 
     #

@@ -167,41 +167,70 @@ class Controller:
                 #
                 # Call results menu
                 elif self.__model.check_sim_code(code):
-                    #
-                    # Result
-                    res = Result(code)
+                    back = True
+                    while back:
+                        #
+                        # Result
+                        res = Result(code)
 
-                    #
-                    # Options
-                    options = {
-                        1 : "Position histogram",\
-                        2 : "Heat map"
-                    }
+                        #
+                        # Options
+                        options = {
+                            1 : "Position histogram"
+                        }
 
-                    header = "Simulation " + str(res.sim_code) + " " + res.sim_name
-                    
-                    opt = self.__call_menu(options, header)
+                        header = "Simulation " + str(res.sim_code) + " " + res.sim_name
+                        
+                        opt = self.__call_menu(options, header)
 
-                    if opt == -1:
-                        call_term = False
+                        if opt == -1:
+                            back = False
 
-                    elif opt == 1 or opt == 2:
-                        call_axis = True
-                        while call_axis:
-                            opts = {
-                                1 : 'x-axis',\
-                                2 : 'y-axis',\
-                                3 : 'z-axis'
-                            }
+                        #
+                        # Position histogram
+                        elif opt == 1:
+                            call_loop = True
+                            while call_loop:
+                                call_axis = True
+                                call_loop = False
 
-                            opt = self.__call_menu(opts, "Choose the axis")
-                            
-                            if opt == -1:
-                                call_term = True
-                                call_axis = False
+                                #
+                                # Check loop
+                                if res.loop["var"] != "default":
+                                    header = "Choose an option"
 
-                            else:
-                                self.__view.position_marginal_histogram(res, opt-1)
+                                    idx = [i+1 for i in range(len(res.loop["values"]))]
+                                    loop_idx = [res.loop["var"] + " = " + str(res.loop["values"][i]) for i in range(len(res.loop["values"]))]
+                                    opts = dict(zip(idx, loop_idx))
+                                    print(opts)
+                                    
+                                    opt = self.__call_menu(opts, header)
+
+                                    if opt == -1:
+                                        call_axis = False
+                                        call_loop = False
+
+                                    else:
+                                        res.loop_idx(opt)
+
+                                #
+                                # Choose axis
+                                while call_axis:
+                                    opts = {
+                                        1 : 'x-axis',\
+                                        2 : 'y-axis',\
+                                        3 : 'z-axis'
+                                    }
+
+                                    opt = self.__call_menu(opts, "Choose the axis")
+                                    
+                                    if opt == -1:
+                                        call_axis = False
+                                        if res.loop["var"] != "default":
+                                            call_loop = True
+
+                                    else:
+                                        self.__view.pos_marg_hist(res, opt-1)
 
                 else:
                     msg = "Code %d invalid!\n" % code
