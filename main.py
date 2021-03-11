@@ -11,4 +11,4 @@ if __name__ == '__main__':
 
     #
     # Initial menu
-    ctrler.main()
+    ctrler.main_menu()

@@ -1,8 +1,9 @@
 ,conditions
 T_0,50.0
 B_0,2.26
-g_bool,0
+delta,loop[-20 0 5]
+g_bool,1
 i_max,1e5
 r_max,3.0
-num_sim,2000
-num_bins,128
+num_sim,100
+num_bins,32

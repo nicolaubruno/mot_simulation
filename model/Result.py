@@ -46,11 +46,17 @@ class Result:
         return self._sim_name
 
     #
-    # Positions histogram
+    # 3D-Histogram of the position distribution
     @property
     def pos_hist(self):
         return self._pos_hist
 
+    #
+    # Histogram of the positions marginals distributions
+    @property
+    def position_marginal_histogram(self):
+        return self._position_marginal_histogram
+    
 
     ''' Methods '''
 
@@ -127,28 +133,32 @@ class Result:
 
         #
         # Positions frequencies
-        path = dir_path + 'positions.csv'
-        self._pos_hist['freqs'] = pd.read_csv(path, index_col=0)[['x', 'y', 'z']].to_numpy()
-        self._pos_hist['freqs'] = self._pos_hist['freqs'].T
+        path = dir_path + 'frequencies_positions.csv'
+        self._pos_hist["freqs"] = pd.read_csv(path, index_col=0, squeeze=True).to_numpy().reshape((self.conds['num_bins'], self.conds['num_bins'], self.conds['num_bins']))
 
         #
         # Positions densities
-        self._pos_hist['dens'] = []
-        
-        for i in range(3):
-            self._pos_hist['dens'].append(self._pos_hist['freqs'][i] / sum(self._pos_hist['freqs'][i]))
+        self._position_marginal_histogram = [{"freqs":[], "dens":[], "bins":[]} for i in range(3)]
 
-        self._pos_hist['dens'] = np.array(self._pos_hist['dens'])
 
-        #
-        # Positions bins
-        self._pos_hist["bins"] = np.zeros((3, self.conds['num_bins']))
-        self._pos_hist["bins"] = self._pos_hist["bins"] - self.conds['r_max']
-        delta = 2*self.conds['r_max'] / self.conds['num_bins']
+        # Frequencies
+        self._position_marginal_histogram[0]["freqs"] = np.sum(self.pos_hist["freqs"], axis=(1, 2))
+        self._position_marginal_histogram[1]["freqs"] = np.sum(self.pos_hist["freqs"], axis=(0, 2))
+        self._position_marginal_histogram[2]["freqs"] = np.sum(self.pos_hist["freqs"], axis=(0, 1))
 
         for i in range(3):
+            # Densities
+            self._position_marginal_histogram[i]["dens"] = self._position_marginal_histogram[i]["freqs"] / np.sum(self._position_marginal_histogram[i]["freqs"])
+            self._position_marginal_histogram[i]["dens"] = np.array(self._position_marginal_histogram[i]["dens"])
+
+            #
+            # Positions bins
+            self._position_marginal_histogram[i]["bins"] = np.zeros(self.conds['num_bins'])
+            self._position_marginal_histogram[i]["bins"] = self._position_marginal_histogram[i]["bins"] - self.conds['r_max']
+            delta = 2*self.conds['r_max'] / self.conds['num_bins']
+
             for j in range(self.conds['num_bins']):
-                self._pos_hist["bins"][i][j] += j*delta
+                self._position_marginal_histogram[i]["bins"][j] += j*delta
 
     #
     def show_positions(self):

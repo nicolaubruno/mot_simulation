@@ -2,73 +2,41 @@
 // Libraries
 //
 
-#include <Python.h>
-#include "mot_sim.h"
-
-//
-// Prototypes
-//
-
-// Read simulation for a single atom
-static PyObject* C_simulate_atom(PyObject *self, PyObject *args);
-
-// Initialize module
-PyMODINIT_FUNC PyInit_mot_sim(void);
-
-// Convert a int array in C to PyObject list
-PyObject *build_list(int *arr, int size);
-
-//
-// Structures
-//
-
-// List methods
-static PyMethodDef mot_sim_methods[] = {
-    {"simulate_atom", C_simulate_atom, METH_NOARGS, "Read the parameters from CSV files and generate the results"},
-    {NULL, NULL, 0, NULL}
-};
-
-// Define module
-static struct PyModuleDef mot_sim_module = {
-    PyModuleDef_HEAD_INIT,
-    "mot_sim",
-    "C Extension with optimized functions related to the MOTSim",
-    -1,
-    mot_sim_methods
-};
-
-//
-// Implementation
-//
+#include "Py_wrapper.h"
 
 // Read simulation for a single atom
 static PyObject* C_simulate_atom(PyObject *self, PyObject *args){
-    //
+    // Variables
+    int i, j, k;
+    long time;
+    PyObject *ret;
+    results_t res;
+    char *params_path;
+
+    // Get parameters path
+    if(!PyArg_ParseTuple(args, "sl", &params_path, &time)){
+        return NULL;
+    }
+    
     // Results
-    //
+    res = simulate_atom(params_path, time);
+    ret = Py_BuildValue("O", build_pos_freqs(res));
 
-    results_t res = simulate_atom();
-    PyObject *x_bins, *y_bins, *z_bins, *ret;
+    // Release memory
+    for(i = 0; i < res.pos_hist.num_bins[0]; i++){
+        for(j = 0; j < res.pos_hist.num_bins[1]; j++){
+            free(res.pos_hist.freqs[i][j]);
+        }
 
-    // Build PyLists
-    x_bins = build_list(res.pos_hist[0].freqs, res.pos_hist[0].num_bins);
-    y_bins = build_list(res.pos_hist[1].freqs, res.pos_hist[1].num_bins);
-    z_bins = build_list(res.pos_hist[2].freqs, res.pos_hist[2].num_bins);
+        free(res.pos_hist.freqs[i]);
+    }
+    free(res.pos_hist.freqs);
+    free(res.pos_hist.num_bins);
+    free(res.pos_hist.bins_size);
+    free(res.pos_hist.coord0);
 
-    // Return
-    ret = Py_BuildValue(
-        "OOOid", 
-        x_bins, 
-        y_bins,
-        z_bins,
-        res.num_iters,
-        res.time
-    );
 
-    Py_DECREF(x_bins);
-    Py_DECREF(y_bins);
-    Py_DECREF(z_bins);
-
+    //return ret;
     return ret;
 }
 
@@ -77,23 +45,31 @@ PyMODINIT_FUNC PyInit_mot_sim(void){
     return PyModule_Create(&mot_sim_module);
 }
 
-// Convert a int array in C to PyObject list
-PyObject *build_list(int *arr, int size){
+// Convert the results in a PyObject list
+PyObject *build_pos_freqs(results_t res){
     //
     // Variables
     //
 
-    int i;
+    int i, j, k, dim_x, dim_y, dim_z;
     PyObject *list;
 
     //
     // Build list
     //
 
-    list = PyList_New(size);
+    dim_x = res.pos_hist.num_bins[0];
+    dim_y = res.pos_hist.num_bins[1];
+    dim_z = res.pos_hist.num_bins[2];
 
-    for(i = 0; i < size; i++){
-        PyList_SetItem(list, i, Py_BuildValue("i", arr[i]));
+    list = PyList_New(dim_x*dim_y*dim_z);
+
+    for(i = 0; i < dim_x; i++){
+        for(j = 0; j < dim_y; j++){
+            for(k = 0; k < dim_z; k++){
+                PyList_SetItem(list, (dim_y*dim_z)*i + dim_z*j + k, Py_BuildValue("i", res.pos_hist.freqs[i][j][k]));
+            }
+        }
     }
 
     // Return

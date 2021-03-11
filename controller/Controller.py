@@ -12,6 +12,11 @@ class Controller:
     
     ''' Attributes '''
 
+    #
+    @property
+    def menu_request(self):
+        return self._menu_request
+
 
     ''' Methods '''
 
@@ -19,12 +24,13 @@ class Controller:
     def __init__(self):
         self.__model = Model()
         self.__view = View(self.__model)
+        self._menu_request = -1
 
     #
-    def main(self):
+    def main_menu(self):
         #
         # Header
-        header = "Initial menu"
+        header = "Main menu"
 
         #
         # Options
@@ -36,60 +42,50 @@ class Controller:
 
         #
         # Call menu
-        call_menu = True
-        while call_menu:
+        while self.menu_request == -1:
             opt = self.__call_menu(options, header)
-            call_menu = False
-
-            #
-            # Call menu again
-            if opt == -1:
-                call_menu = True
 
             #
             # Run Simulation
             if opt == 1:
-                call_menu = self.run_simulation()
+                self.run_simulation()
 
             #
             # Show parameters of the simulation
             elif opt == 2:
-                call_menu = self.view_parameters()
+                self.view_parameters()
 
             #
             # Show results
             elif opt == 3:
-                call_menu = self.view_results()
+                self.view_results()
 
     #
     def run_simulation(self):
         #
-        # Call initial menu
-        call_initial_menu = False
-
-        #
-        # Ask for shortname
+        # Get shortname
         shortname = self.__call_input("Insert a short name for the simulation")
 
         #
-        # Check shortname
-        if shortname == '-1':
-            call_initial_menu = True
+        # Chose a parameter
+        if self.menu_request == 1:
+            #
+            # Change menu request
+            self._menu_request = -1
 
-        else:
             #
             # Time update
             time = dt.now().timestamp()
 
             #
-            # Start simulation
+            # Print simulation status
             self.__model.start_simulation(shortname)
             self.__view.print_simulation_status()
-
+            
             #
             # Simulate atoms
-            for i in range(self.__model.conds.num_sim):
-                self.__model.simulate_atom()
+            while not self.__model.sim_end:
+                self.__model.simulate()
 
                 if (dt.now().timestamp() - time) > 0.5:
                     self.__view.print_simulation_status()
@@ -97,10 +93,7 @@ class Controller:
 
             #
             # Finish simulation
-            self.__model.finish_simulation()
             self.__view.print_simulation_status()
-
-        return call_initial_menu
 
     #
     def view_parameters(self):
@@ -208,7 +201,7 @@ class Controller:
                                 call_axis = False
 
                             else:
-                                self.__view.position_histogram(res, opt-1)
+                                self.__view.position_marginal_histogram(res, opt-1)
 
                 else:
                     msg = "Code %d invalid!\n" % code
@@ -247,9 +240,11 @@ class Controller:
                     exit()
 
                 elif opt in options.keys():
+                    self._menu_request = 1
                     call = False
 
                 elif opt == -1:
+                    self._menu_request = -1
                     call = False
 
         return opt
@@ -263,5 +258,11 @@ class Controller:
         if opt == '0':
             print('\nExiting ...\n')
             exit(0)
+
+        elif opt == '-1':
+            self._menu_request = -1
+
+        else:
+            self._menu_request = 1
 
         return opt

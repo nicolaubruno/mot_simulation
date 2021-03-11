@@ -10,40 +10,55 @@
 
 // --
 
-results_t simulate_atom(){
-    // Seed used by the rand() function
-    srand(time(NULL));
-
+results_t simulate_atom(char *params_path, long time){
     //
     // Variables
     //
 
-    int i;                  // Iterations
+    int i, j, k;            // Iterations
     double r, dt;           // Dynamics
     results_t res;          // Results
     double *a_B;            // Magnetic acceleration
 
+    // Seeds random variable
+    srand(time);
+
     // Parameters of the simulation
-    conditions_t conds = get_conditions();
-    beams_setup_t beams_setup = get_beams();
-    atom_t atom = get_atom(conds);
+    conditions_t conds = get_conditions(params_path);
+    beams_setup_t beams_setup = get_beams(params_path);
+    atom_t atom = get_atom(conds, params_path);
 
     // Scattering process
     scattering_t scatt;
 
+    //
     // Position histogram
-    res.pos_hist = (histogram_t*) calloc(3, sizeof(histogram_t));
+    //
+
+    res.pos_hist.num_bins = (int*) calloc(3, sizeof(int));
+    res.pos_hist.bins_size = (double*) calloc(3, sizeof(double));
+    res.pos_hist.coord0 = (double*) calloc(3, sizeof(double));
 
     for(i = 0; i < 3; i++){
-        // Histogram
-        res.pos_hist[i].num_bins = conds.num_bins;
-        res.pos_hist[i].bin_size = 2 * conds.r_max / res.pos_hist[i].num_bins;
-        res.pos_hist[i].coord0 = - conds.r_max;
-        res.pos_hist[i].freqs = (int *) calloc(res.pos_hist[i].num_bins, sizeof(int));
-
-        // Insert initial position
-        update_hist(&res.pos_hist[i], atom.pos[i]);
+        res.pos_hist.num_bins[i] = conds.num_bins;
+        res.pos_hist.bins_size[i] = 2 * conds.r_max / res.pos_hist.num_bins[i];
+        res.pos_hist.coord0[i] = - conds.r_max;
     }
+
+    res.pos_hist.freqs = (int***) calloc(res.pos_hist.num_bins[0], sizeof(int**));
+
+    for(i = 0; i < res.pos_hist.num_bins[0]; i++){
+        res.pos_hist.freqs[i] = (int**) calloc(res.pos_hist.num_bins[1], sizeof(int*));
+        for(j = 0; j < res.pos_hist.num_bins[1]; j++){
+            res.pos_hist.freqs[i][j] = (int*) calloc(res.pos_hist.num_bins[2], sizeof(int));
+            for(k = 0; k < res.pos_hist.num_bins[2]; k++){
+               res.pos_hist.freqs[i][j][k] = 0; 
+            }
+        }
+    }
+
+    // Insert initial position
+    update_hist_3d(&res.pos_hist, atom.pos);
 
     // Compute distance and speed of the atom
     r = sqrt(r3_inner_product(atom.pos, atom.pos)); // Distance from centre
@@ -88,25 +103,21 @@ results_t simulate_atom(){
         }
 
         // Update results
-        for(i = 0; i < 3; i++) update_hist(&res.pos_hist[i], atom.pos[i]);
+        update_hist_3d(&res.pos_hist, atom.pos);
 
         r = r3_mod(atom.pos);
-        res.num_iters++;
+        res.num_iters += 1;
 
         // Print status
-        //if(res.num_iters % 1 == 0) print_status(atom, res);
+        //if(res.num_iters % 500 == 0) print_status(atom, res);
     }
 
     // Print status
     //print_status(atom, res);
-
-    // Release memory
-    free(a_B);
-
     return res;
 }
 
-atom_t get_atom(conditions_t conds){
+atom_t get_atom(conditions_t conds, char *params_path){
     //
     // Variables
     //
@@ -116,7 +127,7 @@ atom_t get_atom(conditions_t conds){
     int i;
 
     char row[STRING_BUFFER_SIZE];
-    char *path = concatenate_ROOT_PATH("parameters/atom.csv");
+    char *path = str_concatenate(params_path, "atom.csv");
     char *token, *rest;
     
     double std_dev;
@@ -192,7 +203,7 @@ atom_t get_atom(conditions_t conds){
     }
 
     // Optical transition
-    atom.transition = get_transition();
+    atom.transition = get_transition(params_path);
 
     // Close file
     fclose(fp);
@@ -200,14 +211,14 @@ atom_t get_atom(conditions_t conds){
     return atom;
 }
 
-transition_t get_transition(){
+transition_t get_transition(char *params_path){
     //
     // Variables
     //
 
     transition_t transition;
     char row[STRING_BUFFER_SIZE];
-    char *path = concatenate_ROOT_PATH("parameters/transition.csv");
+    char *path = str_concatenate(params_path, "transition.csv");
     char *token, *rest;
     FILE *fp;
 
@@ -315,14 +326,13 @@ transition_t get_transition(){
     return transition;
 }
 
-conditions_t get_conditions(){
+conditions_t get_conditions(char *params_path){
     //
     // Variables
     //
-
     conditions_t conditions;
     char row[STRING_BUFFER_SIZE];
-    char *path = concatenate_ROOT_PATH("parameters/conditions.csv");
+    char *path = str_concatenate(params_path, "conditions.csv");
     char *token, *rest;
     FILE *fp;
 
@@ -359,6 +369,18 @@ conditions_t get_conditions(){
             printf("Invalid parameter \"B_0\" in the file \"%s\"\n", path);
             exit(0);
         } else conditions.B_0 = atof(token);
+    }
+
+    // Laser detuning
+    if(!(fgets(row, STRING_BUFFER_SIZE, fp) == NULL)){
+        rest = row;
+        token = strtok_r(rest, DELIM, &rest); // Variable name
+        token = strtok_r(rest, DELIM, &rest); // Value
+
+        if(!token){
+            printf("Invalid parameter \"delta\" in the file \"%s\"\n", path);
+            exit(0);
+        } else conditions.delta = atof(token);
     }
 
     // Gravity
@@ -425,19 +447,21 @@ conditions_t get_conditions(){
     return conditions;
 }
 
-beams_setup_t get_beams(){
+beams_setup_t get_beams(char *params_path){
     //
     // Variables
     //
 
     beams_setup_t beams_setup;
-    beam_t *beams = (beam_t*) malloc(MAX_BEAMS * sizeof(beam_t));
+    beam_t *beams = (beam_t*) calloc(MAX_BEAMS, sizeof(beam_t));
     beam_t *c_beams;
 
     int num_beams = 0, n;
     char row[STRING_BUFFER_SIZE];
-    char *path = concatenate_ROOT_PATH("parameters/beams.csv");
+
+    char *path = str_concatenate(params_path, "beams.csv");
     char *token, *rest;
+
     FILE *fp;
 
     // Open file
@@ -454,27 +478,19 @@ beams_setup_t get_beams(){
     // Get beams
     while(!(fgets(row, STRING_BUFFER_SIZE, fp) == NULL)){
         //
-        // Laser detuning
-        //
-
-        rest = row;
-        token = strtok_r(rest, DELIM, &rest); // Value
-
-        if(!token){
-            printf("Invalid parameter \"delta\" in the file \"%s\"\n", path);
-            exit(0);
-        } else beams[num_beams].delta = atof(token);
-
-        //
         // Wave vector direction
         //
 
+        rest = row;
+        //token = strtok_r(rest, DELIM, &rest); // Id
         token = strtok_r(rest, DELIM, &rest); // Value
 
         if(!token){
             printf("Invalid parameter \"k_dic\" in the file \"%s\"\n", path);
             exit(0);
-        } else beams[num_beams].k_dic = r3_normalize(get_double_array(token, &n));
+        } else {
+            beams[num_beams].k_dic = r3_normalize(get_double_array(token, &n));
+        }
 
         //
         // Polarization vector
@@ -512,7 +528,7 @@ beams_setup_t get_beams(){
         num_beams++;
     }
 
-    c_beams = (beam_t *) malloc(num_beams * sizeof(beam_t));
+    c_beams = (beam_t *) calloc(num_beams, sizeof(beam_t));
     for(n = 0; n < num_beams; n++) c_beams[n] = beams[n];
 
     beams_setup.num = num_beams;
@@ -575,7 +591,7 @@ scattering_t photonic_recoil(atom_t atom, beams_setup_t beams_setup, conditions_
         pol = random_pick(pol_opt, eps_probs, 3);
 
         // Compute scattering
-        scatt_opt[i].R = scattering_rate(atom, beams_setup.beams[i], B, pol); // Hz
+        scatt_opt[i].R = scattering_rate(atom, beams_setup.beams[i], conds, B, pol); // Hz
         if(scatt_opt[i].R > 0) scatt_opt[i].dt = (1 / scatt_opt[i].R); // s
         else scatt_opt[i].dt = 0;
 
@@ -780,7 +796,7 @@ double *polarization_probs(beam_t beam, double *eB){
     return eps_probs;
 }
 
-double scattering_rate(atom_t atom, beam_t beam, double *B, int pol){
+double scattering_rate(atom_t atom, beam_t beam, conditions_t conds, double *B, int pol){
     //
     // Variables
     //
@@ -816,7 +832,7 @@ double scattering_rate(atom_t atom, beam_t beam, double *B, int pol){
     lambda = atom.transition.lambda;    // nm
 
     // Laser detuning
-    delta += beam.delta;
+    delta += conds.delta;
 
     // Doppler shift
     doppler_shift = -1e4 * r3_inner_product(atom.vel, C[2]) / (lambda * gamma); // Hz
@@ -862,40 +878,13 @@ int print_status(atom_t atom, results_t res){
     return 1;
 }
 
-int write_results(char *dir_code, results_t res){
-    //
-    // Variables
-    //
+int print_results(results_t res){
+    printf("Simulation status\n--\n");
+    printf("number of iterations = %d\n", res.num_iters);
+    printf("total time (s) = %f\n", res.time);
+    printf("\n");
 
-    int i, size;                // Auxiliary variables
-    char *path;                 // File stream
-    FILE *fp;                   // File stream
-
-    // Open file
-    path = str_concatenate(str_concatenate(concatenate_ROOT_PATH("results/"), dir_code), "/position.csv");
-
-    fp = fopen(path, "w");
-    
-    if(fp == NULL){
-        printf("Error to open file \"%s\"", path);
-        exit(0);
-    }
-
-    // Write file
-    fprintf(fp, "id,x,y,z\n");
-
-    size = res.pos_hist[0].num_bins;
-    for(i = 0; i < size; i++){
-        fprintf(fp, "%d,", i+1);
-        fprintf(fp, "%d,", res.pos_hist[0].freqs[i]);
-        fprintf(fp, "%d,", res.pos_hist[1].freqs[i]);
-        fprintf(fp, "%d\n", res.pos_hist[2].freqs[i]);
-    }
-
-    // Close file
-    fclose(fp);
-
-    return 1;
+    return 0;
 }
 
 //
@@ -979,7 +968,7 @@ char *str_concatenate(char *str1, char *str2){
     //
 
     size = (int) (strlen(str1) + strlen(str2) - 1);
-    str = (char*) malloc(size * sizeof(char));
+    str = (char*) calloc(STRING_BUFFER_SIZE, sizeof(char));
     
     for(i = 0; i < ((int) strlen(str1)); i++)
         str[i] = str1[i];
@@ -1066,6 +1055,39 @@ int update_hist(histogram_t *hist, double val){
             break;
         }
     }
+
+    return 1;
+}
+
+int update_hist_3d(histogram_3d_t *hist, double *vals){
+    //
+    // Variables
+    //
+
+    int i, bin, *coord, dim = 3;
+    double lower_lim, upper_lim;
+
+    // Coordinates
+    coord = (int*) calloc(dim, sizeof(int));
+
+    // Check each coordinate
+    for(i = 0; i < dim; i++){
+        // Add frequency
+        for(bin = 0; bin < (*hist).num_bins[i]; bin++){
+            lower_lim = (*hist).coord0[i] + bin * (*hist).bins_size[i];
+            upper_lim = lower_lim + (*hist).bins_size[i];
+
+            if((vals[i] >= lower_lim) && (vals[i] < upper_lim)){
+                coord[i] = bin;
+                break;
+            }
+        }  
+    }
+
+    (*hist).freqs[coord[0]][coord[1]][coord[2]] += 1;
+
+    // Release memory
+    free(coord);
 
     return 1;
 }

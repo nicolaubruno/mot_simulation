@@ -58,6 +58,7 @@ typedef struct{
 typedef struct{
     double T_0;     /* Initial temperature  */
     double B_0;     /* Magnetic Field gradient */
+    double delta;   /* Laser detuning */
     int g_bool;     /* Use gravity */
     int i_max;      /* Maximum number of iteration */
     double r_max;   /* Maximum distance (threshold) */
@@ -66,7 +67,6 @@ typedef struct{
 
 // Beam
 typedef struct {
-    double delta;    /* Laser detuning */
     double *k_dic;   /* Wave vector direction */
     double *eps;     /* Polarization vector */
     double s_0;      /* Peak of the saturation parameter */
@@ -87,6 +87,14 @@ typedef struct {
     int *freqs;         /* Frequencies */
 } histogram_t;
 
+// 3D-dimensional Histogram
+typedef struct {
+    int *num_bins;    /* Number of bins in each axis */
+    double *bins_size;    /* Bin size in each axis */
+    double *coord0;      /* Initial value in each axis */
+    int ***freqs;        /* Frequencies */
+} histogram_3d_t;
+
 // Photon-atom scattering
 typedef struct {
     double *vel;    /* Velocity gain */
@@ -96,9 +104,9 @@ typedef struct {
 
 // Results
 typedef struct{
-    histogram_t *pos_hist;  /* Histogram of the position */
-    int num_iters;          /* Number of iterations */
-    double time;            /* Total time [s] */
+    histogram_3d_t pos_hist;        /* Histogram of the position */
+    int num_iters;                  /* Number of iterations */
+    double time;                    /* Total time [s] */
 } results_t;
 
 /*
@@ -113,19 +121,19 @@ typedef struct{
 //
 
 // Run simulation for a single atom
-results_t simulate_atom();
+results_t simulate_atom(char *params_path, long time);
 
 // Get atom
-atom_t get_atom();
+atom_t get_atom(conditions_t conds, char *params_path);
 
 // Get transition
-transition_t get_transition();
+transition_t get_transition(char *params_path);
 
 // Get conditions
-conditions_t get_conditions();
+conditions_t get_conditions(char *params_path);
 
 // Get beams setup
-beams_setup_t get_beams();
+beams_setup_t get_beams(char *params_path);
 
 // Compute scattering variables (scattering_t) in a photon-atom scattering event
 scattering_t photonic_recoil(atom_t atom, beams_setup_t beams_setup, conditions_t conds);
@@ -137,7 +145,7 @@ double *magnetic_acceleration(atom_t atom, double B_0);
 double *get_magnetic_field(double B_0, double *r);
 
 // Get scattering rate
-double scattering_rate(atom_t atom, beam_t beam, double *B, int pol);
+double scattering_rate(atom_t atom, beam_t beam, conditions_t conds, double *B, int pol);
 
 // Get components of a vector v on the basis B given the components on basis A
 double *change_basis(double *v, double **A, double **B);
@@ -147,6 +155,9 @@ double *polarization_probs(beam_t beam, double *eB);
 
 // Print simulation status
 int print_status(atom_t atom, results_t res);
+
+// Print results
+int print_results(results_t res);
 
 // Write results in a CSV file
 int write_results(char *dir_code, results_t res);
@@ -175,6 +186,9 @@ double random_exp(double mean);
 
 // Update histogram
 int update_hist(histogram_t *hist, double val);
+
+// Update multidimensional histogram
+int update_hist_3d(histogram_3d_t *hist, double *vals);
 
 // Convert the components (module) of a polarization vector on the basis C to a basis D
 double *update_polarization_vector(double *eps, double **r3_C, double **r3_D);
