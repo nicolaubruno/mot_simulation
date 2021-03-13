@@ -10,7 +10,7 @@
 
 // --
 
-results_t simulate_atom(char *params_path, long time){
+results_t simulate_atom(char *params_path, int only_marginals, long time){
     //
     // Variables
     //
@@ -19,6 +19,7 @@ results_t simulate_atom(char *params_path, long time){
     double r, dt;           // Dynamics
     results_t res;          // Results
     double *a_B;            // Magnetic acceleration
+    double **B_basis;       // Basis
 
     // Seeds random variable
     srand(time);
@@ -31,34 +32,52 @@ results_t simulate_atom(char *params_path, long time){
     // Scattering process
     scattering_t scatt;
 
+    // Basis with z-direction parallel to the axial direction of the quadrupolar magnetic field
+    B_basis = orthonormal_basis(conds.B_axial);
+
     //
     // Position histogram
     //
 
-    res.pos_hist.num_bins = (int*) calloc(3, sizeof(int));
-    res.pos_hist.bins_size = (double*) calloc(3, sizeof(double));
-    res.pos_hist.coord0 = (double*) calloc(3, sizeof(double));
+    // Only marginals
+    if(only_marginals){
+        res.pos_hist = (histogram_t*) calloc(3, sizeof(histogram_t));
 
-    for(i = 0; i < 3; i++){
-        res.pos_hist.num_bins[i] = conds.num_bins;
-        res.pos_hist.bins_size[i] = 2 * conds.r_max / res.pos_hist.num_bins[i];
-        res.pos_hist.coord0[i] = - conds.r_max;
-    }
+        for(i = 0; i < 3; i++){
+            res.pos_hist[i].num_bins = conds.num_bins;
+            res.pos_hist[i].bin_size = 2 * conds.r_max / res.pos_hist[i].num_bins;
+            res.pos_hist[i].coord0 = - conds.r_max;
+            res.pos_hist[i].freqs = (int*) calloc(res.pos_hist[i].num_bins, sizeof(int));
+            update_hist(&res.pos_hist[i], atom.pos[i]);
+        }
 
-    res.pos_hist.freqs = (int***) calloc(res.pos_hist.num_bins[0], sizeof(int**));
+    // Complete histograms
+    } else{
+        res.pos_3Dhist.num_bins = (int*) calloc(3, sizeof(int));
+        res.pos_3Dhist.bins_size = (double*) calloc(3, sizeof(double));
+        res.pos_3Dhist.coord0 = (double*) calloc(3, sizeof(double));
 
-    for(i = 0; i < res.pos_hist.num_bins[0]; i++){
-        res.pos_hist.freqs[i] = (int**) calloc(res.pos_hist.num_bins[1], sizeof(int*));
-        for(j = 0; j < res.pos_hist.num_bins[1]; j++){
-            res.pos_hist.freqs[i][j] = (int*) calloc(res.pos_hist.num_bins[2], sizeof(int));
-            for(k = 0; k < res.pos_hist.num_bins[2]; k++){
-               res.pos_hist.freqs[i][j][k] = 0; 
+        for(i = 0; i < 3; i++){
+            res.pos_3Dhist.num_bins[i] = conds.num_bins;
+            res.pos_3Dhist.bins_size[i] = 2 * conds.r_max / res.pos_3Dhist.num_bins[i];
+            res.pos_3Dhist.coord0[i] = - conds.r_max;
+        }
+
+        res.pos_3Dhist.freqs = (int***) calloc(res.pos_3Dhist.num_bins[0], sizeof(int**));
+
+        for(i = 0; i < res.pos_3Dhist.num_bins[0]; i++){
+            res.pos_3Dhist.freqs[i] = (int**) calloc(res.pos_3Dhist.num_bins[1], sizeof(int*));
+            for(j = 0; j < res.pos_3Dhist.num_bins[1]; j++){
+                res.pos_3Dhist.freqs[i][j] = (int*) calloc(res.pos_3Dhist.num_bins[2], sizeof(int));
+                for(k = 0; k < res.pos_3Dhist.num_bins[2]; k++){
+                   res.pos_3Dhist.freqs[i][j][k] = 0; 
+                }
             }
         }
-    }
 
-    // Insert initial position
-    update_hist_3d(&res.pos_hist, atom.pos);
+        // Insert initial position
+        update_hist_3d(&res.pos_3Dhist, atom.pos);
+    }
 
     // Compute distance and speed of the atom
     r = sqrt(r3_inner_product(atom.pos, atom.pos)); // Distance from centre
@@ -73,10 +92,10 @@ results_t simulate_atom(char *params_path, long time){
 
     while((res.num_iters < conds.i_max) && (r < conds.r_max)){
         // Compute the photonic recoil
-        scatt = photonic_recoil(atom, beams_setup, conds);
+        scatt = photonic_recoil(atom, beams_setup, conds, B_basis);
 
         // Magnetic acceleration
-        a_B = magnetic_acceleration(atom, conds.B_0);
+        a_B = magnetic_acceleration(atom, conds.B_0, B_basis);
 
         // Update time
         if(scatt.dt > 0 && scatt.dt < MAX_dt) dt = scatt.dt;
@@ -84,26 +103,36 @@ results_t simulate_atom(char *params_path, long time){
         res.time += dt;
 
         // Update position
-        atom.vel[2] += - (g * dt*dt) / 2;
-        for(i = 0; i < 3; i++) atom.pos[i] += atom.vel[i] * dt + (a_B[i] * dt*dt) / 2;
+        for(i = 0; i < 3; i++) {
+            atom.pos[i] += atom.vel[i] * dt;
+            atom.pos[i] += (a_B[i] * dt*dt) / 2;    // Magnetic acceleration
+        }
+
+        if(conds.g_bool) 
+            atom.pos[2] += -(g * dt*dt) / 2;    // Gravity
 
         //
         // Update velocity
         //
 
         // Gravitational acceleration
-        if(conds.g_bool) atom.vel[2] += - g * dt;
+        if(conds.g_bool)
+            atom.vel[2] += - g * dt;
 
         for(i = 0; i < 3; i++){
             // Photonic recoil
-            if(scatt.dt > 0 && scatt.dt < MAX_dt) atom.vel[i] += scatt.vel[i];
+            if(scatt.dt > 0 && scatt.dt < MAX_dt) 
+                atom.vel[i] += scatt.vel[i];
 
             // Magnetic acceleration
             atom.vel[i] += a_B[i] * dt;
         }
 
         // Update results
-        update_hist_3d(&res.pos_hist, atom.pos);
+        if(only_marginals)
+            for(i = 0; i < 3; i++) update_hist(&res.pos_hist[i], atom.pos[i]);
+        
+        else update_hist_3d(&res.pos_3Dhist, atom.pos);
 
         r = r3_mod(atom.pos);
         res.num_iters += 1;
@@ -114,6 +143,12 @@ results_t simulate_atom(char *params_path, long time){
 
     // Print status
     //print_status(atom, res);
+
+    // Release memory
+    for(i = 0; i < 3; i++) free(B_basis[i]);
+    free(B_basis);
+    free(a_B);
+
     return res;
 }
 
@@ -208,6 +243,9 @@ atom_t get_atom(conditions_t conds, char *params_path){
     // Close file
     fclose(fp);
 
+    // Release memory
+    free(path);
+
     return atom;
 }
 
@@ -242,7 +280,7 @@ transition_t get_transition(char *params_path){
         if(!token){
             printf("Invalid parameter \"gamma\" in the file \"%s\"\n", path);
             exit(0);
-        } else transition.gamma = atof(token) * 2 * PI;
+        } else transition.gamma = atof(str_replace(token, ".", ",")) * 2 * PI;
     }
 
     // Resonant wave length
@@ -254,7 +292,7 @@ transition_t get_transition(char *params_path){
         if(!token){
             printf("Invalid parameter \"lambda\" in the file \"%s\"\n", path);
             exit(0);
-        } else transition.lambda = atof(token);
+        } else transition.lambda = atof(str_replace(token, ".", ","));
     }
 
     // Total angular momentum of the ground state
@@ -290,7 +328,7 @@ transition_t get_transition(char *params_path){
         if(!token){
             printf("Invalid parameter \"g_gnd\" in the file \"%s\"\n", path);
             exit(0);
-        } else transition.g_gnd = atof(token);
+        } else transition.g_gnd = atof(str_replace(token, ".", ","));
     }
 
     // Landè factor of the excited state
@@ -302,7 +340,7 @@ transition_t get_transition(char *params_path){
         if(!token){
             printf("Invalid parameter \"g_exc\" in the file \"%s\"\n", path);
             exit(0);
-        } else transition.g_exc = atof(token);
+        } else transition.g_exc = atof(str_replace(token, ".", ","));
     }
 
     //
@@ -321,6 +359,7 @@ transition_t get_transition(char *params_path){
     fclose(fp);
 
     // Release memory
+    free(path);
 
     // Return
     return transition;
@@ -330,6 +369,8 @@ conditions_t get_conditions(char *params_path){
     //
     // Variables
     //
+
+    int n;
     conditions_t conditions;
     char row[STRING_BUFFER_SIZE];
     char *path = str_concatenate(params_path, "conditions.csv");
@@ -356,7 +397,7 @@ conditions_t get_conditions(char *params_path){
         if(!token){
             printf("Invalid parameter \"T_0\" in the file \"%s\"\n", path);
             exit(0);
-        } else conditions.T_0 = atof(token);
+        } else conditions.T_0 = atof(str_replace(token, ".", ","));
     }
 
     // Magnetic field gradient
@@ -368,7 +409,19 @@ conditions_t get_conditions(char *params_path){
         if(!token){
             printf("Invalid parameter \"B_0\" in the file \"%s\"\n", path);
             exit(0);
-        } else conditions.B_0 = atof(token);
+        } else conditions.B_0 = atof(str_replace(token, ".", ","));
+    }
+
+    // Magnetic field axial direction
+    if(!(fgets(row, STRING_BUFFER_SIZE, fp) == NULL)){
+        rest = row;
+        token = strtok_r(rest, DELIM, &rest); // Variable name
+        token = strtok_r(rest, DELIM, &rest); // Value
+
+        if(!token){
+            printf("Invalid parameter \"B_axial\" in the file \"%s\"\n", path);
+            exit(0);
+        } else conditions.B_axial = r3_normalize(get_double_array(token, &n));
     }
 
     // Laser detuning
@@ -380,7 +433,10 @@ conditions_t get_conditions(char *params_path){
         if(!token){
             printf("Invalid parameter \"delta\" in the file \"%s\"\n", path);
             exit(0);
-        } else conditions.delta = atof(token);
+        } else { 
+            if(token[0] == '-') conditions.delta= -atof(str_replace(token+1, ".", ",")); 
+            else conditions.delta = atof(str_replace(token, ".", ","));
+        }
     }
 
     // Gravity
@@ -404,7 +460,7 @@ conditions_t get_conditions(char *params_path){
         if(!token){
             printf("Invalid parameter \"i_max\" in the file \"%s\"\n", path);
             exit(0);
-        } else conditions.i_max = (int) atof(token);
+        } else conditions.i_max = (int) atof(str_replace(token, ".", ","));
     }
 
     // Maximum distance
@@ -416,7 +472,7 @@ conditions_t get_conditions(char *params_path){
         if(!token){
             printf("Invalid parameter \"r_max\" in the file \"%s\"\n", path);
             exit(0);
-        } else conditions.r_max = atof(token);
+        } else conditions.r_max = atof(str_replace(token, ".", ","));
     }
 
     // Number of simulations
@@ -443,7 +499,12 @@ conditions_t get_conditions(char *params_path){
         } else conditions.num_bins = atoi(token);
     }
 
+    // Close file
     fclose(fp);
+
+    // Release memory
+    free(path);
+
     return conditions;
 }
 
@@ -512,7 +573,10 @@ beams_setup_t get_beams(char *params_path){
         if(!token){
             printf("Invalid parameter \"s_0\" in the file \"%s\"\n", path);
             exit(0);
-        } else beams[num_beams].s_0 = atof(token);
+        } else {
+            if(token[0] == '-') beams[num_beams].s_0 = -atof(str_replace(token+1, ".", ",")); 
+            else beams[num_beams].s_0 = atof(str_replace(token, ".", ","));
+        }
 
         //
         // Waist Radius
@@ -523,7 +587,7 @@ beams_setup_t get_beams(char *params_path){
         if(!token){
             printf("Invalid parameter \"w\" in the file \"%s\"\n", path);
             exit(0);
-        } else beams[num_beams].w = atof(token);
+        } else beams[num_beams].w = atof(str_replace(token, ".", ","));
 
         num_beams++;
     }
@@ -534,17 +598,18 @@ beams_setup_t get_beams(char *params_path){
     beams_setup.num = num_beams;
     beams_setup.beams = c_beams;
 
-    // Release memory
-    free(beams);
-
     // Close file
     fclose(fp);
+
+    // Release memory
+    free(beams);
+    free(path);
 
     // Return
     return beams_setup;
 }
 
-scattering_t photonic_recoil(atom_t atom, beams_setup_t beams_setup, conditions_t conds){
+scattering_t photonic_recoil(atom_t atom, beams_setup_t beams_setup, conditions_t conds, double **B_basis){
     //
     // Variables
     //
@@ -556,7 +621,7 @@ scattering_t photonic_recoil(atom_t atom, beams_setup_t beams_setup, conditions_
     int *pol_opt, pol;                          // Polarization
 
     // Get Magnetic field
-    B = get_magnetic_field(conds.B_0, atom.pos);
+    B = get_magnetic_field(conds.B_0, B_basis, atom.pos);
 
     //
     // Get scattering length
@@ -622,7 +687,10 @@ scattering_t photonic_recoil(atom_t atom, beams_setup_t beams_setup, conditions_
     }
 
     // Release memory
+    free(eK);
     free(eB);
+    free(B);
+    free(eps_probs);
     free(pol_opt);
     free(rd_v);
 
@@ -630,20 +698,30 @@ scattering_t photonic_recoil(atom_t atom, beams_setup_t beams_setup, conditions_
     return scatt_opt[j];
 }
 
-double *magnetic_acceleration(atom_t atom, double B_0){
+double *magnetic_acceleration(atom_t atom, double B_0, double **B_basis){
     // Variables
     int i;
     double *a_B, *del_B, norm;  // Magnetic field
     double g_gnd, mJ_gnd;       // Transition
+    double *r_prime;
 
     // Magnetic field gradient
     if(r3_mod(atom.pos) > 0){
         del_B = (double*) calloc(3, sizeof(double)); // G / cm
-        norm = sqrt(pow(atom.pos[0], 2) * pow(atom.pos[1], 2) + 4 * pow(atom.pos[2], 2));
-        
-        del_B[0] = (B_0 * atom.pos[0]) / (2 * norm); // G / cm
-        del_B[1] = (B_0 * atom.pos[1]) / (2 * norm); // G / cm
-        del_B[2] = (2 * B_0 * atom.pos[2]) / norm; // G / cm
+        r_prime = (double*) calloc(3, sizeof(double)); // cm
+
+        for(i = 0; i < 3; i++)
+            r_prime[i] = r3_inner_product(atom.pos, B_basis[i]);
+
+        norm = sqrt(pow(r_prime[0], 2) * pow(r_prime[1], 2) + 4 * pow(r_prime[2], 2));
+
+        for(i = 0; i < 3; i++){
+            del_B[i] = 0;
+            del_B[i] += B_basis[0][i] * r_prime[0] / (2 * norm);
+            del_B[i] += B_basis[1][i] * r_prime[1] / (2 * norm);
+            del_B[i] += - B_basis[2][i] * 2  * r_prime[2] / norm;
+            del_B[i] = B_0 * del_B[i];
+        }
 
         // Magnetic acceleration
         a_B = (double*) calloc(3, sizeof(double)); // cm / s^2
@@ -656,6 +734,7 @@ double *magnetic_acceleration(atom_t atom, double B_0){
 
         // Release memory
         free(del_B);
+        free(r_prime);
     } else {
         a_B = (double*) calloc(3, sizeof(double)); // cm / s^2
         for(i = 0; i < 3; i++) a_B[i] = 0;
@@ -664,19 +743,31 @@ double *magnetic_acceleration(atom_t atom, double B_0){
     return a_B;
 }
 
-double *get_magnetic_field(double B_0, double *r){
+double *get_magnetic_field(double B_0, double **B_basis, double *r){
     //
     // Variables
     //
-    double *B;      // Magnetic field vector
+    int i;
+    double *B;          // Magnetic field vector
+    double *r_prime;
 
     B = (double*) calloc(3, sizeof(double));
+    r_prime = (double*) calloc(3, sizeof(double));
 
-    B[0] = B_0 * r[0] / 2; // Radial magnetic field
-    B[1] = B_0 * r[1] / 2; // Radial magnetic field
-    B[2] = - B_0 * r[2]; // Axial magnetic field
+    for(i = 0; i < 3; i++)
+        r_prime[i] = r3_inner_product(r, B_basis[i]);
 
-    // Return
+    for(i = 0; i < 3; i++){
+        B[i] = 0;
+        B[i] += r_prime[0] * B_basis[0][i] / 2;
+        B[i] += r_prime[1] * B_basis[1][i] / 2;
+        B[i] += - r_prime[2] * B_basis[2][i];
+        B[i] = B_0 * B[i];
+    }
+
+    // Release memory
+    free(r_prime);
+
     return B;
 }
 
@@ -782,6 +873,8 @@ double *polarization_probs(beam_t beam, double *eB){
         free(A1[i]);
         free(A1_i[i]);
         free(A2[i]);
+        free(r3_C[i]);
+        free(r3_D[i]);
         free(c3_C[i]);
         free(c3_D[i]);
     }
@@ -791,6 +884,13 @@ double *polarization_probs(beam_t beam, double *eB){
     free(A2);
     free(c3_C);
     free(c3_D);
+    free(r3_C);
+    free(r3_D);
+    free(eK);
+    free(C_eps);
+    free(Cp_eps);
+    free(D_eps);
+    free(Dp_eps);
 
     // Return
     return eps_probs;
@@ -808,6 +908,7 @@ double scattering_rate(atom_t atom, beam_t beam, conditions_t conds, double *B, 
     int mj_gnd, mj_exc;                                 // Zeeman shift
     double g_gnd, g_exc;                                // Zeeman shift
     double **C;                                         // Basis of the beam frame
+    int i;
 
     // Basis of the beam frame
     C = orthonormal_basis(r3_normalize(beam.k_dic));
@@ -828,14 +929,14 @@ double scattering_rate(atom_t atom, beam_t beam, conditions_t conds, double *B, 
     //
 
     delta = 0;
-    gamma = atom.transition.gamma;      // kHz
+    gamma = 2*PI*atom.transition.gamma; // kHz
     lambda = atom.transition.lambda;    // nm
 
     // Laser detuning
     delta += conds.delta;
 
     // Doppler shift
-    doppler_shift = -1e4 * r3_inner_product(atom.vel, C[2]) / (lambda * gamma); // Hz
+    doppler_shift = -1e4 * r3_inner_product(atom.vel, C[2]) / (lambda * gamma);
     delta += doppler_shift;
 
     // Zeeman shift
@@ -850,15 +951,8 @@ double scattering_rate(atom_t atom, beam_t beam, conditions_t conds, double *B, 
     // Scattering rate
     R = ((1e3 * gamma)/2) * s / (1 + s + 4*delta*delta); // Hz
 
-    //printf("R = %f\n", R);
-    //printf("mj_gnd = %d\n", mj_gnd);
-    //printf("mj_exc = %d\n", mj_exc);
-    //printf("s = %f\n", s);
-    //printf("doppler_shift = %f\n", doppler_shift);
-    //printf("zeeman_shift = %f\n", zeeman_shift);
-    //printf("|B| (G / cm) = %f\n", r3_mod(B));
-
-    // Release memory    
+    // Release memory  
+    for(i = 0; i < 3; i++) free(C[i]); 
     free(C);
 
     // Return
@@ -922,6 +1016,9 @@ int *get_int_array(char *str, int *size){
     arr = (int*) malloc(i * sizeof(int));
     for(j = 0; j < i; j++) arr[j] = aux_arr[j];
 
+    // Release memory
+    free(token);
+
     return arr;
 }
 
@@ -944,8 +1041,8 @@ double *get_double_array(char *str, int *size){
 
     i = 0;
     while(token && (i < max_size)){
-        if(token[0] == '-') aux_arr[i] = -atof((token + 1)); 
-        else aux_arr[i] = atof(token);
+        if(token[0] == '-') aux_arr[i] = -atof(str_replace(token+1, ".", ",")); 
+        else aux_arr[i] = atof(str_replace(token, ".", ","));
 
         token = strtok_r(str, " ", &str);
         i++;
@@ -953,6 +1050,9 @@ double *get_double_array(char *str, int *size){
 
     arr = (double *) malloc(i * sizeof(double));
     for(j = 0; j < i; j++) arr[j] = aux_arr[j];
+
+    // Release memory
+    free(token);
 
     return arr;
 }
@@ -983,9 +1083,9 @@ char *str_concatenate(char *str1, char *str2){
 
 char *concatenate_ROOT_PATH(char *filename){
     int i;
-    char aux_path[124];
-    char *path;
+    char *path, *aux_path;
 
+    aux_path = (char*) calloc(STRING_BUFFER_SIZE, sizeof(char));
     aux_path[0] = '\0';
 
     strcat(aux_path, ROOT_PATH);
@@ -997,6 +1097,9 @@ char *concatenate_ROOT_PATH(char *filename){
     path = (char*) malloc(i*sizeof(char));
     strcpy(path, aux_path);
 
+    // Release memory
+    free(aux_path);
+
     return path;
 }
 
@@ -1006,9 +1109,11 @@ double random_norm(double mean, double std_dev){
     //
 
     int i;
-    double v[2], r, theta;   // Variables for Box-Muller method
+    double *v, r, theta;     // Variables for Box-Muller method
     double std_norm;         // Normal(0, 1)
     double norm;             // Adjusted normal
+
+    v = (double*) calloc(2, sizeof(double));
 
     //
     // Box-Muller transform
@@ -1029,6 +1134,9 @@ double random_norm(double mean, double std_dev){
 
     // Adjust std_norm
     norm = (std_norm * std_dev) + mean;
+
+    // Release memory
+    free(v);
 
     return norm;
 }
@@ -1098,8 +1206,8 @@ double **orthonormal_basis(double *v){
     //
 
     int i;
-    double **B;       // Desired basis
-    double *v1, *v2, *v3;    // Auxiliary vectors
+    double **B;             // Desired basis
+    double *v1, *v2, *v3;   // Auxiliary vectors
 
     // Normalize vector v
     v3 = r3_normalize(v);
@@ -1116,14 +1224,18 @@ double **orthonormal_basis(double *v){
     v2 = r3_cross_product(v3, v1);
 
     // Define basis
-    B = (double **) malloc(3 * sizeof(double *));
-    
-    B[0] = v1;
-    B[1] = v2;
-    B[2] = v3;
+    B = (double **) calloc(3, sizeof(double *));
 
-    // Release memory
-    free(v);
+    for(i = 0; i < 3; i++)
+        B[i] = (double *) calloc(3, sizeof(double));
+
+    for(i = 0; i < 3; i++){
+        B[0][i] = v1[i];
+        B[1][i] = v2[i];
+        B[2][i] = v3[i];
+    }
+
+    // Free
     free(v1);
     free(v2);
     free(v3);
@@ -1170,4 +1282,51 @@ int random_pick(int *arr, double *probs, int size){
 
     // Return
     return picked;
+}
+
+char *str_replace(char *orig, char *rep, char *with){
+    char *result; // the return string
+    char *ins;    // the next insert point
+    char *tmp;    // varies
+    int len_rep;  // length of rep (the string to remove)
+    int len_with; // length of with (the string to replace rep with)
+    int len_front; // distance between rep and end of last rep
+    int count;    // number of replacements
+
+    // sanity checks and initialization
+    if (!orig || !rep)
+        return NULL;
+    len_rep = strlen(rep);
+    if (len_rep == 0)
+        return NULL; // empty rep causes infinite loop during count
+    if (!with)
+        with = "";
+    len_with = strlen(with);
+
+    // count the number of replacements needed
+    ins = orig;
+    for (count = 0; tmp = strstr(ins, rep); ++count) {
+        ins = tmp + len_rep;
+    }
+
+    tmp = result = malloc(strlen(orig) + (len_with - len_rep) * count + 1);
+
+    if (!result)
+        return NULL;
+
+    // first time through the loop, all the variable are set correctly
+    // from here on,
+    //    tmp points to the end of the result string
+    //    ins points to the next occurrence of rep in orig
+    //    orig points to the remainder of orig after "end of rep"
+    while (count--) {
+        ins = strstr(orig, rep);
+        len_front = ins - orig;
+        tmp = strncpy(tmp, orig, len_front) + len_front;
+        tmp = strcpy(tmp, with) + len_with;
+        orig += len_front + len_rep; // move to next "end of rep"
+    }
+    strcpy(tmp, orig);
+
+    return result;
 }

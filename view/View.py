@@ -31,10 +31,10 @@ class View:
     ''' Methods '''
 
     #
-    def __init__(self, model):
+    def __init__(self, simulation):
         #
-        # Model object
-        self.__model = model
+        # Simulation object
+        self.__simulation = simulation
 
         #
         # Terminal separator line
@@ -49,7 +49,7 @@ class View:
         self._header += " 0 -> Exit\n"
 
     #
-    def terminal_menu(self, options, header = '', footer = '', clear_screen = True):
+    def terminal_menu(self, options, header = None, footer = None, clear_screen = True):
         #
         # Clear screen
         if clear_screen:
@@ -59,25 +59,25 @@ class View:
         #
         # Show header 
         print(self.header)
-        if len(header) > 0: print(header + self.separator)
+        if header is not None: print(header + self.separator)
 
         #
         # Show options
         for key, val in options.items():
             print('%d -> %s;' % (key, val))
 
-        print("")
+        print('')
 
         #
         # Show footer
-        if len(footer) > 0: print(footer)
+        if footer is not None: print(footer)
 
         #
         # Return input
         return input('Option code: ')
 
     #
-    def terminal_input(self, description = '', clear_screen = True, header = True):
+    def terminal_input(self, description = None, clear_screen = True, header = True, footer= None):
         #
         # Clear screen
         if clear_screen:
@@ -89,48 +89,41 @@ class View:
         if header: print(self.header)
 
         #
+        # Show footer 
+        if footer is not None: print(footer)
+
+        #
         # Input
-        if len(description) > 0: description += ": "
+        if description is not None: description += ": "
+        else: description = ''
+
         input_str = input('\n' + description)
 
         return input_str
 
     #
     # Print the status of the simulation
-    def print_simulation_status(self):
+    def simulation_status(self, clear_screen=True):
         #
         # Clear screen
-        if os.name == 'nt': os.system('cls')
-        else: os.system('clear')
+        if clear_screen:
+            if os.name == 'nt': os.system('cls')
+            else: os.system('clear')
 
         #
         # Show header 
         print(self.header)
 
-        print('')
-        if self.__model.atoms_simulated == -1:
-            print('Starting simulation ...\n')
-
-        elif self.__model.atoms_simulated < self.__model.conds['num_sim']:
-            print('Simulating ...\n')
-            print('Atoms simulated: %d / %d' % (self.__model.atoms_simulated, self.__model.conds['num_sim']))
-            print('Loop counter: %d / %d' % (self.__model.loop["counter"]+1, len(self.__model.loop["values"])))
-            print('')
-
-        else:
-            print('Simulation has finished ...\n')
-            print('Simulation code: %d' % self.__model.sim_code)
-            print("Simulation name: " + self.__model.sim_name)
-            print('Atoms simulated: %d / %d' % (self.__model.atoms_simulated, self.__model.conds['num_sim']))
-            print('Loop counter: %d / %d' % (self.__model.loop["counter"] + 1, len(self.__model.loop["values"])))
-            print('')
+        print()
+        print("Atoms simulated = %d / %d" % (self.__simulation.atoms_simulated, self.__simulation.conds['num_sim']))
+        print()
 
     #
     # Print the results
-    def print_results(self, num = 10, clear_screen = True):
+    def results_history(self, num = 5, clear_screen = True):
         #
-        # Get results code
-        res = self.__model.get_results(num)
+        # Get results
+        res = self.__simulation.get_results(num)
 
         #
         # Clear screen
@@ -146,7 +139,11 @@ class View:
         print('Results history' + self.separator)
 
         for i, val in enumerate(res):
-            print(str(i + 1) + " - (" + str(val[0]) + ") " + str(dt.fromtimestamp(val[0])) + " " + val[1])
+            print(str(i + 1), end='')
+            print(" - (" + str(val[0]) + ")", end='')
+            print(' ' + str(dt.fromtimestamp(val[0])), end='')
+            print(' ' + val[1], end='')
+            print()
 
     #
     # View position marginal histogram
@@ -185,3 +182,58 @@ class View:
         #
         # Show
         plt.show()
+
+    #
+    # Print a 3D-vector
+    def mass_centre(self, res):
+        r_c, std_r_c = res.mass_centre()
+
+        if res.loop["var"]:
+            #
+            # Clear stored plots
+            plt.clf()
+
+            #
+            # Set style
+            plt.style.use('seaborn-whitegrid')
+            plt.tight_layout()
+            plt.rcParams.update({
+                    "figure.figsize": (7,6),\
+                    "font.size":14,\
+                    "axes.titlepad":16
+                })
+
+            #
+            # Set labels
+            labels = ['x', 'y', 'z']
+            plt.title("Centre of mass as a function of the laser detuning")
+            plt.xlabel(r"$ \Delta (2\pi \times MHz) $")
+            plt.ylabel("position (cm)")
+
+            #
+            # Plot
+            style={
+                "linestyle":'-'
+            }
+
+            markers = ['o', '^', 's']
+
+            delta = np.array(res.loop["values"])*(res.transition["gamma"]*1e-3)
+
+            for i in range(3):
+                plt.plot(delta, r_c[i], label=labels[i], marker=markers[i], **style)
+
+            #
+            # Set plot
+            plt.grid(linestyle="--")
+            plt.legend(frameon=True)
+
+            #
+            # Show
+            plt.show()
+        else:
+            print()
+            print("x = %f +- %f" % (r_c[0], std_r_c[0]))
+            print("y = %f +- %f" % (r_c[1], std_r_c[1]))
+            print("z = %f +- %f" % (r_c[2], std_r_c[2]))
+            print()

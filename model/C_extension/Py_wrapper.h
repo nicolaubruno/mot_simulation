@@ -19,6 +19,9 @@ PyMODINIT_FUNC PyInit_mot_sim(void);
 // Convert the results in a PyObject list
 PyObject *build_pos_freqs(results_t res);
 
+// Convert the results in a PyObject list
+PyObject *build_pos_3Dfreqs(results_t res);
+
 //
 // Structures
 //

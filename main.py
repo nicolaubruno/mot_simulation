@@ -3,11 +3,12 @@
 from controller import Controller
 
 #
+# Controller Object
+ctrler = Controller()
+
+#
 # Main
 if __name__ == '__main__':
-    #
-    # Controller Object
-    ctrler = Controller()
 
     #
     # Initial menu

@@ -3,15 +3,37 @@
 //
 
 #include "mot_sim.h"
+#include <time.h>
 
 int main(){
-    int i, j, k;
+    int i, j;
     results_t res;
 
-    for(i = 0; i < 10; i++){
-        res = simulate_atom("../results/1615476589_test/loop0/parameters/");
-        printf("%d\n", res.num_iters);
+    for(i = 0; i < 3; i++){
+        res = simulate_atom("../results/1615573253_test/loop1_delta/parameters/", 1, time(NULL));
+        
+        printf("\nSim %d\n", i+1);
+
+        printf("x = [");
+        for(j = 0; j < res.pos_hist[0].num_bins; j++)
+            printf(" %d ", res.pos_hist[0].freqs[j]);
+        printf("]\n");
+
+        printf("\n");
+
+        printf("y = [");
+        for(j = 0; j < res.pos_hist[1].num_bins; j++)
+            printf(" %d ", res.pos_hist[1].freqs[j]);
+        printf("]\n");
+
+        printf("\n");
+
+        printf("z = [");
+        for(j = 0; j < res.pos_hist[2].num_bins; j++)
+            printf(" %d ", res.pos_hist[2].freqs[j]);
+        printf("]\n\n");
     }
+
 
     return 0;
 }

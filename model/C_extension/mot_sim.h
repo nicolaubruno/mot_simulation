@@ -17,7 +17,7 @@
 #define STRING_BUFFER_SIZE 1024
 #define DELIM ","
 #define MAX_BEAMS 16
-#define MAX_dt 0.1
+#define MAX_dt 0.01
 //#define ROOT_PATH "../"
 #define ROOT_PATH "model/"
 
@@ -56,13 +56,14 @@ typedef struct{
 
 // Conditions
 typedef struct{
-    double T_0;     /* Initial temperature  */
-    double B_0;     /* Magnetic Field gradient */
-    double delta;   /* Laser detuning */
-    int g_bool;     /* Use gravity */
-    int i_max;      /* Maximum number of iteration */
-    double r_max;   /* Maximum distance (threshold) */
-    int num_bins;   /* Number of bins in each histogram */
+    double T_0;         /* Initial temperature  */
+    double B_0;         /* Magnetic Field gradient */
+    double *B_axial;    /* Magnetic Field axial direction */
+    double delta;       /* Laser detuning */
+    int g_bool;         /* Use gravity */
+    int i_max;          /* Maximum number of iteration */
+    double r_max;       /* Maximum distance (threshold) */
+    int num_bins;       /* Number of bins in each histogram */
 } conditions_t;
 
 // Beam
@@ -104,7 +105,8 @@ typedef struct {
 
 // Results
 typedef struct{
-    histogram_3d_t pos_hist;        /* Histogram of the position */
+    histogram_3d_t pos_3Dhist;      /* Histogram of the position */
+    histogram_t *pos_hist;          /* Marginal histograms */
     int num_iters;                  /* Number of iterations */
     double time;                    /* Total time [s] */
 } results_t;
@@ -121,7 +123,7 @@ typedef struct{
 //
 
 // Run simulation for a single atom
-results_t simulate_atom(char *params_path, long time);
+results_t simulate_atom(char *params_path, int marginals, long time);
 
 // Get atom
 atom_t get_atom(conditions_t conds, char *params_path);
@@ -136,19 +138,19 @@ conditions_t get_conditions(char *params_path);
 beams_setup_t get_beams(char *params_path);
 
 // Compute scattering variables (scattering_t) in a photon-atom scattering event
-scattering_t photonic_recoil(atom_t atom, beams_setup_t beams_setup, conditions_t conds);
+scattering_t photonic_recoil(atom_t atom, beams_setup_t beams_setup, conditions_t conds, double **B);
 
 // Get magnetic acceleration
-double *magnetic_acceleration(atom_t atom, double B_0);
+double *magnetic_acceleration(atom_t atom, double B_0, double **B_basis);
 
 // Get magnetic field vector in the lab frame
-double *get_magnetic_field(double B_0, double *r);
+double *get_magnetic_field(double B_0, double **B_basis, double *r);
 
 // Get scattering rate
 double scattering_rate(atom_t atom, beam_t beam, conditions_t conds, double *B, int pol);
 
 // Get components of a vector v on the basis B given the components on basis A
-double *change_basis(double *v, double **A, double **B);
+double *change_basis(double *v, double **A, double **B_basis);
 
 // Get polarization probabilities given the magnetic field direction
 double *polarization_probs(beam_t beam, double *eB);
@@ -198,3 +200,6 @@ double **orthonormal_basis(double *v3);
 
 // Pick randomly a element of an integer array given an array of probabilities
 int random_pick(int *arr, double *probs, int size);
+
+// Replace a character in a string
+char* str_replace(char *orig, char *rep, char *with);

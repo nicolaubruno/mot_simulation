@@ -46,11 +46,17 @@ class Result:
         return self._sim_name
 
     #
-    # 3D-Histogram of the position distribution
+    # 3D-Histogram of the positions
+    @property
+    def pos_3Dhist(self):
+        return self._pos_3Dhist
+    
+    #
+    # Marginal histograms of the positions
     @property
     def pos_hist(self):
         return self._pos_hist
-    
+
     #
     # Looping status
     @property
@@ -67,7 +73,7 @@ class Result:
     ''' Methods '''
 
     #
-    def __init__(self, sim_code, loop_idx=1):
+    def __init__(self, sim_code, loop_idx=0):
         #
         # Simulation code
         self._sim_code = sim_code
@@ -95,8 +101,8 @@ class Result:
         # Get looping status
         self.__get_loop()
 
-        if loop_idx <= (len(self.loop["values"])+1): 
-            self._loop["active"] = loop_idx-1
+        if loop_idx < len(self.loop["dirs"]): 
+            self._loop["active"] = loop_idx
 
         #
         # Get attributes
@@ -139,41 +145,51 @@ class Result:
         # Positions histogram
         #
 
-        self._pos_hist = {
+        # 3D-Histograms of the positions
+        self._pos_3Dhist = {
             'freqs':[],\
             'dens':[],\
-            'bins':[],\
-            'margs':[]
+            'bins':[]
         }
 
+        # Marginal histograms of the positions
+        self._pos_hist = [{"freqs":[], "dens":[], "bins":[]} for i in range(3)]
+
         #
-        # Positions frequencies
+        # Frequencies of the 3D-Histograms of the positions
         path = dir_path + 'positions.csv'
-        self._pos_hist["freqs"] = pd.read_csv(path, index_col=0, squeeze=True).to_numpy().reshape((self.conds['num_bins'], self.conds['num_bins'], self.conds['num_bins']))
+        if os.path.exists(path):
+            self._pos_3Dhist["freqs"] = pd.read_csv(path, index_col=0, squeeze=True).to_numpy().reshape((self.conds['num_bins'], self.conds['num_bins'], self.conds['num_bins']))
+
+            # Frequencies
+            self._pos_hist[0]["freqs"] = np.sum(self.pos_3Dhist["freqs"], axis=(1, 2))
+            self._pos_hist[1]["freqs"] = np.sum(self.pos_3Dhist["freqs"], axis=(0, 2))
+            self._pos_hist[2]["freqs"] = np.sum(self.pos_3Dhist["freqs"], axis=(0, 1))
+
+            for i in range(3):
+                # Densities
+                self._pos_hist[i]["dens"] = self._pos_hist[i]["freqs"] / np.sum(self._pos_hist[i]["freqs"])
+                self._pos_hist[i]["dens"] = np.array(self._pos_hist[i]["dens"])
+
+                #
+                # Bins
+                self._pos_hist[i]["bins"] = - np.ones(self.conds['num_bins']) * float(self.conds['r_max'])
+                delta = 2*float(self.conds['r_max']) / float(self.conds['num_bins'])
+
+                for j in range(self.conds['num_bins']):
+                    self._pos_hist[i]["bins"][j] += j*delta
 
         #
-        # Positions densities
-        self._pos_hist["margs"] = [{"freqs":[], "dens":[], "bins":[]} for i in range(3)]
+        # Frequencies of the marginal histograms of the positions
+        #
 
-
-        # Frequencies
-        self._pos_hist["margs"][0]["freqs"] = np.sum(self.pos_hist["freqs"], axis=(1, 2))
-        self._pos_hist["margs"][1]["freqs"] = np.sum(self.pos_hist["freqs"], axis=(0, 2))
-        self._pos_hist["margs"][2]["freqs"] = np.sum(self.pos_hist["freqs"], axis=(0, 1))
-
-        for i in range(3):
-            # Densities
-            self._pos_hist["margs"][i]["dens"] = self._pos_hist["margs"][i]["freqs"] / np.sum(self._pos_hist["margs"][i]["freqs"])
-            self._pos_hist["margs"][i]["dens"] = np.array(self._pos_hist["margs"][i]["dens"])
-
-            #
-            # Bins
-            self._pos_hist["margs"][i]["bins"] = np.zeros(self.conds['num_bins'])
-            self._pos_hist["margs"][i]["bins"] = self._pos_hist["margs"][i]["bins"] - self.conds['r_max']
-            delta = 2*self.conds['r_max'] / self.conds['num_bins']
-
-            for j in range(self.conds['num_bins']):
-                self._pos_hist["margs"][i]["bins"][j] += j*delta
+        path = dir_path + 'marginals.csv'
+        if os.path.exists(path):
+            df = pd.read_csv(path, index_col=0)
+            '''
+            for i in range(3):
+                self._pos_hist[i]["freqs"] = df[i].to_numpy()
+            '''
 
     #
     def __get_loop(self):
@@ -222,4 +238,41 @@ class Result:
 
     #
     def loop_idx(self, idx):
-        self.__get_attr(idx-1)
+        self.__get_attr(idx)
+
+    #
+    def mass_centre(self):
+        # Variables
+        if not self.loop["var"]:
+            r_c = [0,0,0]
+            std_r_c = [0,0,0]
+
+            for i in range(3):
+                x = self.pos_3Dhist["margs"][i]["bins"]
+                p = self.pos_3Dhist["margs"][i]["dens"]
+                r_c[i] = np.sum(x*p)
+
+            for i in range(3):
+                x2 = self.pos_3Dhist["margs"][i]["bins"]*self.pos_3Dhist["margs"][i]["bins"]
+                p = self.pos_3Dhist["margs"][i]["dens"]
+                std_r_c[i] = np.sqrt(np.sum(x2*p) - r_c[i]**2)
+
+        else:
+            r_c = np.zeros((3,len(self.loop["values"])))
+            r_c_square = np.zeros((3,len(self.loop["values"])))
+            std_r_c = np.zeros((3,len(self.loop["values"])))
+
+            for i in range(len(self.loop["values"])):
+                self.loop_idx(i+1)
+
+                for j in range(3):
+                    x = self.pos_3Dhist["margs"][j]["bins"]
+                    p = self.pos_3Dhist["margs"][j]["dens"]
+
+                    r_c[j][i] = np.sum(x*p)
+                    r_c_square[j][i] = np.sum(x*x*p)
+
+            std_r_c = np.sqrt(r_c_square - r_c*r_c)
+
+        return r_c, std_r_c
+
