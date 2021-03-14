@@ -90,7 +90,7 @@ results_t simulate_atom(char *params_path, int only_marginals, long time){
     dt = 0;
     res.time = 0;
 
-    while((res.num_iters < conds.i_max) && (r < conds.r_max)){
+    while((res.num_iters < conds.i_max) && (r < conds.r_max) && (res.time < 0.1)){
         // Compute the photonic recoil
         scatt = photonic_recoil(atom, beams_setup, conds, B_basis);
 
@@ -98,8 +98,8 @@ results_t simulate_atom(char *params_path, int only_marginals, long time){
         a_B = magnetic_acceleration(atom, conds.B_0, B_basis);
 
         // Update time
-        if(scatt.dt > 0 && scatt.dt < MAX_dt) dt = scatt.dt;
-        else dt = 1 / atom.transition.gamma;
+        if(scatt.R > 0 && scatt.dt < MAX_dt) dt = scatt.dt;
+        else dt = 1e-3;
         res.time += dt;
 
         // Update position
@@ -121,7 +121,7 @@ results_t simulate_atom(char *params_path, int only_marginals, long time){
 
         for(i = 0; i < 3; i++){
             // Photonic recoil
-            if(scatt.dt > 0 && scatt.dt < MAX_dt) 
+            if(scatt.R > 0 && scatt.dt < MAX_dt) 
                 atom.vel[i] += scatt.vel[i];
 
             // Magnetic acceleration
@@ -138,7 +138,7 @@ results_t simulate_atom(char *params_path, int only_marginals, long time){
         res.num_iters += 1;
 
         // Print status
-        //if(res.num_iters % 500 == 0) print_status(atom, res);
+        //print_status(atom, res);
     }
 
     // Print status

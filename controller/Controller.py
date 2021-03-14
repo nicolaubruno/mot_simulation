@@ -3,7 +3,7 @@
 import numpy as np
 import time, gc
 
-from model import Simulation, Result
+from model import Simulation, Results
 from view import View
 
 from datetime import datetime as dt
@@ -25,11 +25,6 @@ class Controller:
     @property
     def menu_level(self):
         return self._menu_level
-
-    #
-    @property
-    def sim_code(self):
-        return self._sim_code
     
 
     ''' Methods '''
@@ -75,100 +70,6 @@ class Controller:
                 self.view_results()
 
     #
-    def bk_run_simulation(self):
-        #
-        # Menu level
-        self._menu_level = 1
-
-        #
-        # Get shortname
-        shortname = self.__call_input("Insert a short name for the simulation")
-
-        #
-        # Chose a parameter
-        if self.menu_level == 1:
-            opts = {
-                1: "Simulate just marginal histograms",\
-                2: "Complete 3D histogram"
-            }
-
-            only_marginals = self.__call_menu(opts, "Choose a simulation option:")
-
-            if only_marginals == 2:
-                only_marginals = 0
-
-            if only_marginals != -1:
-                #
-                # Start simulation
-                self.__simulation.start(shortname, only_marginals)
-                sim_code = self.__simulation.code
-
-                #
-                # Release memory
-                del self.__simulation
-                del self.__view
-
-                self.__simulation = Simulation(sim_code, 0, only_marginals)
-                self.__view = View(self.__simulation)
-
-                #
-                # Number of loopings
-                loop_num = len(self.__simulation.loop["values"])
-                if loop_num == 0: loop_num = 1
-
-                #
-                # Number of the parallel processes
-                num_proc = cpu_count() - 1
-                if num_proc == 0: num_proc = 1
-
-                for idx in range(loop_num):
-                    #
-                    # Update loop counter
-                    self.__simulation.loop["active"] = idx
-                    self.__simulation.atoms_simulated = 0
-
-                    if self.__simulation.loop["var"]: 
-                        desc = 'Looping ' + str(idx) + \
-                            " (" + self.__simulation.loop["var"] +\
-                            " = " + str("%.2f" % self.__simulation.loop["values"][idx]) + ")"
-
-                    else: desc = "Atoms simulated"
-
-                    #
-                    # Progress bar
-                    all_freqs = None
-                    with tqdm(total=self.__simulation.conds["num_sim"], desc=desc) as pbar:
-                        with Pool(num_proc) as pool:
-                            only_marg = [only_marginals for i in range(self.__simulation.conds["num_sim"])]
-                            for freqs in pool.map(self.__simulation.simulate, only_marg):
-                                if all_freqs is None: all_freqs = freqs
-                                else: all_freqs += freqs
-
-                                pbar.update()
-
-                                del freqs
-                                gc.collect()
-
-                        self.__simulation.update_pos_freqs(all_freqs)
-                        self.__simulation.save()
-                        gc.collect()
-
-                    #
-                    # Release memory
-                    del self.__simulation
-                    del self.__view
-
-                    self.__simulation = Simulation(sim_code, idx, only_marginals)
-                    self.__view = View(self.__simulation)
-
-                gc.collect()
-                exit(0)
-
-        #
-        # Set menu level
-        self._menu_level = 0
-
-    #
     def run_simulation(self):
         #
         # Menu level
@@ -194,7 +95,7 @@ class Controller:
                 self.__simulation.new(shortname, opt)
 
                 # Check looping
-                loop_num = len(self.__simulation.loop["values"])
+                loop_num = len(self.__simulation.results.loop["values"])
                 if loop_num == 0: loop_num = 1
 
                 # Update time
@@ -205,19 +106,19 @@ class Controller:
 
                 pbars = []
                 for i in range(loop_num):
-                    desc = "Atoms simulated" if loop_num == 1 else "Loop %d / %d" % (i+1, loop_num)
-                    pbars.append(tqdm(total=self.__simulation.conds["num_sim"], desc=desc, position=i))
+                    desc = "Atoms simulated" if loop_num == 1 else self.__simulation.results.loop["var"] + " = " + str(self.__simulation.results.loop["values"][i])
+                    pbars.append(tqdm(total=self.__simulation.results.conds["num_sim"], desc=desc, position=i))
 
                 # Run simulation
                 for i in range(loop_num):
                     #
                     # Open new simulation for each looping value
-                    if i > 0: self.__simulation.open(self.__simulation.code, i, opt)
+                    if i > 0: self.__simulation.open(self.__simulation.results.code, i, opt)
 
                     #
                     # Loop all atoms
-                    while self.__simulation.atoms_simulated < self.__simulation.conds["num_sim"]:
-                        times = int(64 / (self.__simulation.conds["num_bins"]))
+                    while self.__simulation.atoms_simulated < self.__simulation.results.conds["num_sim"]:
+                        times = int(32 / (self.__simulation.results.conds["num_bins"]))
                         if times < 1: times = 1
 
                         times = self.__simulation.run(times)
@@ -232,6 +133,9 @@ class Controller:
                 #
                 # Release memory
                 gc.collect()
+
+                self.__view.simulation_header(clear_screen=True)
+                exit()
 
         #
         # Set menu level
@@ -293,7 +197,7 @@ class Controller:
                 check = check or (code[0] == "-" and code[1:].isdigit())
 
                 if check:
-                    check = self.__simulation.code(code)
+                    check = self.__simulation.check_results_code(code)
 
                 return check
             
@@ -308,11 +212,11 @@ class Controller:
             while self._menu_level == 2:
                 #
                 # Result
-                res = Result(code)
+                res = Results(code)
 
                 #
                 # Header
-                header = "Simulation " + str(res.sim_code) + " " + res.sim_name
+                header = "Simulation " + str(res.code) + " " + res.name
 
                 #
                 # Options
@@ -344,7 +248,7 @@ class Controller:
                             opt = int(opt)
 
                             if opt != -1: 
-                                res.loop_idx(opt)
+                                res.loop_idx(opt-1)
                                 self._menu_level += 1
 
                         else: self._menu_level += 1

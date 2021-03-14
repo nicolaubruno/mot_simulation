@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from datetime import datetime as dt
-from model import Result
+from model import Results
 from tqdm import tqdm
 
 #
@@ -35,7 +35,7 @@ class View:
     #
     def __init__(self, simulation):
         #
-        # Simulation object
+        # Model objects
         self.__simulation = simulation
 
         #
@@ -116,18 +116,18 @@ class View:
         # Show header 
         print(self.header)
 
-        if not self.__simulation.loop["var"]:
+        if not self.__simulation.results.loop["var"]:
             print()
-            print("Atoms simulated = %d / %d" % (self.__simulation.atoms_simulated, self.__simulation.conds['num_sim']))
+            print("Atoms simulated = %d / %d" % (self.__simulation.atoms_simulated, self.__simulation.results.conds['num_sim']))
             print()
 
         else:
             print()
-            print("Atoms simulated = %d / %d" % (self.__simulation.atoms_simulated, self.__simulation.conds['num_sim']))
-            print("Loop " + str(self.__simulation.loop["active"]+1) + "/", end='')
-            print(str(len(self.__simulation.loop['values'])) + " ", end='')
-            print("(" + str(self.__simulation.loop["var"]) + " ", end='')
-            print(str(self.__simulation.loop["values"][self.__simulation.loop["active"]]) + ")")
+            print("Atoms simulated = %d / %d" % (self.__simulation.atoms_simulated, self.__simulation.results.conds['num_sim']))
+            print("Loop " + str(self.__simulation.results.loop["active"]+1) + "/", end='')
+            print(str(len(self.__simulation.results.loop['values'])) + " ", end='')
+            print("(" + str(self.__simulation.results.loop["var"]) + " ", end='')
+            print(str(self.__simulation.loop["values"][self.__simulation.results.loop["active"]]) + ")")
             print()
 
     #
@@ -144,17 +144,17 @@ class View:
         print(self.header)
 
         print()
-        print("Simulation " + str(self.__simulation.code) + " " + self.__simulation.name + self._separator)
+        print("Results " + str(self.__simulation.results.code) + " " + self.__simulation.results.name + self._separator)
 
-        if not self.__simulation.loop["var"]:
-            print("Atoms simulated = %d / %d" % (self.__simulation.atoms_simulated, self.__simulation.conds['num_sim']))
+        if not self.__simulation.results.loop["var"]:
+            print("Atoms simulated = %d / %d" % (self.__simulation.atoms_simulated, self.__simulation.results.conds['num_sim']))
             print()
 
         else:
             print()
-            print("Number of atoms simulated in each looping = " + str(self.__simulation.conds["num_sim"]))
-            print("Looping: " + self.__simulation.loop["var"] + " = ", end='')
-            print(self.__simulation.loop["values"])
+            print("Number of atoms simulated in each looping = " + str(self.__simulation.results.conds["num_sim"]))
+            print(self.__simulation.results.loop["var"] + " = ", end='')
+            print(self.__simulation.results.loop["values"])
             print()
 
     #
@@ -212,7 +212,7 @@ class View:
         # Plot
         style={}
 
-        plt.bar(res.pos_hist["margs"][axis]["bins"], height=res.pos_hist["margs"][axis]["dens"], **style)
+        plt.bar(res.pos_hist[axis]["bins"], height=res.pos_hist[axis]["dens"], **style)
 
         #
         # Set plot

@@ -1,2 +1,2 @@
 from .Simulation import Simulation
-from .Result import Result
+from .Results import Results
