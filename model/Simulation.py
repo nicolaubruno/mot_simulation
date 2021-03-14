@@ -248,14 +248,14 @@ class Simulation:
 
         #
         # Simulate 3D distribution (Heavy option)
-        if self._option == 0:
+        if self.option == 0:
             #
             # Frequencies of positions (1D-array)
             self._pos_freqs_arr = np.zeros(self.conds["num_bins"]**3)
 
         #
         # Simulate marginal distributions (Lightweight option)
-        elif self._option == 1:
+        elif self.option == 1:
             #
             # Frequencies of positions (3D-array)
             self._pos_freqs_arr = np.zeros((3, self.conds["num_bins"]))
@@ -273,7 +273,12 @@ class Simulation:
     def run(self, times):
         #
         # Check simulation status
-        if (self.atoms_simulated + times) <= self.conds["num_sim"]:
+        if self.atoms_simulated < self.conds["num_sim"]:
+            #
+            # Check number of executions
+            if (self.atoms_simulated + times) > self.conds["num_sim"]:
+                times = 1
+
             # 
             # Arguments to the pool 
             args_pool = []
@@ -286,7 +291,6 @@ class Simulation:
             def simulate_atom(args):
                 params_dir, opt, s = args
                 return C_ext.simulate_atom(params_dir, opt, s)
-
 
             #
             # Parallel execution
@@ -316,6 +320,8 @@ class Simulation:
             # Release memory
             gc.collect()
 
+            return times
+
     #
     def open(self, code, loop_idx = 0, opt = 0):
         # Set loop variable
@@ -325,6 +331,7 @@ class Simulation:
             "active": loop_idx
         }
 
+        # Identification
         self._code = code
         self.__get_name()
         self.__get_loop()
@@ -359,7 +366,7 @@ class Simulation:
 
         #
         # Simulate 3D distribution (Heavy option)
-        if self._option == 0:
+        if self.option == 0:
             #
             # Frequencies of positions (1D-array)
             del self._pos_freqs_arr
@@ -367,7 +374,7 @@ class Simulation:
 
         #
         # Simulate marginal distributions (Lightweight option)
-        elif self._option == 1:
+        elif self.option == 1:
             #
             # Frequencies of positions (3D-array)
             del self._pos_freqs_arr
@@ -403,9 +410,6 @@ class Simulation:
             pos_freqs.to_csv(path)
 
             # Release memory
-            values.clear()
-            indexes.clear()
-
             del values
             del indexes
             del pos_freqs

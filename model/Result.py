@@ -36,14 +36,14 @@ class Result:
     #
     # Simulation identification code
     @property
-    def sim_code(self):
-        return self._sim_code
+    def code(self):
+        return self._code
 
     #
     # Simulation short name
     @property
-    def sim_name(self):
-        return self._sim_name
+    def name(self):
+        return self._name
 
     #
     # 3D-Histogram of the positions
@@ -74,19 +74,30 @@ class Result:
 
     #
     def __init__(self, sim_code, loop_idx=0):
-        #
-        # Simulation code
-        self._sim_code = sim_code
+        # Set loop variable
+        self._loop = {
+            "var": '',\
+            "values": [],\
+            "active": loop_idx
+        }
+
+        # Identification
+        self._code = code
+        self.__get_name()
+        self.__get_loop()
 
         #
-        # Get simulation name
-        self.__get_sim_name()
-
+        # Set result directory
         #
-        # Results directory
-        self._results_dir = "model/results/" + str(self.sim_code)
-        if len(self.sim_name) > 0: self._results_dir += '_' + self.sim_name
+
+        self._results_dir = "model/results/" + str(self.code)
+        if self.name: self._results_dir += '_' + self.name
         self._results_dir += '/'
+
+        if self.loop["var"]: 
+            self._results_dir += "res" + str(self.loop["active"] + 1) + '_' + self.loop["var"] + '/'
+        else:
+            self._results_dir += "res1/"
 
         #
         # Looping status
@@ -192,6 +203,27 @@ class Result:
             '''
 
     #
+    def __get_name(self):
+        #
+        # Get short name
+        dir_path = "model/results/"
+        obj_scandir = os.scandir(dir_path)
+        self._name = ''
+
+        for path in obj_scandir:
+            str_splited = path.name.split("_")
+
+            act_code = int(str_splited[0])
+            name = ""
+            for j in range(1, len(str_splited)):
+                if j == 1: name += str_splited[j]
+                else: name += '_' + str_splited[j]
+
+            if act_code == self.code:
+                self._name = name  
+                break
+
+    #
     def __get_loop(self):
         # Variables
         i = 0
@@ -214,27 +246,6 @@ class Result:
                 self._loop["values"].append(float(conds["delta"]))
 
             i += 1
-
-    #
-    def __get_sim_name(self):
-        #
-        # Get short name
-        dir_path = "model/results/"
-        obj_scandir = os.scandir(dir_path)
-        self._sim_name = ''
-
-        for path in obj_scandir:
-            str_splited = path.name.split("_")
-
-            code = int(str_splited[0])
-            name = ""
-            for j in range(1, len(str_splited)):
-                if j == 1: name += str_splited[j]
-                else: name += '_' + str_splited[j]
-
-            if code == self.sim_code:
-                self._sim_name = name  
-                break
 
     #
     def loop_idx(self, idx):

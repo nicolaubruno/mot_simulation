@@ -220,7 +220,7 @@ class Controller:
                         times = int(64 / (self.__simulation.conds["num_bins"]))
                         if times < 1: times = 1
 
-                        self.__simulation.run(times)
+                        times = self.__simulation.run(times)
                         pbars[i].update(times)
 
                     # Save simulation
