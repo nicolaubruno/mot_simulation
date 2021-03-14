@@ -7,7 +7,8 @@ from model import Simulation, Result
 from view import View
 
 from datetime import datetime as dt
-from multiprocessing import cpu_count, Process
+#from threading import Thread
+from multiprocessing import Process
 from pathos.multiprocessing import ProcessPool as Pool
 from tqdm import tqdm
 
@@ -25,6 +26,11 @@ class Controller:
     def menu_level(self):
         return self._menu_level
 
+    #
+    @property
+    def sim_code(self):
+        return self._sim_code
+    
 
     ''' Methods '''
 
@@ -69,7 +75,7 @@ class Controller:
                 self.view_results()
 
     #
-    def run_simulation(self):
+    def bk_run_simulation(self):
         #
         # Menu level
         self._menu_level = 1
@@ -163,7 +169,7 @@ class Controller:
         self._menu_level = 0
 
     #
-    def bk_run_simulation(self):
+    def run_simulation(self):
         #
         # Menu level
         self._menu_level = 1
@@ -176,77 +182,52 @@ class Controller:
         # Chose a parameter
         if self.menu_level == 1:
             opts = {
-                1: "Simulate just marginal histograms",\
-                2: "Complete 3D histogram"
+                1: "Marginal distributions",\
+                2: "Complete 3D distribution"
             }
 
-            only_marginals = self.__call_menu(opts, "Choose a simulation option:")
+            opt = self.__call_menu(opts, "Choose a simulation option:")
+            if opt == 2: opt = 0
 
-            if only_marginals == 2:
-                only_marginals = 0
+            if opt != -1:
+                # Create a new simulation
+                self.__simulation.new(shortname, opt)
 
-            if only_marginals != -1:
-                #
-                # Time update
-                time = dt.now().timestamp()
+                # Check looping
+                loop_num = len(self.__simulation.loop["values"])
+                if loop_num == 0: loop_num = 1
 
-                #
-                # Start simulation
-                self.__simulation.start(shortname, only_marginals)
-                self.__view.simulation_status()
+                # Update time
+                check_time = dt.now().timestamp()
 
-                def simulate(i):
-                    self.__simulation.simulate()
+                # Print simulation status
+                self.__view.simulation_header()
 
-                pool = Pool(process=cpu_count())
-                num_sim = self.__simulation.conds['num_sim']
+                pbars = []
+                for i in range(loop_num):
+                    desc = "Atoms simulated" if loop_num == 1 else "Loop %d / %d" % (i+1, loop_num)
+                    pbars.append(tqdm(total=self.__simulation.conds["num_sim"], desc=desc, position=i))
 
-                while not self.__simulation.end:
-                    pool.map(simulate, range(int(0.5*num_sim)))
-                    #self.__view.simulation_status()
-                    print(self.__simulation.atoms_simulated)
-                    exit(0);
+                # Run simulation
+                for i in range(loop_num):
+                    #
+                    # Open new simulation for each looping value
+                    if i > 0: self.__simulation.open(self.__simulation.code, i, opt)
 
                     #
-                    # Print simulation status
-                    if (dt.now().timestamp() - time) > 0.5:
-                        self.__view.simulation_status()
-                        time = dt.now().timestamp()
+                    # Loop all atoms
+                    while self.__simulation.atoms_simulated < self.__simulation.conds["num_sim"]:
+                        times = int(64 / (self.__simulation.conds["num_bins"]))
+                        if times < 1: times = 1
 
-                    if not self.__simulation.status:
-                        self.__simulation.save()
-                        self.__simulation.status = True
+                        self.__simulation.run(times)
+                        pbars[i].update(times)
 
-                #
-                # Finish simulation
-                self.__view.simulation_status()
-                exit(0)
+                    # Save simulation
+                    self.__simulation.save()
 
-                '''
-
-
-                #
-                # Time update
-                time = dt.now().timestamp()
-
-                #
-                # Process
-                simulate = Process(target=self.__simulation.simulate)
-
-                #
-                # Simulate atoms
-                while not self.__simulation.end:
-                    simulate.start()
-
-                    if (dt.now().timestamp() - time) > 0.5:
-                        self.__view.simulation_status()
-                        time = dt.now().timestamp()
-
-                    simulate.join()
-                '''
-                #
-                # Finish simulation
-                self.__view.simulation_status()
+                for i in range(loop_num):
+                    pbars[i].close()
 
                 #
                 # Release memory

@@ -116,7 +116,7 @@ class View:
         # Show header 
         print(self.header)
 
-        if self.__simulation.loop["var"]:
+        if not self.__simulation.loop["var"]:
             print()
             print("Atoms simulated = %d / %d" % (self.__simulation.atoms_simulated, self.__simulation.conds['num_sim']))
             print()
@@ -128,6 +128,33 @@ class View:
             print(str(len(self.__simulation.loop['values'])) + " ", end='')
             print("(" + str(self.__simulation.loop["var"]) + " ", end='')
             print(str(self.__simulation.loop["values"][self.__simulation.loop["active"]]) + ")")
+            print()
+
+    #
+    # Print general information of a simulation
+    def simulation_header(self, clear_screen=False):
+        #
+        # Clear screen
+        if clear_screen:
+            if os.name == 'nt': os.system('cls')
+            else: os.system('clear')
+
+        #
+        # Show header 
+        print(self.header)
+
+        print()
+        print("Simulation " + str(self.__simulation.code) + " " + self.__simulation.name + self._separator)
+
+        if not self.__simulation.loop["var"]:
+            print("Atoms simulated = %d / %d" % (self.__simulation.atoms_simulated, self.__simulation.conds['num_sim']))
+            print()
+
+        else:
+            print()
+            print("Number of atoms simulated in each looping = " + str(self.__simulation.conds["num_sim"]))
+            print("Looping: " + self.__simulation.loop["var"] + " = ", end='')
+            print(self.__simulation.loop["values"])
             print()
 
     #
