@@ -138,6 +138,12 @@ class Simulation:
         self.__get_attr()
 
     #
+    # Atoms simulated
+    @atoms_simulated.setter
+    def atoms_simulated(self, num):
+        self._atoms_simulated = num
+
+    #
     def __get_attr(self):
         #
         # Parameters directory
@@ -255,25 +261,14 @@ class Simulation:
                 self.conds.to_csv(params_dir + "conditions.csv")
 
     #
-    def simulate(self):
+    def simulate(self, only_marginals):
         #
-        # Check atoms simulated
-        if self._atoms_simulated < self.conds["num_sim"]:
-            #
-            # Simulate atoms
-            params_dir = self.loop["dirs"][self.loop["active"]] + "parameters/"
-            seed =  int((1000 * (dt.now().timestamp())) % 1000 + 1e3*self.atoms_simulated)
-            
-            freqs = C_ext.simulate_atom(params_dir, seed, self.only_marginals)
+        # Simulate atoms
+        params_dir = self.loop["dirs"][self.loop["active"]] + "parameters/"
+        seed =  int((1000 * (dt.now().timestamp())) % 1000 + 1e3*self.atoms_simulated)
+        freqs = C_ext.simulate_atom(params_dir, only_marginals, seed)
 
-            #
-            # Add frequencies
-            self._pos_freqs_arr += np.array(freqs)
-            self._atoms_simulated += 1
-
-            # Release memory
-            del freqs
-            gc.collect()
+        return np.array(freqs)
 
     #
     def save(self):
@@ -295,42 +290,16 @@ class Simulation:
 
             values = np.array(values)
 
+            #
+            # Save file
             path = self.loop["dirs"][self.loop["active"]] + "/positions.csv"
-            if os.path.exists(path):
-                old_values = []
-
-                for i in range(res.conds['num_bins']):
-                    for j in range(res.conds['num_bins']):
-                        for k in range(res.conds['num_bins']):
-                            old_values.append(res.pos_3Dhist["freqs"][i][j][k])
-
-                values += np.array(old_values)
-                self._pos_freqs_arr = values
-
-                os.remove(path)
-
-            pos_freqs = pd.Series(self._pos_freqs_arr, index=indexes).astype("int32")
+            pos_freqs = pd.Series(values, index=indexes).astype("int32")
             pos_freqs.fillna(0, inplace=True)
             pos_freqs.to_csv(path)
-
-            self._pos_freqs_arr = None
-
-            del values
-            del old_values
-            del path
 
         elif self.only_marginals == 1:
             indexes = [i+1 for i in range(res.conds['num_bins'])]
             columns = ["x", "y", "z"]
-
-            path = self.loop["dirs"][self.loop["active"]] + "marginals.csv"
-            if os.path.exists(path):
-                df = pd.read_csv(path, index_col=0)
-
-                for i in range(3):
-                    self._pos_freqs_arr[i] += df[i].to_numpy()
-
-                os.remove(path)
 
             data = {
                 'x': self._pos_freqs_arr[0],\
@@ -338,15 +307,13 @@ class Simulation:
                 'z': self._pos_freqs_arr[2]
             }
 
+            path = self.loop["dirs"][self.loop["active"]] + "marginals.csv"
             pos_freqs = pd.DataFrame(data).astype("int32")
             pos_freqs.fillna(0, inplace=True)
             pos_freqs.to_csv(path)
 
-            del indexes
-            del columns
-            del path
-            del pos_freqs
-
+        #
+        # Release memory
         gc.collect()
 
     #
@@ -418,6 +385,10 @@ class Simulation:
             if code == self.code:
                 self._name = name  
                 break
+
+    #
+    def update_pos_freqs(self, freqs):
+        self._pos_freqs_arr += np.array(freqs)
 
     #
     # Utility methods

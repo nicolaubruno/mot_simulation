@@ -1,12 +1,15 @@
 #
 # Libraries and modules
+import numpy as np
+import time, gc
+
 from model import Simulation, Result
 from view import View
+
 from datetime import datetime as dt
-from multiprocessing import cpu_count
+from multiprocessing import cpu_count, Process
 from pathos.multiprocessing import ProcessPool as Pool
 from tqdm import tqdm
-import gc, numpy as np
 
 #
 # Controller class
@@ -92,62 +95,67 @@ class Controller:
                 #
                 # Start simulation
                 self.__simulation.start(shortname, only_marginals)
-                self.__view.simulation_status()
-
                 sim_code = self.__simulation.code
+
+                #
+                # Release memory
+                del self.__simulation
+                del self.__view
+
+                self.__simulation = Simulation(sim_code, 0, only_marginals)
+                self.__view = View(self.__simulation)
 
                 #
                 # Number of loopings
                 loop_num = len(self.__simulation.loop["values"])
                 if loop_num == 0: loop_num = 1
 
-                def simulate_looping(idx):
-                    #
-                    # Time update
-                    time = dt.now().timestamp()
-
-                    #
-                    # Simulate atoms
-                    while self.__simulation.atoms_simulated < self.__simulation.conds["num_sim"]:
-                        self.__simulation.simulate()
-                        
-                        #
-                        # Print status
-                        if (dt.now().timestamp() - time) > 1.0:
-                            #view.simulation_status()
-                            time = dt.now().timestamp()
-
-                    self.__simulation.save()
-                    #view.simulation_status()
-
-                    return idx
-
-
                 #
-                # Parallel processing
+                # Number of the parallel processes
+                num_proc = cpu_count() - 1
+                if num_proc == 0: num_proc = 1
 
-                pool = Pool(2)
+                for idx in range(loop_num):
+                    #
+                    # Update loop counter
+                    self.__simulation.loop["active"] = idx
+                    self.__simulation.atoms_simulated = 0
 
-                for i in enumerate(pool.imap(simulate_looping, range(loop_num))):
-                    progress_bar.update()
-                    
-                progress_bar = tqdm(pool.imap(simulate_looping, range(loop_num)), total=loop_num)
+                    if self.__simulation.loop["var"]: 
+                        desc = 'Looping ' + str(idx) + \
+                            " (" + self.__simulation.loop["var"] +\
+                            " = " + str("%.2f" % self.__simulation.loop["values"][idx]) + ")"
 
-                pool.close()
-                pool.join()
-                progress_bar.close()
+                    else: desc = "Atoms simulated"
 
-                del self.__simulation
-                del self.__view
+                    #
+                    # Progress bar
+                    all_freqs = None
+                    with tqdm(total=self.__simulation.conds["num_sim"], desc=desc) as pbar:
+                        with Pool(num_proc) as pool:
+                            only_marg = [only_marginals for i in range(self.__simulation.conds["num_sim"])]
+                            for freqs in pool.map(self.__simulation.simulate, only_marg):
+                                if all_freqs is None: all_freqs = freqs
+                                else: all_freqs += freqs
 
-                self.__simulation = Simulation(sim_code)
-                self.__view = View(self.__simulation)
+                                pbar.update()
 
-                #
-                # Finish simulation
-                self.__view.simulation_status()
+                                del freqs
+                                gc.collect()
+
+                        self.__simulation.update_pos_freqs(all_freqs)
+                        self.__simulation.save()
+                        gc.collect()
+
+                    #
+                    # Release memory
+                    del self.__simulation
+                    del self.__view
+
+                    self.__simulation = Simulation(sim_code, idx, only_marginals)
+                    self.__view = View(self.__simulation)
+
                 gc.collect()
-
                 exit(0)
 
         #
@@ -304,7 +312,7 @@ class Controller:
                 check = check or (code[0] == "-" and code[1:].isdigit())
 
                 if check:
-                    check = self.__simulation.check_sim_code(code)
+                    check = self.__simulation.code(code)
 
                 return check
             

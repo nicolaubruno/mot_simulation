@@ -1,11 +1,13 @@
 #
 # Libraries and modules
-import os, sys
+import os, sys, time
 import pandas as pd
-from datetime import datetime as dt
 import matplotlib.pyplot as plt
-from model import Result
 import numpy as np
+
+from datetime import datetime as dt
+from model import Result
+from tqdm import tqdm
 
 #
 class View:
@@ -114,9 +116,19 @@ class View:
         # Show header 
         print(self.header)
 
-        print()
-        print("Atoms simulated = %d / %d" % (self.__simulation.atoms_simulated, self.__simulation.conds['num_sim']))
-        print()
+        if self.__simulation.loop["var"]:
+            print()
+            print("Atoms simulated = %d / %d" % (self.__simulation.atoms_simulated, self.__simulation.conds['num_sim']))
+            print()
+
+        else:
+            print()
+            print("Atoms simulated = %d / %d" % (self.__simulation.atoms_simulated, self.__simulation.conds['num_sim']))
+            print("Loop " + str(self.__simulation.loop["active"]+1) + "/", end='')
+            print(str(len(self.__simulation.loop['values'])) + " ", end='')
+            print("(" + str(self.__simulation.loop["var"]) + " ", end='')
+            print(str(self.__simulation.loop["values"][self.__simulation.loop["active"]]) + ")")
+            print()
 
     #
     # Print the results
@@ -237,3 +249,4 @@ class View:
             print("y = %f +- %f" % (r_c[1], std_r_c[1]))
             print("z = %f +- %f" % (r_c[2], std_r_c[2]))
             print()
+
