@@ -107,7 +107,7 @@ PyObject *build_pos_freqs(results_t res){
     //
 
     int i, j, dim;
-    PyObject *list, *item;
+    PyObject *list, *item, *item2;
 
     //
     // Build list
@@ -119,8 +119,10 @@ PyObject *build_pos_freqs(results_t res){
         dim = res.pos_hist[i].num_bins;
         item = PyList_New(dim);
 
-        for(j = 0; j < dim; j++)
-            PyList_SetItem(item, j, Py_BuildValue("i", res.pos_hist[i].freqs[j]));
+        for(j = 0; j < dim; j++){
+            item2 = Py_BuildValue("i", res.pos_hist[i].freqs[j]);
+            PyList_SetItem(item, j, item2);
+        }
         
         PyList_SetItem(list, i, item);
     }

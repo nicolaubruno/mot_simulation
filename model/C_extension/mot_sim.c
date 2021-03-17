@@ -16,10 +16,11 @@ results_t simulate_atom(char *params_path, int only_marginals, long time){
     //
 
     int i, j, k;            // Iterations
-    double r, dt;           // Dynamics
+    double r, dt, dt_c;     // Dynamics
     results_t res;          // Results
     double *a_B;            // Magnetic acceleration
     double **B_basis;       // Basis
+    int get_values;
 
     // Seeds random variable
     srand(time);
@@ -48,7 +49,7 @@ results_t simulate_atom(char *params_path, int only_marginals, long time){
             res.pos_hist[i].bin_size = 2 * conds.r_max / res.pos_hist[i].num_bins;
             res.pos_hist[i].coord0 = - conds.r_max;
             res.pos_hist[i].freqs = (int*) calloc(res.pos_hist[i].num_bins, sizeof(int));
-            update_hist(&res.pos_hist[i], atom.pos[i]);
+            //update_hist(&res.pos_hist[i], atom.pos[i]);
         }
 
     // Complete histograms
@@ -76,7 +77,7 @@ results_t simulate_atom(char *params_path, int only_marginals, long time){
         }
 
         // Insert initial position
-        update_hist_3d(&res.pos_3Dhist, atom.pos);
+        //update_hist_3d(&res.pos_3Dhist, atom.pos);
     }
 
     // Compute distance and speed of the atom
@@ -88,9 +89,11 @@ results_t simulate_atom(char *params_path, int only_marginals, long time){
 
     res.num_iters = 0; 
     dt = 0;
+    dt_c = 0;
     res.time = 0;
+    get_values = 0;
 
-    while((res.num_iters < conds.i_max) && (r < conds.r_max) && (res.time < 0.1)){
+    while((res.num_iters < conds.i_max) && (r < conds.r_max)){
         // Compute the photonic recoil
         scatt = photonic_recoil(atom, beams_setup, conds, B_basis);
 
@@ -98,8 +101,7 @@ results_t simulate_atom(char *params_path, int only_marginals, long time){
         a_B = magnetic_acceleration(atom, conds.B_0, B_basis);
 
         // Update time
-        if(scatt.R > 0 && scatt.dt < MAX_dt) dt = scatt.dt;
-        else dt = 1e-3;
+        dt = scatt.dt;
         res.time += dt;
 
         // Update position
@@ -121,21 +123,26 @@ results_t simulate_atom(char *params_path, int only_marginals, long time){
 
         for(i = 0; i < 3; i++){
             // Photonic recoil
-            if(scatt.R > 0 && scatt.dt < MAX_dt) 
-                atom.vel[i] += scatt.vel[i];
+            atom.vel[i] += scatt.vel[i];
 
             // Magnetic acceleration
             atom.vel[i] += a_B[i] * dt;
         }
 
         // Update results
-        if(only_marginals)
-            for(i = 0; i < 3; i++) update_hist(&res.pos_hist[i], atom.pos[i]);
-        
-        else update_hist_3d(&res.pos_3Dhist, atom.pos);
+        if(get_values == 1){
+            if(only_marginals)
+                for(i = 0; i < 3; i++) update_hist(&res.pos_hist[i], atom.pos[i]);
+            else update_hist_3d(&res.pos_3Dhist, atom.pos);
+        }
 
         r = r3_mod(atom.pos);
         res.num_iters += 1;
+
+        if(res.num_iters > conds.ini_iters){
+            res.time = 0;
+            get_values = 1;
+        }
 
         // Print status
         //print_status(atom, res);
@@ -206,7 +213,7 @@ atom_t get_atom(conditions_t conds, char *params_path){
         if(!token){
             printf("Invalid parameter \"Z\" in the file \"%s\"\n", path);
             exit(0);
-        } else atom.Z = atoi(token);
+        } else atom.Z = (int) atof(token);
     }
 
     // Mass
@@ -218,7 +225,7 @@ atom_t get_atom(conditions_t conds, char *params_path){
         if(!token){
             printf("Invalid parameter \"mass\" in the file \"%s\"\n", path);
             exit(0);
-        } else atom.mass = atoi(token);
+        } else atom.mass = atof(token);
     }
 
     //
@@ -496,7 +503,19 @@ conditions_t get_conditions(char *params_path){
         if(!token){
             printf("Invalid parameter \"num_bins\" in the file \"%s\"\n", path);
             exit(0);
-        } else conditions.num_bins = atoi(token);
+        } else conditions.num_bins = (int) atof(token);
+    }
+
+    // Equilibrium iterations
+    if(!(fgets(row, STRING_BUFFER_SIZE, fp) == NULL)){
+        rest = row;
+        token = strtok_r(rest, DELIM, &rest); // Variable name
+        token = strtok_r(rest, DELIM, &rest); // Value
+
+        if(!token){
+            printf("Invalid parameter \"ini_iters\" in the file \"%s\"\n", path);
+            exit(0);
+        } else conditions.ini_iters = (int) atof(token);
     }
 
     // Close file

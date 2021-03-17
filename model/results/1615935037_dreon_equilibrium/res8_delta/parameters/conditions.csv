@@ -1,0 +1,11 @@
+,conditions
+T_0,20.0
+B_0,1.71
+B_axial,[1 0 0]
+delta,-8.400000000000002
+g_bool,1
+i_max,1e6
+r_max,4.0
+num_sim,1024
+num_bins,256
+ini_iters,1000

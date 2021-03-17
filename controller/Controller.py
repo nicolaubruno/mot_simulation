@@ -102,11 +102,11 @@ class Controller:
                 check_time = dt.now().timestamp()
 
                 # Print simulation status
-                self.__view.simulation_header()
+                self.__view.simulation_header(header=False)
 
                 pbars = []
                 for i in range(loop_num):
-                    desc = "Atoms simulated" if loop_num == 1 else self.__simulation.results.loop["var"] + " = " + str(self.__simulation.results.loop["values"][i])
+                    desc = "Atoms simulated" if loop_num == 1 else self.__simulation.results.loop["var"] + " = " + ("%.2f" % self.__simulation.results.loop["values"][i])
                     pbars.append(tqdm(total=self.__simulation.results.conds["num_sim"], desc=desc, position=i))
 
                 # Run simulation
@@ -118,24 +118,27 @@ class Controller:
                     #
                     # Loop all atoms
                     while self.__simulation.atoms_simulated < self.__simulation.results.conds["num_sim"]:
-                        times = int(32 / (self.__simulation.results.conds["num_bins"]))
+                        if opt == 0: times = int(128 / self.__simulation.results.conds["num_bins"])
+                        else: times = int(2048 / self.__simulation.results.conds["num_bins"])
                         if times < 1: times = 1
 
-                        times = self.__simulation.run(times)
+                        #
+                        # Simulate atoms
+                        self.__simulation.run(times)
+                        
                         pbars[i].update(times)
 
                     # Save simulation
                     self.__simulation.save()
 
-                for i in range(loop_num):
-                    pbars[i].close()
+                for i in range(loop_num): pbars[i].close()
 
                 #
                 # Release memory
                 gc.collect()
 
+                # Information of the simulation
                 self.__view.simulation_header(clear_screen=True)
-                exit()
 
         #
         # Set menu level
@@ -188,7 +191,7 @@ class Controller:
         while self.menu_level == 1:
             #
             # Show the first results
-            self.__view.results_history()
+            self.__view.results_history(10)
 
             #
             # Get code
@@ -223,7 +226,7 @@ class Controller:
                 options = {
                     1: "Position histogram",\
                     2: "Centre of mass",\
-                    3: "Heat map"
+                    3: "Position of highest probability"
                 }
                 
                 opt = self.__call_menu(options, header)
@@ -241,7 +244,7 @@ class Controller:
                             header = "Choose an option"
 
                             idx = [i+1 for i in range(len(res.loop["values"]))]
-                            loop_idx = [res.loop["var"] + " = " + str(res.loop["values"][i]) for i in range(len(res.loop["values"]))]
+                            loop_idx = [res.loop["var"] + " = " + ("%.2f" % res.loop["values"][i]) for i in range(len(res.loop["values"]))]
                             opts = dict(zip(idx, loop_idx))
 
                             opt = self.__call_menu(opts, header)
@@ -262,7 +265,10 @@ class Controller:
                                 3 : 'z-axis'
                             }
 
-                            opt = self.__call_menu(opts, "Choose the axis")
+                            header = "(" +res.loop["var"] + " = "
+                            header += ("%.2f" % res.loop["values"][res.loop["active"]])
+                            header += ") Choose the axis"
+                            opt = self.__call_menu(opts, header)
 
                             if (opt == "-1") and not (res.loop["var"]):
                                 self._menu_level -= 1
@@ -284,6 +290,25 @@ class Controller:
                         elif not res.loop["var"]:
                             self.__view.mass_centre(res)
                             opt = self.__call_input("Enter with any key to continue:", header = False,clear_screen=False)
+                            if opt != "-1": self._menu_level -= 1
+
+                        else:
+                            self._menu_level -= 1
+
+                #
+                # Position of highest probability
+                elif opt == 3:
+                    #
+                    # Set menu level
+                    self._menu_level += 1
+                    while self.menu_level == 3:
+                        if len(res.loop["var"]) > 0:
+                            self.__view.highest_prob_pos(res)
+                            self._menu_level -= 1
+
+                        elif not res.loop["var"]:
+                            self.__view.highest_prob_pos(res)
+                            opt = self.__call_input("Enter with any key to continue", header = False,clear_screen=False)
                             if opt != "-1": self._menu_level -= 1
 
                         else:

@@ -59,6 +59,7 @@
 - r_max     -> (float)		Maximum distance (threshold) [cm]
 - num_sim   -> (int)		Number of simulations (individual atoms) stopped by reach the maximum distance (r_max)
 - num_bins  -> (int)		Number of bins in each histogram axis
+- ini_iter  -> (int)        Initial iterations necessary for the simulation to reach the equilibrium
 
 # Constants
 

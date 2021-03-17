@@ -64,6 +64,7 @@ typedef struct{
     int i_max;          /* Maximum number of iteration */
     double r_max;       /* Maximum distance (threshold) */
     int num_bins;       /* Number of bins in each histogram */
+    int ini_iters;      /* Equilibrium iterations */
 } conditions_t;
 
 // Beam

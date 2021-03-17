@@ -1,6 +1,6 @@
 #
 # Libraries and modules
-import sys, os
+import sys, os, gc
 import numpy as np
 import pandas as pd
 
@@ -69,6 +69,12 @@ class Results:
     def directory(self):
         return self._directory
 
+    #
+    # Root directory
+    @property
+    def root_dir(self):
+        return self._root_dir
+    
 
     ''' Methods '''
 
@@ -80,6 +86,10 @@ class Results:
             "values": [],\
             "active": int(loop_idx)
         }
+
+        #
+        # Root dir
+        self._root_dir = "model/results/"
 
         #
         # Identification
@@ -120,7 +130,7 @@ class Results:
         # Change directory
         #
 
-        self._directory = "model/results/" + str(self.code)
+        self._directory = self.root_dir + str(self.code)
 
         if self.name:  
             self._directory += '_' + self._name
@@ -168,43 +178,74 @@ class Results:
     def __get_dists(self):
         # 3D-Histograms of the positions
         self._pos_3Dhist = {
-            'freqs':[],\
-            'dens':[],\
-            'bins':[]
+            'freqs': None,\
+            'dens': None,\
+            'bins': None
         }
 
         # Marginal histograms of the positions
         self._pos_hist = [{"freqs":[], "dens":[], "bins":[]} for i in range(3)]
 
         #
-        # Frequencies of the 3D-Histograms of the positions
+        # 3D-Histograms of the positions
         path = self.directory + 'positions.csv'
         if os.path.exists(path):
+            #
+            # Read histogram file
             self._pos_3Dhist["freqs"] = pd.read_csv(path, index_col=0, squeeze=True).to_numpy().reshape((self.conds['num_bins'], self.conds['num_bins'], self.conds['num_bins']))
+            
+            #
+            # Densities
+            self._pos_3Dhist["dens"] = self.pos_3Dhist["freqs"] / np.sum(self.pos_3Dhist["freqs"])
 
-            # Frequencies
+            #
+            # Bins
+            self._pos_3Dhist["bins"] = np.zeros((3, self.conds["num_bins"])) - float(self.conds['r_max'])
+            
+            for i in range(3):
+                for j in range(self.conds['num_bins']):
+                    delta = 2*float(self.conds['r_max']) / float(self.conds['num_bins'])
+                    self._pos_3Dhist["bins"][i][j] += j*delta
+
+            #
+            # Marginal frequencies
             self._pos_hist[0]["freqs"] = np.sum(self.pos_3Dhist["freqs"], axis=(1, 2))
             self._pos_hist[1]["freqs"] = np.sum(self.pos_3Dhist["freqs"], axis=(0, 2))
             self._pos_hist[2]["freqs"] = np.sum(self.pos_3Dhist["freqs"], axis=(0, 1))
 
-        #
-        # Frequencies of the marginal histograms of the positions
-        path = self.directory + 'marginals.csv'
-        if os.path.exists(path):
-            df = pd.read_csv(path, index_col=0)
+            #
+            # Defined marginals
+            for i in range(3):
+                #
+                # Marginal densities
+                self._pos_hist[i]["dens"] = self._pos_hist[i]["freqs"] / np.sum(self._pos_hist[i]["freqs"])
 
+                #
+                # Marginal bins
+                self._pos_hist[i]["bins"] = - np.ones(self.conds['num_bins']) * float(self.conds['r_max'])
+                delta = 2*float(self.conds['r_max']) / float(self.conds['num_bins'])
+
+                for j in range(self.conds['num_bins']):
+                    self._pos_hist[i]["bins"][j] += j*delta
+
+        #
+        # Marginal histograms of the positions
+        elif os.path.exists(self.directory + 'marginals.csv'):
+            #
+            # Read file
+            df = pd.read_csv(self.directory + 'marginals.csv', index_col=0)
+
+            #
             # Frequencies
             self._pos_hist[0]["freqs"] = df['x'].to_numpy()
             self._pos_hist[1]["freqs"] = df['y'].to_numpy()
             self._pos_hist[2]["freqs"] = df['z'].to_numpy()
 
-        #
-        # Densities and bins
-        if len(self._pos_hist[0]["freqs"]) > 0:
+            #
+            # Densities and bins of marginal histograms
             for i in range(3):
                 # Densities
                 self._pos_hist[i]["dens"] = self._pos_hist[i]["freqs"] / np.sum(self._pos_hist[i]["freqs"])
-                self._pos_hist[i]["dens"] = np.array(self._pos_hist[i]["dens"])
 
                 #
                 # Bins
@@ -218,8 +259,7 @@ class Results:
     def __get_name(self):
         #
         # Get short name
-        dir_path = "model/results/"
-        obj_scandir = os.scandir(dir_path)
+        obj_scandir = os.scandir(self.root_dir)
         self._name = ''
 
         for path in obj_scandir:
@@ -239,7 +279,7 @@ class Results:
     def __get_loop(self):
         #
         # Get root directory            
-        root_dir = "model/results/" + str(self.code)
+        root_dir = self.root_dir + str(self.code)
 
         if self.name:  
             root_dir += '_' + self._name
@@ -286,10 +326,13 @@ class Results:
                 end = float(opts[1])
                 step = float(opts[2])
                 
-                values = []
-                while val <= end:
-                    values.append(val)
-                    val += step
+                if ((end - val) < 0 and step < 0) or ((end - val) > 0 and step > 0):
+                    values = []
+                    while val <= end:
+                        values.append(val)
+                        val += step
+                else:
+                    raise ValueError('Incorrect looping in the parameters')
 
             elif loop_str[4] == '{' and loop_str[-1] == '}':
                 values = loop_str[5:-1].split(' ')
@@ -305,7 +348,7 @@ class Results:
         self._name = name
 
         # Check if results directory exists
-        self._directory = "model/results/"
+        self._directory = self.root_dir
         if not os.path.exists(self._directory):
             os.mkdir(self._directory)
 
@@ -317,11 +360,10 @@ class Results:
 
         #
         # Create directories for each result (looping)
-        #
 
-        # Create new attributes
+        # Create new attributes        
         self.__create_attr()
-        
+
         # Looping
         num_res = len(self.loop["values"]) if len(self.loop["values"]) > 0 else 1
         for i in range(num_res):
@@ -440,15 +482,14 @@ class Results:
 
             std_r_c = np.sqrt(r_c_square - r_c*r_c)
 
-        return r_c, std_r_c
+        return r_c, std_r_c      
 
     #
     # Check if code exists
     def __check_code(self, code):
         #
         # Variables
-        dir_path = "model/results/"
-        obj_scandir = os.scandir(dir_path)
+        obj_scandir = os.scandir(self.root_dir)
         ret = False
 
         for path in obj_scandir:
@@ -471,8 +512,7 @@ class Results:
     def __check_name(self, name):
         #
         # Variables
-        dir_path = "model/results/"
-        obj_scandir = os.scandir(dir_path)
+        obj_scandir = os.scandir(self.root_dir)
         ret = False
 
         for path in obj_scandir:
@@ -496,3 +536,78 @@ class Results:
         self._loop["active"] = idx
         self.__get_attr()
         self.__get_dists()
+
+    #
+    # Add 3D position histogram
+    def add_positions(self, pos_freqs_arr):
+        #
+        # Transform the 3D-array in a 1D-array
+
+        indexes = []
+        values = []
+
+        for i in range(self.conds['num_bins']):
+            for j in range(self.conds['num_bins']):
+                for k in range(self.conds['num_bins']):
+                    indexes.append("[%d,%d,%d]" % (i+1, j+1, k+1))
+                    values.append(pos_freqs_arr[self.conds['num_bins']**2 * i + self.conds['num_bins']*j + k])
+
+        values = np.array(values)
+
+        #
+        # Save file
+
+        path = self.directory + "/positions.csv"
+        pos_freqs = pd.Series(values, index=indexes).astype("int32")
+        pos_freqs.fillna(0, inplace=True)
+        pos_freqs.to_csv(path)
+
+        #
+        # Update distributions
+        self.__get_dists()
+
+        #
+        # Add marginal distribution files
+        pos_freqs_arr = [self.pos_hist[i]["freqs"] for i in range(3)]
+        self.add_marginal_positions(pos_freqs_arr)
+
+        #
+        # Release memory
+
+        del values
+        del indexes
+        del pos_freqs
+        del path
+
+        gc.collect()
+
+    #
+    # Add marginal positions
+    def add_marginal_positions(self, pos_freqs_arr):
+        indexes = [i+1 for i in range(self.conds['num_bins'])]
+        columns = ["x", "y", "z"]
+
+        data = {
+            'x': pos_freqs_arr[0],\
+            'y': pos_freqs_arr[1],\
+            'z': pos_freqs_arr[2]
+        }
+
+        path = self.directory + "marginals.csv"
+        pos_freqs = pd.DataFrame(data).astype("int32")
+        pos_freqs.fillna(0, inplace=True)
+        pos_freqs.to_csv(path)
+
+        #
+        # Release memory
+
+        indexes.clear()
+        columns.clear()
+
+        del indexes
+        del columns
+        del pos_freqs
+        del data
+        del path
+
+        gc.collect()

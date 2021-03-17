@@ -6,9 +6,15 @@ import pandas as pd
 import mot_sim as C_ext
 
 from multiprocessing import cpu_count
-from pathos.multiprocessing import ProcessPool as Pool
+from multiprocessing import Pool
 from datetime import datetime as dt
 from model.Results import Results
+
+#
+# Wrapper function for pool
+def simulate_atom(args):
+    params_dir, opt, s = args
+    return C_ext.simulate_atom(params_dir, opt, s)
 
 #
 class Simulation:
@@ -121,14 +127,8 @@ class Simulation:
                 args_pool.append((self.results.directory + "parameters/", self.option, seed))
 
             #
-            # Wrapper function for pool
-            def simulate_atom(args):
-                params_dir, opt, s = args
-                return C_ext.simulate_atom(params_dir, opt, s)
-
-            #
             # Parallel execution
-            with Pool(cpu_count(), maxtasksperchild=1000) as pool:
+            with Pool(cpu_count(), maxtasksperchild=100) as pool:
                 freqs = pool.map(simulate_atom, args_pool)
 
                 #
@@ -143,11 +143,17 @@ class Simulation:
                             for j in range(self.results.conds["num_bins"]):
                                 self._pos_freqs_arr[i][j] += freqs[k][i][j]
 
+                #
+                # Release memory
                 del freqs
                 del args_pool
-                del simulate_atom
                 del seed
 
+                #
+                # Finish pool and release memory
+                pool.terminate()
+
+            #
             # Update atoms simulated
             self._atoms_simulated += times
 
@@ -205,81 +211,14 @@ class Simulation:
         #
         # Check file
         if self.option == 0:
-            indexes = []
-            values = []
-
-            for i in range(self.results.conds['num_bins']):
-                for j in range(self.results.conds['num_bins']):
-                    for k in range(self.results.conds['num_bins']):
-                        indexes.append("[%d,%d,%d]" % (i+1, j+1, k+1))
-                        values.append(self.pos_freqs_arr[self.results.conds['num_bins']**2 * i + self.results.conds['num_bins']*j + k])
-
-            values = np.array(values)
-
-            # Save file
-            path = self.results.directory + "/positions.csv"
-            pos_freqs = pd.Series(values, index=indexes).astype("int32")
-            pos_freqs.fillna(0, inplace=True)
-            pos_freqs.to_csv(path)
-
-            # Release memory
-            del values
-            del indexes
-            del pos_freqs
-            del path
+            self.results.add_positions(self.pos_freqs_arr)
 
         elif self.option == 1:
-            indexes = [i+1 for i in range(self.results.conds['num_bins'])]
-            columns = ["x", "y", "z"]
-
-            data = {
-                'x': self._pos_freqs_arr[0],\
-                'y': self._pos_freqs_arr[1],\
-                'z': self._pos_freqs_arr[2]
-            }
-
-            path = self.results.directory + "marginals.csv"
-            pos_freqs = pd.DataFrame(data).astype("int32")
-            pos_freqs.fillna(0, inplace=True)
-            pos_freqs.to_csv(path)
-
-            # Release memory
-            indexes.clear()
-            columns.clear()
-
-            del indexes
-            del columns
-            del pos_freqs
-            del data
-            del path
+            self.results.add_marginal_positions(self.pos_freqs_arr)
 
         #
         # Release memory
         gc.collect()
-
-    #
-    # Check if results code exists
-    def check_results_code(self, code):
-        #
-        # Variables
-        dir_path = "model/results/"
-        obj_scandir = os.scandir(dir_path)
-        ret = False
-
-        for path in obj_scandir:
-            str_splited = path.name.split("_")
-            check_code = int(str_splited[0])
-
-            name = ""
-            for j in range(1, len(str_splited)):
-                if j == 1: name += str_splited[j]
-                else: name += '_' + str_splited[j]
-
-            if check_code == int(code):
-                ret = True
-                break
-
-        return ret  
 
     #
     def get_results(self, num=10):
@@ -307,6 +246,66 @@ class Simulation:
         return res
 
     #
-    # Utility methods
-    #
+    def available_results(self, max_num_results=10):
+        #
+        # Variables
+        res = []
+        check = True
 
+        #
+        # List all results directories
+        results_dir = os.scandir("model/results/")
+        for res_dir_item in results_dir:
+            #
+            # Check if the results is valid
+            if res_dir_item.is_dir():
+                res_dir = os.scandir(res_dir_item.path)
+
+                check = True
+                for res_item in res_dir:
+                    if not check: break
+                    elif res_item.is_dir():
+                        res_loop = os.scandir(res_item.path)
+                        check  = False
+
+                        for res_loop_item in res_loop:
+                            if res_loop_item.name == "marginals.csv":
+                                check = True
+                                break
+
+                if check:
+                    str_splited = res_dir_item.name.split("_")
+
+                    code = int(str_splited[0])
+                    name = ""
+                    for j in range(1, len(str_splited)):
+                        if j == 1: name += str_splited[j]
+                        else: name += '_' + str_splited[j]
+
+                    res.append([code, name])
+
+        return sorted(res, key=lambda res: -res[0])[:max_num_results]
+
+    #
+    # Check if results code exists
+    def check_results_code(self, code):
+        #
+        # Variables
+        dir_path = "model/results/"
+        obj_scandir = os.scandir(dir_path)
+        ret = False
+
+        for path in obj_scandir:
+            str_splited = path.name.split("_")
+            sim_code = int(str_splited[0])
+
+            name = ""
+            for j in range(1, len(str_splited)):
+                if j == 1: name += str_splited[j]
+                else: name += '_' + str_splited[j]
+
+            if sim_code == int(code):
+                ret = True
+                break
+
+        return ret  

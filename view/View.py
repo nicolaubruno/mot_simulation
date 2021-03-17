@@ -132,7 +132,7 @@ class View:
 
     #
     # Print general information of a simulation
-    def simulation_header(self, clear_screen=False):
+    def simulation_header(self, header = True, clear_screen = False):
         #
         # Clear screen
         if clear_screen:
@@ -141,7 +141,7 @@ class View:
 
         #
         # Show header 
-        print(self.header)
+        if header: print(self.header)
 
         print()
         print("Results " + str(self.__simulation.results.code) + " " + self.__simulation.results.name + self._separator)
@@ -153,8 +153,17 @@ class View:
         else:
             print()
             print("Number of atoms simulated in each looping = " + str(self.__simulation.results.conds["num_sim"]))
-            print(self.__simulation.results.loop["var"] + " = ", end='')
-            print(self.__simulation.results.loop["values"])
+            
+            #
+            # Looping
+            if len(self.__simulation.results.loop["var"]) > 0:
+                print("Number of loopings over the parameter " + self.__simulation.results.loop["var"] + " = " + str(len(self.__simulation.results.loop["values"])))
+                print(self.__simulation.results.loop["var"] + " = [ ", end='')
+                
+                for val in self.__simulation.results.loop["values"]:
+                    print("%.2f " % val, end='')
+
+                print(']')
             print()
 
     #
@@ -162,7 +171,7 @@ class View:
     def results_history(self, num = 5, clear_screen = True):
         #
         # Get results
-        res = self.__simulation.get_results(num)
+        res = self.__simulation.available_results(num)
 
         #
         # Clear screen
@@ -210,9 +219,9 @@ class View:
 
         #
         # Plot
-        style={}
-
-        plt.bar(res.pos_hist[axis]["bins"], height=res.pos_hist[axis]["dens"], **style)
+        if axis in [0, 1, 2]:
+            style={}
+            plt.bar(res.pos_hist[axis]["bins"], height=res.pos_hist[axis]["dens"], **style)
 
         #
         # Set plot
@@ -227,7 +236,7 @@ class View:
     def mass_centre(self, res):
         r_c, std_r_c = res.mass_centre()
 
-        if res.loop["var"]:
+        if len(res.loop["var"]) > 0:
             #
             # Clear stored plots
             plt.clf()
@@ -242,25 +251,25 @@ class View:
                     "axes.titlepad":16
                 })
 
-            #
-            # Set labels
-            labels = ['x', 'y', 'z']
-            plt.title("Centre of mass as a function of the laser detuning")
-            plt.xlabel(r"$ \Delta (2\pi \times MHz) $")
-            plt.ylabel("position (cm)")
-
-            #
-            # Plot
             style={
                 "linestyle":'-'
             }
 
             markers = ['o', '^', 's']
 
+            #
+            # Set labels
+            labels = ['x', 'y', 'z']
+            plt.title("Centre of mass as a function of the laser detuning")
+            plt.xlabel(r"$ \Delta (2\pi \times MHz) $")
+            plt.ylabel("position (cm)")
             delta = np.array(res.loop["values"])*(res.transition["gamma"]*1e-3)
 
+            #
+            # Plot simulated date
             for i in range(3):
                 plt.plot(delta, r_c[i], label=labels[i], marker=markers[i], **style)
+
 
             #
             # Set plot
@@ -270,6 +279,7 @@ class View:
             #
             # Show
             plt.show()
+
         else:
             print()
             print("x = %f +- %f" % (r_c[0], std_r_c[0]))
