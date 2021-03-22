@@ -9,6 +9,7 @@ from multiprocessing import cpu_count
 from multiprocessing import Pool
 from datetime import datetime as dt
 from model.Results import Results
+from random import randint
 
 #
 # Wrapper function for pool
@@ -22,7 +23,7 @@ class Simulation:
     ''' Attributes '''
 
     __slots__ = [
-        "_pos_freqs_arr", "_atoms_simulated", "_option", "_results"
+        "_pos_freqs_arr", "_atoms_simulated", "_option", "_results", "_transitions", "_time"
     ]
 
     #
@@ -40,6 +41,19 @@ class Simulation:
     @property
     def atoms_simulated(self):
         return self._atoms_simulated
+
+    #
+    # Occurred transitions
+    @property
+    def transitions(self):
+        return self._transitions
+
+    #
+    # Average time
+    @property
+    def time(self):
+        return self._time
+    
 
     #
     # Simulation option
@@ -61,6 +75,8 @@ class Simulation:
         #
         # Set-up initial values
         self._atoms_simulated = -1
+        self._transitions = np.zeros(3);
+        self._time = 0;
         self._results = None
 
     #
@@ -71,7 +87,7 @@ class Simulation:
 
         # Empty results
         self._results = Results(int(dt.now().timestamp()), shortname.strip())
-
+        
         #
         # Check simulation option
         # 
@@ -106,6 +122,14 @@ class Simulation:
         self._atoms_simulated = 0
 
         #
+        # Transitions
+        self._transitions = np.zeros(3)
+
+        #
+        # Time
+        self._time = 0
+
+        #
         # Release memory
         gc.collect()
 
@@ -123,25 +147,38 @@ class Simulation:
             # Arguments to the pool 
             args_pool = []
             for i in range(times):
-                seed =  int((1000 * (dt.now().timestamp())) % 1000 + 1e3*(self.atoms_simulated + i))
+                seed = int(randint(0, 1e10))
                 args_pool.append((self.results.directory + "parameters/", self.option, seed))
 
             #
             # Parallel execution
             with Pool(cpu_count(), maxtasksperchild=100) as pool:
-                freqs = pool.map(simulate_atom, args_pool)
+                res = pool.map(simulate_atom, args_pool)
 
                 #
                 # Add frequencies
                 for k in range(times):
+                    freqs = res[k][0]
+                    time = res[k][1]
+                    trans = res[k][2]
+
                     if self.option == 0:
                         for i in range(self.results.conds["num_bins"]**3):
-                            self._pos_freqs_arr[i] += freqs[k][i]
+                            self._pos_freqs_arr[i] += freqs[i]
 
                     elif self.option == 1:                
                         for i in range(3):
                             for j in range(self.results.conds["num_bins"]):
-                                self._pos_freqs_arr[i][j] += freqs[k][i][j]
+                                self._pos_freqs_arr[i][j] += freqs[i][j]
+
+                #
+                # Add time
+                self._time += time
+
+                #
+                # Add transitions
+                for i in range(3):
+                    self._transitions[i] += trans[i]
 
                 #
                 # Release memory

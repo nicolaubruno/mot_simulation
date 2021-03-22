@@ -69,6 +69,15 @@ int c3_operator_print(complex_t **A, char *name);
 // Convert a R3 vector to a C3 vector
 complex_t *r3_to_c3(double *v);
 
+// Convert a R3 operator to a C3 operator
+complex_t **r3_oper_to_c3_oper(double **A);
+
+// Empty C3 operator
+complex_t **c3_operator_zeros();
+
+// Complex conjugate operator
+complex_t **c3_operator_dagger(complex_t **A);
+
 //
 // R3 space
 //

@@ -46,26 +46,20 @@
 
 - k_dic		-> (float[3])   non-unit vector on the basis A parallel to the wave vector
 - eps		-> (int[3])     Polarizations on the basis C
-- s_0  		-> (float)      Peak of the saturation parameter (I_peak / I_sat)
-- w    		-> (float)      Waist Radius [cm]
 
 # Conditions (conditions.csv)
 
 - T_0       -> (float)      Initial temperature [uK]
-- B_0       -> (float) 		Axial magnetic field gradient [G / cm]
-- delta     -> (float)(l)   Laser detuning in units of the transition rate (gamma)
-- g_bool    -> (int)		1- use gravity, 0 - do not use gravity
 - i_max     -> (int)		Maximum number of iteration (simulation of individual atoms)
 - r_max     -> (float)		Maximum distance (threshold) [cm]
 - num_sim   -> (int)		Number of simulations (individual atoms) stopped by reach the maximum distance (r_max)
 - num_bins  -> (int)		Number of bins in each histogram axis
-- ini_iter  -> (int)        Initial iterations necessary for the simulation to reach the equilibrium
+- ini_iters -> (int)        Initial iterations necessary for the simulation to reach the equilibrium
 
-# Constants
+# Environment (conditions.csv)
 
-- h			-> (float)		Planck constant [10^{-34} J s]
-- e			-> (float)		Elementary charge [10^{-19} C]
-- c			-> (float)		Speed of light [10^{8} m / s]
-- k_B		-> (float)		Boltzmann constant [10^{-23} J / K]
-- mu_B		-> (float)		Bohr magneton [10^{-24} J / T]
-- u			-> (float) 		Atomic mass unit [10^{-27} kg]
+- B_0       -> (float)      Axial magnetic field gradient [G / cm]
+- delta     -> (float)(l)   Laser detuning in units of the transition rate (gamma)
+- s_0       -> (float)      Peak of the saturation parameter (I_peak / I_sat)
+- w         -> (float)      Waist Radius [cm]
+- g_bool    -> (int)        1- use gravity, 0 - do not use gravity

@@ -16,11 +16,14 @@ static PyObject* C_simulate_atom(PyObject *self, PyObject *args);
 // Initialize module
 PyMODINIT_FUNC PyInit_mot_sim(void);
 
-// Convert the results in a PyObject list
-PyObject *build_pos_freqs(results_t res);
+// Build a PyObject list of histograms
+PyObject *build_pos_freqs(histogram_t *pos);
 
-// Convert the results in a PyObject list
-PyObject *build_pos_3Dfreqs(results_t res);
+// Build a PyObject list of a 3D-histogram
+PyObject *build_pos_3Dfreqs(histogram_3d_t pos);
+
+// Build PyObject list of occurred transitions
+PyObject *build_transitions(int *trans);
 
 //
 // Structures

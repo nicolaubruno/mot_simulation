@@ -3,6 +3,7 @@
 import os, sys, time
 import pandas as pd
 import matplotlib.pyplot as plt
+import seaborn as sns
 import numpy as np
 
 from datetime import datetime as dt
@@ -152,12 +153,12 @@ class View:
 
         else:
             print()
-            print("Number of atoms simulated in each looping = " + str(self.__simulation.results.conds["num_sim"]))
+            print("Number of atoms simulated in each looping: " + str(self.__simulation.results.conds["num_sim"]))
             
             #
             # Looping
             if len(self.__simulation.results.loop["var"]) > 0:
-                print("Number of loopings over the parameter " + self.__simulation.results.loop["var"] + " = " + str(len(self.__simulation.results.loop["values"])))
+                print("Number of loopings: " + str(len(self.__simulation.results.loop["values"])))
                 print(self.__simulation.results.loop["var"] + " = [ ", end='')
                 
                 for val in self.__simulation.results.loop["values"]:
@@ -221,7 +222,7 @@ class View:
         # Plot
         if axis in [0, 1, 2]:
             style={}
-            plt.bar(res.pos_hist[axis]["bins"], height=res.pos_hist[axis]["dens"], **style)
+            plt.bar(res.pos_hist[axis]["bins"], height=res.pos_hist[axis]["dens"], width=0.1, **style)
 
         #
         # Set plot
@@ -232,7 +233,7 @@ class View:
         plt.show()
 
     #
-    # Print a 3D-vector
+    # Plot mass centre
     def mass_centre(self, res):
         r_c, std_r_c = res.mass_centre()
 
@@ -252,7 +253,7 @@ class View:
                 })
 
             style={
-                "linestyle":'-'
+                "linestyle":'--'
             }
 
             markers = ['o', '^', 's']
@@ -286,4 +287,92 @@ class View:
             print("y = %f +- %f" % (r_c[1], std_r_c[1]))
             print("z = %f +- %f" % (r_c[2], std_r_c[2]))
             print()
+
+    #
+    # Plot r.m.s. cloud size
+    def cloud_size(self, res):
+        #
+        # Get data
+        r_c, std_r_c = res.mass_centre()
+
+        #
+        # Clear stored plots
+        plt.clf()
+
+        #
+        # Set style
+        plt.style.use('seaborn-whitegrid')
+        plt.tight_layout()
+        plt.rcParams.update({
+                "figure.figsize": (7,6),\
+                "font.size":14,\
+                "axes.titlepad":16
+            })
+
+        style={
+            "linestyle":''
+        }
+
+        markers = ['o', '^', 's']
+
+        #
+        # Set labels
+        labels = [r'$\sigma_x$', r'$\sigma_y$', r'$\sigma_z$']
+        plt.title("R.M.S. cloud size as a function of the laser detuning")
+        plt.xlabel(r"$ \Delta (2\pi \times MHz) $")
+        plt.ylabel("Size (mm)")
+        delta = np.array(res.loop["values"])*(res.transition["gamma"]*1e-3)
+
+        #
+        # Plot simulated date
+        for i in range(3):
+            plt.plot(delta, std_r_c[i], label=labels[i], marker=markers[i], **style)
+
+        #
+        # Set plot
+        plt.grid(linestyle="--")
+        plt.legend(frameon=True)
+
+        #
+        # Show
+        plt.show()
+
+    #
+    # Heat map
+    def heatmap(self, res, axis, val):
+        #
+        # Get data
+        hist = res.pos_2Dhist(axis, val)*1e3;
+
+        #
+        # Clear stored plots
+        plt.clf()
+
+        #
+        # Set style
+        plt.style.use('seaborn-whitegrid')
+        plt.tight_layout()
+        plt.rcParams.update({
+                "figure.figsize": (7,6),\
+                "font.size":12,\
+                "axes.titlepad":12
+            })
+
+        #
+        # Set labels
+        plane_label = ['yz', 'xz', 'xy']
+        axis_label = ['x', 'y', 'z']
+
+        plt.title("Position distribution in " + plane_label[axis] + "-axis and " + axis_label[axis] + " = " + ("%.2f" % float(val)))
+        plt.xlabel(plane_label[axis][0] + " [cm]")
+        plt.ylabel(plane_label[axis][1] + " [cm]")
+
+        #
+        # Plot simulated date
+        l = float(res.conds['r_max'])
+        plt.imshow(hist, cmap="Blues", vmin=np.min(hist), vmax=np.max(hist), extent=[-l, l, -l, l])
+
+        #
+        # Show
+        plt.show()
 

@@ -6,7 +6,7 @@
 
 //
 // Complex space
-//
+//--
 
 complex_t c_sum(complex_t z1, complex_t z2){
     complex_t z;
@@ -48,9 +48,11 @@ double c_mod(complex_t z){
     return sqrt(c_inner_product(z, z).re);
 }
 
+//--
+
 //
 // C3 space
-//
+//--
 
 complex_t *c3_sum(complex_t *z1, complex_t *z2){
     //
@@ -171,9 +173,71 @@ complex_t *r3_to_c3(double *v){
     return res;
 }
 
+complex_t **r3_oper_to_c3_oper(double **A){
+    int i, j;
+    complex_t **B;
+
+    B = (complex_t**) calloc(3, sizeof(complex_t*));
+
+    for(i = 0; i < 3; i++){
+        B[i] = (complex_t*) calloc(3, sizeof(complex_t));
+
+        for(j = 0; j < 3; j++){
+            B[i][j].re = A[i][j];
+            B[i][j].im = 0;
+        }
+    }
+
+    return B;
+}
+
+complex_t **c3_operator_zeros(){
+    // Variables
+    int i, j;
+    complex_t **A;
+
+    A = (complex_t**) calloc(3, sizeof(complex_t*));
+
+    for(i = 0; i < 3; i++){
+        A[i] = (complex_t*) calloc(3, sizeof(complex_t));
+
+        for(j = 0; j < 3; j++){
+            A[i][j].re = 0;
+            A[i][j].im = 0;
+        } 
+    }
+
+    return A;
+}
+
+// Conjugate transpose
+complex_t **c3_operator_dagger(complex_t **A){
+    // Variables
+    int i, j;
+    complex_t **A_dagger;
+
+    A_dagger = (complex_t**) calloc(3, sizeof(complex_t*));
+
+    for(i = 0; i < 3; i++){
+        A_dagger[i] = (complex_t*) calloc(3, sizeof(complex_t));
+
+        for(j = 0; j < 3; j++){
+            // Transpose
+            A_dagger[i][j] = A[j][i];
+
+            // Conjugate
+            A_dagger[i][j].im = - A_dagger[i][j].im;
+        } 
+    }
+
+    return A_dagger;
+}
+
+//--
+
 //
 // R3 space
-//
+//--
 
 double r3_mod(double *z){
     return sqrt(r3_inner_product(z, z));
@@ -270,9 +334,9 @@ double *r3_normalize(double *r){
     // Normalization
     //
 
-    mod_r = sqrt(r3_inner_product(r, r));
+    mod_r = r3_mod(r);
     if(mod_r == 0.0){
-        printf("Division by zero in normalize_vector() function\n");
+        printf("Division by zero in r3_normalize() function\n");
         exit(0);
     }
     for(i = 0; i < 3; i++) new_r[i] = (r[i] / mod_r);
@@ -317,3 +381,5 @@ int r3_operator_print(double **A, char *name){
 
     return 1;
 }
+
+//--

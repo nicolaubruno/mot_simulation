@@ -28,6 +28,12 @@ class Results:
         return self._conds
 
     #
+    # (Series) Environment
+    @property
+    def env(self):
+        return self._env
+
+    #
     # (Dataframe)
     @property
     def beams(self):
@@ -56,7 +62,7 @@ class Results:
     @property
     def pos_hist(self):
         return self._pos_hist
-
+    
     #
     # Looping status
     @property
@@ -80,6 +86,7 @@ class Results:
 
     #
     def __init__(self, code, name = '', loop_idx = 0):
+        #
         # Set loop variable
         self._loop = {
             "var": '',\
@@ -93,12 +100,12 @@ class Results:
 
         #
         # Identification
-        #
-
         self._code = None
         self._name = name.strip()
 
+        #
         # Get existent results
+        #--
         if self.__check_code(code):
             # Get code
             self._code = code
@@ -122,6 +129,7 @@ class Results:
 
         # Create a new results
         else: self.__new(code, name)
+        #--
 
     #
     # Get attributes
@@ -173,6 +181,13 @@ class Results:
         self._conds['num_sim'] = int(self._conds['num_sim'])
         self._conds['num_bins'] = int(self._conds['num_bins'])
 
+        #
+        # Environment
+        path = params_dir + "environment.csv"
+        self._env = pd.read_csv(path, header=0, index_col=0, squeeze=True).astype(object)
+        self._env["s_0"] = float(self._env["s_0"])
+        self._env["w"] = float(self._env["w"])
+
     #
     # Get distributions
     def __get_dists(self):
@@ -193,11 +208,14 @@ class Results:
             #
             # Read histogram file
             self._pos_3Dhist["freqs"] = pd.read_csv(path, index_col=0, squeeze=True).to_numpy().reshape((self.conds['num_bins'], self.conds['num_bins'], self.conds['num_bins']))
-            
+
+            #
+            # Filter frequencies considering the waist size as a threshold
+
             #
             # Densities
             self._pos_3Dhist["dens"] = self.pos_3Dhist["freqs"] / np.sum(self.pos_3Dhist["freqs"])
-
+            
             #
             # Bins
             self._pos_3Dhist["bins"] = np.zeros((3, self.conds["num_bins"])) - float(self.conds['r_max'])
@@ -254,7 +272,28 @@ class Results:
 
                 for j in range(self.conds['num_bins']):
                     self._pos_hist[i]["bins"][j] += j*delta
+                    
+            '''
+            #
+            # Filter frequencies and densities
+            # considering the waist size as a threshold
+            for i in range(3):
+                initial_bin = -1
+                final_bin = -1
 
+                for j in range(self.conds["num_bins"]):
+                    if (self.pos_hist[i]["bins"][j] >= self.env["w"]) and (initial_bin == -1):
+                        initial_bin = j
+
+                    elif (self.pos_hist[i]["bins"][j] >= self.env["w"]) and (final_bin == -1):
+                        final_bin = j
+                        break
+
+                self._pos_hist[i]["bins"] = self.pos_hist[i]["bins"][initial_bin:final_bin]
+                self._pos_hist[i]["freqs"] = self._pos_hist[i]["freqs"][initial_bin:final_bin]
+                self._pos_hist[i]["dens"] = self._pos_hist[i]["dens"][initial_bin:final_bin]
+            '''
+    
     #
     def __get_name(self):
         #
@@ -301,12 +340,12 @@ class Results:
                     else: self._loop["var"] += '_' + var[j]
 
             if self.loop["var"] == "delta":
-                conds = pd.read_csv(obj_dir.path + "/parameters/conditions.csv", header=0, index_col=0, squeeze=True).astype(object)
-                self._loop["values"].append(float(conds["delta"]))
+                env = pd.read_csv(obj_dir.path + "/parameters/environment.csv", header=0, index_col=0, squeeze=True).astype(object)
+                self._loop["values"].append(float(env["delta"]))
 
             i += 1
 
-        self.loop["values"] = sorted(self.loop["values"])[::-1]
+        self.loop["values"] = sorted(self.loop["values"], key=(lambda x: abs(x)))
 
     #
     def __get_loop_values(self, loop_str):
@@ -335,12 +374,12 @@ class Results:
                     raise ValueError('Incorrect looping in the parameters')
 
             elif loop_str[4] == '{' and loop_str[-1] == '}':
-                values = loop_str[5:-1].split(' ')
+                values = np.array(loop_str[5:-1].split(' '), dtype=float)
 
             else:
                 raise ValueError('Invalid loop variable')
 
-        return sorted(values)[::-1]
+        return sorted(values, key=(lambda x: abs(x)))
 
     #
     def __new(self, code, name):
@@ -387,12 +426,13 @@ class Results:
             #
             # Add loop variable 
             if self.loop["var"] == "delta":
-                self.conds["delta"] = float(self.loop["values"][i])
+                self.env["delta"] = float(self.loop["values"][i])
 
             self.atom.to_csv(params_dir + "atom.csv")
             self.transition.to_csv(params_dir + "transition.csv")
             self.beams.to_csv(params_dir + "beams.csv", index=False)
             self.conds.to_csv(params_dir + "conditions.csv")
+            self.env.to_csv(params_dir + "environment.csv")
 
             # Release memory
             del res_dir, params_dir
@@ -439,50 +479,114 @@ class Results:
         self._conds = pd.read_csv(path, header=0, index_col=0, squeeze=True).astype(object)
         self._conds['num_sim'] = int(self._conds['num_sim'])
         self._conds['num_bins'] = int(self._conds['num_bins'])
+        
+        #
+        # Environment
+        path = params_dir + "environment.csv"
+        self._env = pd.read_csv(path, header=0, index_col=0, squeeze=True).astype(object)
 
         #
         # Check delta looping
-        values = self.__get_loop_values(str(self.conds["delta"]))
+        values = self.__get_loop_values(str(self.env["delta"]))
         if len(values) > 0:
             self._loop["var"] = "delta"
             self._loop["values"] = values
-            self.conds["delta"] = self.loop["values"][self.loop["active"]]
+            self.env["delta"] = self.loop["values"][self.loop["active"]]
 
     #
-    def mass_centre(self):
+    def mass_centre(self, axis=[0,1,2]):
         # Variables
         if len(self.loop["var"]) == 0:
             r_c = [0,0,0]
             std_r_c = [0,0,0]
 
-            for i in range(3):
+            for i in axis:
+                #
+                # Get bins in the waist interval
+                first_idx = 0
+                last_idx = 0
+
                 x = self.pos_hist[i]["bins"]
                 p = self.pos_hist[i]["dens"]
                 r_c[i] = np.sum(x*p)
 
-            for i in range(3):
+            for i in axis:
                 x2 = self.pos_hist[i]["bins"]*self.pos_hist[i]["bins"]
                 p = self.pos_hist[i]["dens"]
                 std_r_c[i] = np.sqrt(np.sum(x2*p) - r_c[i]**2)
 
         else:
-            r_c = np.zeros((3,len(self.loop["values"])))
-            r_c_square = np.zeros((3,len(self.loop["values"])))
-            std_r_c = np.zeros((3,len(self.loop["values"])))
+            if len(axis) == 1:
+                r_c = np.zeros(len(self.loop["values"]))
+                r_c_square = np.zeros(len(self.loop["values"]))
+                std_r_c = np.zeros(len(self.loop["values"]))
+            
+            else:
+                r_c = np.zeros((len(axis),len(self.loop["values"])))
+                r_c_square = np.zeros((len(axis),len(self.loop["values"])))
+                std_r_c = np.zeros((len(axis),len(self.loop["values"])))
 
             for i in range(len(self.loop["values"])):
                 self.loop_idx(i)
 
-                for j in range(3):
-                    x = self.pos_hist[j]["bins"]
-                    p = self.pos_hist[j]["dens"]
+                if len(axis) > 1:
+                    for j in axis:
+                        x = self.pos_hist[j]["bins"]
+                        p = self.pos_hist[j]["dens"]
 
-                    r_c[j][i] = np.sum(x*p)
-                    r_c_square[j][i] = np.sum(x*x*p)
+                        r_c[j][i] = np.sum(x*p)
+                        r_c_square[j][i] = np.sum(x*x*p)
+
+                else:
+                    x = self.pos_hist[axis[0]]["bins"]
+                    p = self.pos_hist[axis[0]]["dens"]
+
+                    r_c[i] = np.sum(x*p)
+                    r_c_square[i] = np.sum(x*x*p)
 
             std_r_c = np.sqrt(r_c_square - r_c*r_c)
 
         return r_c, std_r_c      
+
+    #
+    # Get 2D-histogram of positions removing an axis
+    def pos_2Dhist(self, axis = 0, val = 0):
+        #
+        # Get bin index
+        bin_idx = 0
+        for idx, bin_size in enumerate(self.pos_3Dhist["bins"][axis]):
+            if idx > 0 and (float(val) <= bin_size):
+                bin_idx = idx - 1
+                break
+
+        #
+        # Get bins
+        if axis == 0:
+            axis_label = {'y', 'z'}
+            hist = np.zeros((len(self.pos_3Dhist["bins"][1]), len(self.pos_3Dhist["bins"][2])))
+
+        elif axis == 1:
+            axis_label = {'x', 'z'}
+            hist = np.zeros((len(self.pos_3Dhist["bins"][0]), len(self.pos_3Dhist["bins"][2])))
+
+        elif axis == 2:
+            axis_label = {'x', 'y'}
+            hist = np.zeros((len(self.pos_3Dhist["bins"][0]), len(self.pos_3Dhist["bins"][1])))
+
+        #
+        # Get densities
+        for i in range(len(hist)):
+            for j in range(len(hist[i])):
+                if axis == 0:
+                    hist[i][j] = self.pos_3Dhist["dens"][bin_idx,i,j]
+
+                elif axis == 1:
+                    hist[i][j] = self.pos_3Dhist["dens"][i,bin_idx,j]
+
+                elif axis == 2:
+                    hist[i][j] = self.pos_3Dhist["dens"][i,j,bin_idx]
+
+        return hist
 
     #
     # Check if code exists
