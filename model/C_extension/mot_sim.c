@@ -788,15 +788,13 @@ int set_pos_hist(int only_marginals, results_t *res, conditions_t conds){
 double move(atom_t *atom, beams_setup_t beams_setup, conditions_t conds, environment_t env){
     //
     // Variables
-    int i, j, *absorbed_beams;
-    double *B, *eB, dt;
+    int i, j, chosen_beam = -1;
+    double *B, *eB;
     double vel_mod, *a_B, *rd_v;
-    double *pol_amp, probs[] = {0, 1};
+    double *pol_amp;
     int pol_opt[] = {+1, -1, 0};  
     polarized_beam_t *beams;
-    
-    // Convert time unit
-    dt = conds.dt / (2*PI*atom->transition.gamma*1e3);
+    double R = 0, dt = 0, aux_R = 0, aux_dt = 0;
 
     //
     // Direction of the magnetic field magnetic field
@@ -809,10 +807,10 @@ double move(atom_t *atom, beams_setup_t beams_setup, conditions_t conds, environ
 
     // Beams
     beams = (polarized_beam_t*) calloc(3*beams_setup.num, sizeof(polarized_beam_t));
-    absorbed_beams = (int*) calloc(3*beams_setup.num, sizeof(int));
 
     // Check each beam
     for(i = 0; i < beams_setup.num; i++){
+        // Polarizations amplitude
         pol_amp = polarizations_amplitudes(beams_setup.beams[i], env, eB);
 
         // Check each polarization
@@ -822,28 +820,25 @@ double move(atom_t *atom, beams_setup_t beams_setup, conditions_t conds, environ
             beams[3*i+j].k_dic = beams_setup.beams[i].k_dic;
             beams[3*i+j].eps = pol_opt[j];
 
-            // Probability
-            probs[1] = dt * scattering_rate(*atom, beams[3*i+j], conds, env, B);
-            probs[0] = 1 - probs[1];
+            // Get scattering rate and process time
+            aux_R = scattering_rate(*atom, beams[3*i+j], conds, env, B);
+            if(aux_R > 0) aux_dt = random_exp(1 / aux_R);
 
-            absorbed_beams[3*i+j] = random_pick(probs, 2);
+            // Check time
+            if((R == 0 && aux_R > 0) || (aux_R > 0 && aux_dt < dt)){
+                R = aux_R;
+                dt = aux_dt;
+                chosen_beam = 3*i+j;
+
+            }
         }
     }
 
-    //--
-
-    //
-    // Random vector
-    //--
-    rd_v = (double*) calloc(3, sizeof(double));  // Random vector
-    for(i = 0; i < 3; i++) {
-        rd_v[i] = ((double) rand()) / ((double) RAND_MAX);
-        if((((double) rand()) / ((double) RAND_MAX)) < 0.5) rd_v[i] = -rd_v[i];
+    // Check absorption
+    if(R == 0 || (dt > conds.dt / (atom->transition.gamma*1e3))){
+        dt = 1 / (atom->transition.gamma*1e3);
+        chosen_beam = -1;
     }
-
-    // Normalization
-    rd_v = r3_normalize(rd_v); // Normalization
-    //--
 
     //
     // Movement
@@ -880,12 +875,24 @@ double move(atom_t *atom, beams_setup_t beams_setup, conditions_t conds, environ
         atom->vel[i] += a_B[i] * dt;
 
     // Photonic recoil
-    vel_mod = 1e4 * h / (atom->transition.lambda * atom->mass * u); // cm / s
-    for(i = 0; i < 3*beams_setup.num; i++){
-        if(absorbed_beams[i]){
-            atom->vel = r3_sum(atom->vel, r3_scalar_product(vel_mod, beams[i].k_dic)); // cm / s
-            atom->vel = r3_sum(atom->vel, r3_scalar_product(vel_mod, rd_v)); // cm / s
+    if(chosen_beam > -1){
+        //
+        // Random vector
+        //--
+        rd_v = (double*) calloc(3, sizeof(double));  // Random vector
+        for(j = 0; j < 3; j++) {
+            rd_v[j] = ((double) rand()) / ((double) RAND_MAX);
+            if((((double) rand()) / ((double) RAND_MAX)) < 0.5) rd_v[j] = -rd_v[j];
         }
+
+        // Normalization
+        rd_v = r3_normalize(rd_v); // Normalization
+        //--
+
+        // Add velocity
+        vel_mod = 1e4 * h / (atom->transition.lambda * atom->mass * u); // cm / s
+        atom->vel = r3_sum(atom->vel, r3_scalar_product(vel_mod, beams[chosen_beam].k_dic)); // cm / s
+        atom->vel = r3_sum(atom->vel, r3_scalar_product(vel_mod, rd_v)); // cm / s
     }
     //--
 
@@ -893,7 +900,8 @@ double move(atom_t *atom, beams_setup_t beams_setup, conditions_t conds, environ
     free(beams);
     
     // Convert time unit
-    dt = dt * (2*PI*atom->transition.gamma*1e3);
+    dt = dt * (atom->transition.gamma*1e3);
+    //printf("dt [ms] = %f\n", dt*1e3);
 
     return dt;
 }
@@ -1096,15 +1104,17 @@ double scattering_rate(atom_t atom, polarized_beam_t beam, conditions_t conds, e
     //
     // Detuning
     delta = 0;
-    gamma = 2*PI*atom.transition.gamma; // kHz
+    gamma = atom.transition.gamma; // kHz
     lambda = atom.transition.lambda; // nm
 
     // Laser detuning
     delta += env.delta*gamma; // kHz
+    //printf("laser_detuning = %f\n", delta);
 
     // Doppler shift
-    doppler_shift = - 1e4 * 2 * PI * r3_inner_product(atom.vel, C[2]) / lambda; // kHz
+    doppler_shift = - 1e4 * r3_inner_product(atom.vel, C[2]) / lambda; // kHz
     delta += doppler_shift;
+    //printf("doppler_shift = %f\n", doppler_shift);
 
     //
     // Zeeman shift
@@ -1120,11 +1130,13 @@ double scattering_rate(atom_t atom, polarized_beam_t beam, conditions_t conds, e
     g_exc = atom.transition.g_exc;
 
     // Compute shift
-    zeeman_shift = 1e5 * 2 * PI * (mu_B / h) * r3_mod(B) * (g_gnd * mj_gnd - g_exc * mj_exc);  // kHz
+    zeeman_shift = 1e3 * (mu_B / h) * r3_mod(B) * (g_gnd * mj_gnd - g_exc * mj_exc);  // kHz
     delta += zeeman_shift;
+    //printf("|B| = %f\n", r3_mod(B));
+    //printf("zeeman_shift = %f\n", zeeman_shift);
 
     // Scattering rate
-    R = ((1e3 * gamma)/2) * s / (1 + s + 4*(delta*delta)/(gamma*gamma)); // Hz
+    R = ((gamma * 1e3)/2) * s / (1 + s + 4*(delta*delta)/(gamma*gamma)); // Hz
 
     // Release //memory  
     for(i = 0; i < 3; i++) free(C[i]); 
@@ -1158,7 +1170,7 @@ int print_results(atom_t atom, results_t res){
     printf("total time [ms] = %f\n\n", res.time / (2*PI*atom.transition.gamma));
 
     for(i = 0; i < 3;i++){
-        printf("dist[%d] = [ ", i+1);
+        printf("dist[%d] = [\n", i+1);
         for(j = 0; j < res.pos_hist[i].num_bins; j++)
             printf("%d ", res.pos_hist[i].freqs[j]);
         printf("]\n\n");

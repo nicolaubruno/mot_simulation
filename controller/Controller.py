@@ -78,6 +78,7 @@ class Controller:
         #
         # Get shortname
         shortname = self.__call_input("Insert a short name for the simulation")
+        if shortname == -1: self._menu_level -= 1
 
         #
         # Chose a parameter
@@ -88,9 +89,9 @@ class Controller:
             }
 
             opt = self.__call_menu(opts, "Choose a simulation option:")
-            if opt == 2: opt = 0
-
-            if opt != -1:
+            if opt ==  -1: self._menu_level -= 1
+            elif opt == 2: opt = 0
+            else:
                 # Create a new simulation
                 self.__simulation.new(shortname, opt)
 

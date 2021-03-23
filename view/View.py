@@ -269,7 +269,7 @@ class View:
             #
             # Plot simulated date
             for i in range(3):
-                plt.plot(delta, r_c[i], label=labels[i], marker=markers[i], **style)
+                plt.errorbar(delta, r_c[i], yerr=std_r_c[i], label=labels[i], marker=markers[i], **style)
 
 
             #
@@ -310,7 +310,7 @@ class View:
             })
 
         style={
-            "linestyle":''
+            "linestyle":'--'
         }
 
         markers = ['o', '^', 's']
