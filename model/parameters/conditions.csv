@@ -1,8 +1,8 @@
 ,conditions
-T_0,50.0
-max_time,5e4
+T_0,20.0
+max_time,4e4
 r_max,1.5
 num_sim,1e3
 num_bins,128
 wait_time,1e4
-dt,10
+dt,1

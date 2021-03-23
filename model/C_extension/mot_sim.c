@@ -788,13 +788,16 @@ int set_pos_hist(int only_marginals, results_t *res, conditions_t conds){
 double move(atom_t *atom, beams_setup_t beams_setup, conditions_t conds, environment_t env){
     //
     // Variables
-    int i, j, chosen_beam = -1;
+    int i, j, chosen_beam;
     double *B, *eB;
     double vel_mod, *a_B, *rd_v;
-    double *pol_amp;
+    double *pol_amp, *probs, p = 0;
     int pol_opt[] = {+1, -1, 0};  
+    double dt;
     polarized_beam_t *beams;
-    double R = 0, dt = 0, aux_R = 0, aux_dt = 0;
+
+    // Time interval
+    dt = conds.dt / (atom->transition.gamma*1e3);
 
     //
     // Direction of the magnetic field magnetic field
@@ -807,8 +810,11 @@ double move(atom_t *atom, beams_setup_t beams_setup, conditions_t conds, environ
 
     // Beams
     beams = (polarized_beam_t*) calloc(3*beams_setup.num, sizeof(polarized_beam_t));
+    probs = (double*) calloc(3*beams_setup.num, sizeof(double));
 
-    // Check each beam
+    //
+    // Get probabilities of each transition happen
+    // --
     for(i = 0; i < beams_setup.num; i++){
         // Polarizations amplitude
         pol_amp = polarizations_amplitudes(beams_setup.beams[i], env, eB);
@@ -820,25 +826,18 @@ double move(atom_t *atom, beams_setup_t beams_setup, conditions_t conds, environ
             beams[3*i+j].k_dic = beams_setup.beams[i].k_dic;
             beams[3*i+j].eps = pol_opt[j];
 
-            // Get scattering rate and process time
-            aux_R = scattering_rate(*atom, beams[3*i+j], conds, env, B);
-            if(aux_R > 0) aux_dt = random_exp(1 / aux_R);
-
-            // Check time
-            if((R == 0 && aux_R > 0) || (aux_R > 0 && aux_dt < dt)){
-                R = aux_R;
-                dt = aux_dt;
-                chosen_beam = 3*i+j;
-
-            }
+            // Probability of the atom to absorb
+            probs[3*i+j] = dt * scattering_rate(*atom, beams[3*i+j], conds, env, B);
+            p += probs[3*i+j];
         }
     }
 
-    // Check absorption
-    if(R == 0 || (dt > conds.dt / (atom->transition.gamma*1e3))){
-        dt = 1 / (atom->transition.gamma*1e3);
-        chosen_beam = -1;
-    }
+    // Probability of the transition does not happen
+    probs[3*beams_setup.num] = 1 - p;
+
+    // Chose a beam to be absorbed or not
+    chosen_beam = random_pick(probs, 3*beams_setup.num+1);
+    //--
 
     //
     // Movement
@@ -874,8 +873,10 @@ double move(atom_t *atom, beams_setup_t beams_setup, conditions_t conds, environ
     for(i = 0; i < 3; i++)
         atom->vel[i] += a_B[i] * dt;
 
+    //
     // Photonic recoil
-    if(chosen_beam > -1){
+    //--
+    if(chosen_beam < 3*beams_setup.num){
         //
         // Random vector
         //--
@@ -894,6 +895,8 @@ double move(atom_t *atom, beams_setup_t beams_setup, conditions_t conds, environ
         atom->vel = r3_sum(atom->vel, r3_scalar_product(vel_mod, beams[chosen_beam].k_dic)); // cm / s
         atom->vel = r3_sum(atom->vel, r3_scalar_product(vel_mod, rd_v)); // cm / s
     }
+    //--
+
     //--
 
     // Release memory
