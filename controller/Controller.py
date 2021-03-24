@@ -160,8 +160,9 @@ class Controller:
         options = {\
             1 : 'Atom',\
             2 : 'Transition',\
-            3 : 'Beams setup',\
-            4 : 'Conditions'
+            3 : 'Environment',\
+            4 : 'Beams setup',\
+            5 : 'Conditions'
         }
 
         #
@@ -170,16 +171,19 @@ class Controller:
             opt = self.__call_menu(options, header)
 
             if opt == 1:
-                header = 'Atom\n\n' + self.__simulation.atom.to_string() + '\n'
+                header = 'Atom\n\n' + self.__simulation.results.atom.to_string() + '\n'
 
             elif opt == 2:
-                header = 'Transition\n\n' + self.__simulation.transition.to_string() + '\n'
-
+                header = 'Transition\n\n' + self.__simulation.results.transition.to_string() + '\n'
+            
             elif opt == 3:
-                header = 'Beams setup\n\n' + self.__simulation.beams.to_string() + '\n'
+                header = 'Environment\n\n' + self.__simulation.results.env.to_string() + '\n'
 
             elif opt == 4:
-                header = 'Conditions\n\n' + self.__simulation.conds.to_string() + '\n'
+                header = 'Beams setup\n\n' + self.__simulation.results.beams.to_string() + '\n'
+
+            elif opt == 5:
+                header = 'Conditions\n\n' + self.__simulation.results.conds.to_string() + '\n'
 
             else:
                 self._menu_level = 0

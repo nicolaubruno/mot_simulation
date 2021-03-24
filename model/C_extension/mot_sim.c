@@ -77,81 +77,58 @@ atom_t get_atom(conditions_t conds, environment_t env, char *params_path){
     //
     // Variables
     // --
-    int i;
-    char row[STRING_BUFFER_SIZE];
-    char *path = str_concatenate(params_path, "atom.csv");
-    char *token, *rest;
+    int i = 0;
+    char *path, **rows;
+    char *token, *saveptr;
     double std_dev, *rd_v;
     atom_t atom;
-    FILE *fp;
     //--
 
-    // Open file
-    fp = fopen(path, "r");
-
-    if (fp == NULL) {
-        printf("Error to access the file \"%s\"\n", path);
-        exit(0);
-    }
-
-    // Skip header
-    fgets(row, STRING_BUFFER_SIZE, fp);
-
-    // Symbol
-    if(!(fgets(row, STRING_BUFFER_SIZE, fp) == NULL)){
-        rest = row;
-        token = strtok_r(rest, DELIM, &rest); // Variable name
-        token = strtok_r(rest, DELIM, &rest); // Value
-
-        if(!token){
-            printf("Invalid parameter \"symbol\" in the file \"%s\"\n", path);
-            exit(0);
-        } else {
-            if(token[2] == '\n') token[2] = '\0';
-
-            atom.symbol = (char *) malloc(strlen(token) * sizeof(char));
-            strcpy(atom.symbol, token);
-        };
-    }
-
-    // Atomic number
-    if(!(fgets(row, STRING_BUFFER_SIZE, fp) == NULL)){
-        rest = row;
-        token = strtok_r(rest, DELIM, &rest); // Variable name
-        token = strtok_r(rest, DELIM, &rest); // Value
-
-        if(!token){
-            printf("Invalid parameter \"Z\" in the file \"%s\"\n", path);
-            exit(0);
-        } 
-
-        // Python module
-        else if(Py_MODULE) atom.Z = (int) atof(str_replace(token, ".", ","));
-
-        // C program
-        else atom.Z = (int) atof(token);
-    }
-
-    // Mass
-    if(!(fgets(row, STRING_BUFFER_SIZE, fp) == NULL)){
-        rest = row;
-        token = strtok_r(rest, DELIM, &rest); // Variable name
-        token = strtok_r(rest, DELIM, &rest); // Value
-
-        if(!token){
-            printf("Invalid parameter \"mass\" in the file \"%s\"\n", path);
-            exit(0);
-        }
-
-        // Python module
-        else if(Py_MODULE) atom.mass = atof(str_replace(token, ".", ","));
-
-        // C program
-        else atom.mass = atof(token);
-    }
+    // Read lines from the CSV file
+    path = str_concatenate(params_path, "atom.csv");
+    rows = read_lines(path);
 
     //
-    // Initial position of the atom
+    // Symbol
+    //--
+    i += 1;
+    token = strtok_r(rows[i], DELIM, &saveptr); // Variable name
+    token = strtok_r(NULL, DELIM, &saveptr); // Value
+
+    atom.symbol = (char *) malloc(strlen(token) * sizeof(char));
+    strcpy(atom.symbol, token);
+    //--
+
+    //
+    // Atomic number
+    //--
+    i += 1;
+    token = strtok_r(rows[i], DELIM, &saveptr); // Variable name
+    token = strtok_r(NULL, DELIM, &saveptr); // Value
+
+    // Python module
+    if(Py_MODULE) atom.Z = (int) atof(str_replace(token, ".", ","));
+
+    // C program
+    else atom.Z = (int) atof(token);
+    //--
+
+    //
+    // Mass
+    //--
+    i += 1;
+    token = strtok_r(rows[i], DELIM, &saveptr); // Variable name
+    token = strtok_r(NULL, DELIM, &saveptr); // Value
+
+    // Python module
+    if(Py_MODULE) atom.mass = atof(str_replace(token, ".", ","));
+
+    // C program
+    else atom.mass = atof(token);
+    //--
+
+    //
+    // Initial position
     //--
     atom.pos = (double *) calloc(3, sizeof(double));
 
@@ -197,9 +174,6 @@ atom_t get_atom(conditions_t conds, environment_t env, char *params_path){
     atom.J = atom.transition.J_gnd;
     atom.mJ = -atom.transition.J_gnd;
 
-    // Close file
-    fclose(fp);
-
     // Release memory
     free(path);
 
@@ -207,139 +181,101 @@ atom_t get_atom(conditions_t conds, environment_t env, char *params_path){
 }
 
 transition_t get_transition(char *params_path){
-    //
     // Variables
-    //
-
+    int i = 0;
+    char *token, *saveptr, *path, **rows;
     transition_t transition;
-    char row[STRING_BUFFER_SIZE];
-    char *path = str_concatenate(params_path, "transition.csv");
-    char *token, *rest;
-    FILE *fp;
 
-    // Open file
-    fp = fopen(path, "r");
+    // Read lines from the CSV file
+    path = str_concatenate(params_path, "transition.csv");
+    rows = read_lines(path);
 
-    if (fp == NULL) {
-        printf("Error to access the file \"%s\"\n", path);
-        exit(0);
-    }
-
-    // Skip header
-    fgets(row, STRING_BUFFER_SIZE, fp);
-
+    //
     // Transition rate
-    if(!(fgets(row, STRING_BUFFER_SIZE, fp) == NULL)){
-        rest = row;
-        token = strtok_r(rest, DELIM, &rest); // Variable name
-        token = strtok_r(rest, DELIM, &rest); // Value
+    //--
+    i += 1;
+    token = strtok_r(rows[i], DELIM, &saveptr); // Variable name
+    token = strtok_r(NULL, DELIM, &saveptr); // Value
 
-        if(!token){
-            printf("Invalid parameter \"gamma\" in the file \"%s\"\n", path);
-            exit(0);
-        } 
+    // Python module
+    if(Py_MODULE) transition.gamma = atof(str_replace(token, ".", ","));
 
-        // Python module
-        else if(Py_MODULE) transition.gamma = atof(str_replace(token, ".", ","));
+    // C program
+    else transition.gamma = atof(token);
+    //--
 
-        // C program
-        else transition.gamma = atof(token);
-    }
-
+    //
     // Resonant wave length
-    if(!(fgets(row, STRING_BUFFER_SIZE, fp) == NULL)){
-        rest = row;
-        token = strtok_r(rest, DELIM, &rest); // Variable name
-        token = strtok_r(rest, DELIM, &rest); // Value
+    //--
+    i += 1;
+    token = strtok_r(rows[i], DELIM, &saveptr); // Variable name
+    token = strtok_r(NULL, DELIM, &saveptr); // Value
 
-        if(!token){
-            printf("Invalid parameter \"lambda\" in the file \"%s\"\n", path);
-            exit(0);
-        }
+    if(Py_MODULE) transition.lambda = atof(str_replace(token, ".", ","));
 
-        // Python module
-        else if(Py_MODULE) transition.lambda = atof(str_replace(token, ".", ","));
+    // C program
+    else transition.lambda = atof(token);
+    //--
 
-        // C program
-        else transition.lambda = atof(token);
-    }
-
+    //
     // Total angular momentum of the ground state
-    if(!(fgets(row, STRING_BUFFER_SIZE, fp) == NULL)){
-        rest = row;
-        token = strtok_r(rest, DELIM, &rest); // Variable name
-        token = strtok_r(rest, DELIM, &rest); // Value
+    //--    
+    i += 1;
+    token = strtok_r(rows[i], DELIM, &saveptr); // Variable name
+    token = strtok_r(NULL, DELIM, &saveptr); // Value
 
-        if(!token){
-            printf("Invalid parameter \"J_gnd\" in the file \"%s\"\n", path);
-            exit(0);
-        }
+    // Python module
+    if(Py_MODULE) transition.J_gnd = (int) atof(str_replace(token, ".", ","));
 
-        // Python module
-        else if(Py_MODULE) transition.J_gnd = (int) atof(str_replace(token, ".", ","));
+    // C Program
+    else transition.J_gnd = (int) atof(token);  
+    //--
 
-        // C Program
-        else transition.J_gnd = (int) atof(token);        
-    }
-
+    //
     // Total angular momentum of the excited state
-    if(!(fgets(row, STRING_BUFFER_SIZE, fp) == NULL)){
-        rest = row;
-        token = strtok_r(rest, DELIM, &rest); // Variable name
-        token = strtok_r(rest, DELIM, &rest); // Value
+    //--
+    i += 1;
+    token = strtok_r(rows[i], DELIM, &saveptr); // Variable name
+    token = strtok_r(NULL, DELIM, &saveptr); // Value
 
-        if(!token){
-            printf("Invalid parameter \"J_exc\" in the file \"%s\"\n", path);
-            exit(0);
-        }
+    // Python module
+    if(Py_MODULE) transition.J_exc = (int) atof(str_replace(token, ".", ","));
 
-        // Python module
-        else if(Py_MODULE) transition.J_exc = (int) atof(str_replace(token, ".", ","));
+    // C Program
+    else transition.J_exc = (int) atof(token);  
+    //--
 
-        // C Program
-        else transition.J_exc = (int) atof(token);  
-    }
-
+    //
     // Landè factor of the ground state
-    if(!(fgets(row, STRING_BUFFER_SIZE, fp) == NULL)){
-        rest = row;
-        token = strtok_r(rest, DELIM, &rest); // Variable name
-        token = strtok_r(rest, DELIM, &rest); // Value
+    //--
+    i += 1;
+    token = strtok_r(rows[i], DELIM, &saveptr); // Variable name
+    token = strtok_r(NULL, DELIM, &saveptr); // Value
 
-        if(!token){
-            printf("Invalid parameter \"g_gnd\" in the file \"%s\"\n", path);
-            exit(0);
-        }
+    // Python module
+    if(Py_MODULE) transition.g_gnd = atof(str_replace(token, ".", ","));
 
-        // Python module
-        else if(Py_MODULE) transition.g_gnd = atof(str_replace(token, ".", ","));
+    // C Program
+    else transition.g_gnd = atof(token);  
+    //--
 
-        // C Program
-        else transition.g_gnd = atof(token);  
-    }
-
+    //
     // Landè factor of the excited state
-    if(!(fgets(row, STRING_BUFFER_SIZE, fp) == NULL)){
-        rest = row;
-        token = strtok_r(rest, DELIM, &rest); // Variable name
-        token = strtok_r(rest, DELIM, &rest); // Value
+    //--
+    i += 1;
+    token = strtok_r(rows[i], DELIM, &saveptr); // Variable name
+    token = strtok_r(NULL, DELIM, &saveptr); // Value
 
-        if(!token){
-            printf("Invalid parameter \"g_exc\" in the file \"%s\"\n", path);
-            exit(0);
-        }
+    // Python module
+    if(Py_MODULE) transition.g_exc = atof(str_replace(token, ".", ","));
 
-        // Python module
-        else if(Py_MODULE) transition.g_exc = atof(str_replace(token, ".", ","));
-
-        // C Program
-        else transition.g_exc = atof(token);  
-    }
+    // C Program
+    else transition.g_exc = atof(token); 
+    //--
 
     //
     // Check values
-    //
-
+    //--
     if((transition.J_exc - transition.J_gnd) < 0){
         printf("J_exc must be grater than J_gnd.\n");
         exit(0);
@@ -347,12 +283,13 @@ transition_t get_transition(char *params_path){
         printf("J_exc and J_gnd must be positive values.\n");
         exit(0);
     }
+    //--
 
-    // Close file
-    fclose(fp);
-
+    //
     // Release memory
+    //--
     free(path);
+    //--
 
     // Return
     return transition;
@@ -363,145 +300,100 @@ conditions_t get_conditions(char *params_path){
     // Variables
     //
 
+    int i = 0;
+    char *token, *saveptr, *path, **rows;
     conditions_t conditions;
-    char row[STRING_BUFFER_SIZE];
-    char *path = str_concatenate(params_path, "conditions.csv");
-    char *token, *rest;
-    FILE *fp;
 
-    // Open file
-    fp = fopen(path, "r");
+    // Read lines from the CSV file
+    path = str_concatenate(params_path, "conditions.csv");
+    rows = read_lines(path);
 
-    if (fp == NULL) {
-        printf("Error to access the file \"%s\"\n", path);
-        exit(0);
-    }
-
-    // Skip header
-    fgets(row, STRING_BUFFER_SIZE, fp);
-
+    //
     // Initial temperature 
-    if(!(fgets(row, STRING_BUFFER_SIZE, fp) == NULL)){
-        rest = row;
-        token = strtok_r(rest, DELIM, &rest); // Variable name
-        token = strtok_r(rest, DELIM, &rest); // Value
+    //--
+    i += 1;
+    token = strtok_r(rows[i], DELIM, &saveptr); // Variable name
+    token = strtok_r(NULL, DELIM, &saveptr); // Value
 
-        if(!token){
-            printf("Invalid parameter \"T_0\" in the file \"%s\"\n", path);
-            exit(0);
-        }
+    // Python module
+    if(Py_MODULE) conditions.T_0 = atof(str_replace(token, ".", ","));
 
-        // Python module
-        else if(Py_MODULE) conditions.T_0 = atof(str_replace(token, ".", ","));
+    // C program
+    else conditions.T_0 = atof(token);
+    //--
 
-        // C program
-        else conditions.T_0 = atof(token);
-    }
-
+    //
     // Maximum time of simulation
-    if(!(fgets(row, STRING_BUFFER_SIZE, fp) == NULL)){
-        rest = row;
-        token = strtok_r(rest, DELIM, &rest); // Variable name
-        token = strtok_r(rest, DELIM, &rest); // Value
+    //--
+    i += 1;
+    token = strtok_r(rows[i], DELIM, &saveptr); // Variable name
+    token = strtok_r(NULL, DELIM, &saveptr); // Value
 
-        if(!token){
-            printf("Invalid parameter \"max_time\" in the file \"%s\"\n", path);
-            exit(0);
-        }
+    // Python module
+    if(Py_MODULE) conditions.max_time = atof(str_replace(token, ".", ","));
 
-        // Python module
-        else if(Py_MODULE) conditions.max_time = atof(str_replace(token, ".", ","));
+    // C Program
+    else conditions.max_time = atof(token);
+    //--
 
-        // C Program
-        else conditions.max_time = atof(token);
-    }
-
+    //
     // Maximum distance
-    if(!(fgets(row, STRING_BUFFER_SIZE, fp) == NULL)){
-        rest = row;
-        token = strtok_r(rest, DELIM, &rest); // Variable name
-        token = strtok_r(rest, DELIM, &rest); // Value
+    //--
+    i += 1;
+    token = strtok_r(rows[i], DELIM, &saveptr); // Variable name
+    token = strtok_r(NULL, DELIM, &saveptr); // Value
 
-        if(!token){
-            printf("Invalid parameter \"r_max\" in the file \"%s\"\n", path);
-            exit(0);
-        }
+    // Python module
+    if(Py_MODULE) conditions.r_max = atof(str_replace(token, ".", ","));
 
-        // Python module
-        else if(Py_MODULE) conditions.r_max = atof(str_replace(token, ".", ","));
+    // C Program
+    else conditions.r_max = atof(token);
+    //--
 
-        // C Program
-        else conditions.r_max = atof(token);
-    }
+    // Skip parameter (number of simulations)
+    i += 1;
 
-    // Number of simulations
-    if(!(fgets(row, STRING_BUFFER_SIZE, fp) == NULL)){
-        rest = row;
-        token = strtok_r(rest, DELIM, &rest); // Variable name
-        token = strtok_r(rest, DELIM, &rest); // Value
-
-        if(!token){
-            printf("Invalid parameter \"num_sim\" in the file \"%s\"\n", path);
-            exit(0);
-        }
-    }
-
+    //
     // Number of bins
-    if(!(fgets(row, STRING_BUFFER_SIZE, fp) == NULL)){
-        rest = row;
-        token = strtok_r(rest, DELIM, &rest); // Variable name
-        token = strtok_r(rest, DELIM, &rest); // Value
+    //--
+    i += 1;
+    token = strtok_r(rows[i], DELIM, &saveptr); // Variable name
+    token = strtok_r(NULL, DELIM, &saveptr); // Value
 
-        if(!token){
-            printf("Invalid parameter \"num_bins\" in the file \"%s\"\n", path);
-            exit(0);
-        }
+    // Python module
+    if(Py_MODULE) conditions.num_bins = (int) atof(str_replace(token, ".", ","));
 
-        // Python module
-        else if(Py_MODULE) conditions.num_bins = (int) atof(str_replace(token, ".", ","));
+    // C Program
+    else conditions.num_bins = (int) atof(token);
+    //--
 
-        // C Program
-        else conditions.num_bins = (int) atof(token);
-    }
-
+    //
     // Time to reach the equilibrium
-    if(!(fgets(row, STRING_BUFFER_SIZE, fp) == NULL)){
-        rest = row;
-        token = strtok_r(rest, DELIM, &rest); // Variable name
-        token = strtok_r(rest, DELIM, &rest); // Value
+    //--
+    i += 1;
+    token = strtok_r(rows[i], DELIM, &saveptr); // Variable name
+    token = strtok_r(NULL, DELIM, &saveptr); // Value
 
-        if(!token){
-            printf("Invalid parameter \"wait_time\" in the file \"%s\"\n", path);
-            exit(0);
-        }
+    // Python module
+    if(Py_MODULE) conditions.wait_time = atof(str_replace(token, ".", ","));
 
-        // Python module
-        else if(Py_MODULE) conditions.wait_time = atof(str_replace(token, ".", ","));
+    // C Program
+    else conditions.wait_time = atof(token);
+    //--
 
-        // C Program
-        else conditions.wait_time = atof(token);
-    }
-
+    //
     // Time interval
-    if(!(fgets(row, STRING_BUFFER_SIZE, fp) == NULL)){
-        rest = row;
-        token = strtok_r(rest, DELIM, &rest); // Variable name
-        token = strtok_r(rest, DELIM, &rest); // Value
+    //--
+    i += 1;
+    token = strtok_r(rows[i], DELIM, &saveptr); // Variable name
+    token = strtok_r(NULL, DELIM, &saveptr); // Value
 
-        if(!token){
-            printf("Invalid parameter \"max_dt\" in the file \"%s\"\n", path);
-            exit(0);
-        }
+    // Python module
+    if(Py_MODULE) conditions.dt = atof(str_replace(token, ".", ","));
 
-        // Python module
-        else if(Py_MODULE) conditions.dt = atof(str_replace(token, ".", ","));
-
-        // C Program
-        else conditions.dt = atof(token);
-    }
-
-    // Close file
-    fclose(fp);
+    // C Program
+    else conditions.dt = atof(token);
+    //--
 
     // Release memory
     free(path);
@@ -510,150 +402,110 @@ conditions_t get_conditions(char *params_path){
 }
 
 environment_t get_environment(char *params_path){
-    //
     // Variables
-    //
-
-    int n;
+    int i = 0, n;
+    char *token, *saveptr, *path, **rows;
     environment_t env;
-    char row[STRING_BUFFER_SIZE];
-    char *path = str_concatenate(params_path, "environment.csv");
-    char *token, *rest;
-    FILE *fp;
 
-    // Open file
-    fp = fopen(path, "r");
+    // Read lines from the CSV file
+    path = str_concatenate(params_path, "environment.csv");
+    rows = read_lines(path);
 
-    if (fp == NULL) {
-        printf("Error to access the file \"%s\"\n", path);
-        exit(0);
-    }
-
-    // Skip header
-    fgets(row, STRING_BUFFER_SIZE, fp);
-
+    //
     // Magnetic field gradient
-    if(!(fgets(row, STRING_BUFFER_SIZE, fp) == NULL)){
-        rest = row;
-        token = strtok_r(rest, DELIM, &rest); // Variable name
-        token = strtok_r(rest, DELIM, &rest); // Value
+    //--
+    i += 1;
+    token = strtok_r(rows[i], DELIM, &saveptr); // Variable name
+    token = strtok_r(NULL, DELIM, &saveptr); // Value
+    
+    // Python module
+    if(Py_MODULE) env.B_0 = atof(str_replace(token, ".", ","));
 
-        if(!token){
-            printf("Invalid parameter \"B_0\" in the file \"%s\"\n", path);
-            exit(0);
-        } 
+    // C program
+    else env.B_0 = atof(token);
+    //--
 
-        // Python module
-        else if(Py_MODULE) env.B_0 = atof(str_replace(token, ".", ","));
-
-        // C program
-        else env.B_0 = atof(token);
-    }
-
+    //
     // Magnetic field axial direction
-    if(!(fgets(row, STRING_BUFFER_SIZE, fp) == NULL)){
-        rest = row;
-        token = strtok_r(rest, DELIM, &rest); // Variable name
-        token = strtok_r(rest, DELIM, &rest); // Value
+    //--
+    i += 1;
+    token = strtok_r(rows[i], DELIM, &saveptr); // Variable name
+    token = strtok_r(NULL, DELIM, &saveptr); // Value
+        
+    env.B_basis = orthonormal_basis(r3_normalize(get_double_array(token, &n)));
+    //--
 
-        if(!token){
-            printf("Invalid parameter \"B_axial\" in the file \"%s\"\n", path);
-            exit(0);
-        } else env.B_basis = orthonormal_basis(r3_normalize(get_double_array(token, &n)));
-    }
-
+    //
     // Local magnetic field gradient
-    if(!(fgets(row, STRING_BUFFER_SIZE, fp) == NULL)){
-        rest = row;
-        token = strtok_r(rest, DELIM, &rest); // Variable name
-        token = strtok_r(rest, DELIM, &rest); // Value
+    //--
+    i += 1;
+    token = strtok_r(rows[i], DELIM, &saveptr); // Variable name
+    token = strtok_r(NULL, DELIM, &saveptr); // Value
 
-        if(!token){
-            printf("Invalid parameter \"local_B\" in the file \"%s\"\n", path);
-            exit(0);
-        }
+    // Python module
+    if(Py_MODULE) env.local_B = atof(str_replace(token, ".", ","));
 
-        // Python module
-        else if(Py_MODULE) env.local_B = atof(str_replace(token, ".", ","));
+    // C program
+    else env.local_B = atof(token);
+    //--
 
-        // C program
-        else env.local_B = atof(token);
-    }
-
+    //
     // Laser detuning
-    if(!(fgets(row, STRING_BUFFER_SIZE, fp) == NULL)){
-        rest = row;
-        token = strtok_r(rest, DELIM, &rest); // Variable name
-        token = strtok_r(rest, DELIM, &rest); // Value
+    //--
+    i += 1;
+    token = strtok_r(rows[i], DELIM, &saveptr); // Variable name
+    token = strtok_r(NULL, DELIM, &saveptr); // Value
 
-        if(!token){
-            printf("Invalid parameter \"delta\" in the file \"%s\"\n", path);
-            exit(0);
-        } 
+    // Python module
+    if(Py_MODULE){
+        if(token[0] == '-') env.delta= -atof(str_replace(token+1, ".", ",")); 
+        else env.delta = atof(str_replace(token, ".", ","));
+    } 
 
-        // Python module
-        else if(Py_MODULE){
-            if(token[0] == '-') env.delta= -atof(str_replace(token+1, ".", ",")); 
-            else env.delta = atof(str_replace(token, ".", ","));
-        } 
-
-        // C program
-        else {
-            if(token[0] == '-') env.delta= -atof(token+1); 
-            else env.delta = atof(token);
-        }
+    // C program
+    else {
+        if(token[0] == '-') env.delta= -atof(token+1); 
+        else env.delta = atof(token);
     }
+    //--
 
+    //
     // Peak of the saturation parameter
-    if(!(fgets(row, STRING_BUFFER_SIZE, fp) == NULL)){
-        rest = row;
-        token = strtok_r(rest, DELIM, &rest); // Variable name
-        token = strtok_r(rest, DELIM, &rest); // Value
+    //--
+    i += 1;
+    token = strtok_r(rows[i], DELIM, &saveptr); // Variable name
+    token = strtok_r(NULL, DELIM, &saveptr); // Value
 
-        if(!token){
-            printf("Invalid parameter \"s_0\" in the file \"%s\"\n", path);
-            exit(0);
-        } 
+    // Python module
+    if(Py_MODULE) env.s_0 = atof(str_replace(token, ".", ","));
 
-        // Python module
-        else if(Py_MODULE) env.s_0 = atof(str_replace(token, ".", ","));
+    // C program
+    else env.s_0 = atof(token);
+    //--
 
-        // C program
-        else env.s_0 = atof(token);
-    }
-
+    //
     // Waist Radius
-    if(!(fgets(row, STRING_BUFFER_SIZE, fp) == NULL)){
-        rest = row;
-        token = strtok_r(rest, DELIM, &rest); // Variable name
-        token = strtok_r(rest, DELIM, &rest); // Value
+    //--
+    i += 1;
+    token = strtok_r(rows[i], DELIM, &saveptr); // Variable name
+    token = strtok_r(NULL, DELIM, &saveptr); // Value
 
-        if(!token){
-            printf("Invalid parameter \"w\" in the file \"%s\"\n", path);
-            exit(0);
-        }
+    // Python module
+    if(Py_MODULE) env.w = atof(str_replace(token, ".", ","));
 
-        // Python module
-        else if(Py_MODULE) env.w = atof(str_replace(token, ".", ","));
+    // C program
+    else env.w = atof(token);
+    //--
 
-        // C program
-        else env.w = atof(token);
-    }
-
+    //
     // Gravity
-    if(!(fgets(row, STRING_BUFFER_SIZE, fp) == NULL)){
-        rest = row;
-        token = strtok_r(rest, DELIM, &rest); // Variable name
-        token = strtok_r(rest, DELIM, &rest); // Value
+    //--
+    i += 1;
+    token = strtok_r(rows[i], DELIM, &saveptr); // Variable name
+    token = strtok_r(NULL, DELIM, &saveptr); // Value
 
-        if(!token){
-            printf("Invalid parameter \"g_bool\" in the file \"%s\"\n", path);
-            exit(0);
-        } else env.g_bool = atoi(token);
-    }
-
-    // Close file
-    fclose(fp);
+    env.g_bool = atoi(token);
+    //--
 
     // Release memory
     free(path);
@@ -662,71 +514,44 @@ environment_t get_environment(char *params_path){
 }
 
 beams_setup_t get_beams(char *params_path){
-    //
     // Variables
-    //
-
+    int i = 0, num_beams = 0, n;
+    char *token, *saveptr, *path, **rows;
     beams_setup_t beams_setup;
     beam_t *beams = (beam_t*) calloc(MAX_BEAMS, sizeof(beam_t));
     beam_t *c_beams;
 
-    int num_beams = 0, n;
-    char row[STRING_BUFFER_SIZE];
+    // Read lines from the CSV file
+    path = str_concatenate(params_path, "beams.csv");
+    rows = read_lines(path);
 
-    char *path = str_concatenate(params_path, "beams.csv");
-    char *token, *rest;
-
-    FILE *fp;
-
-    // Open file
-    fp = fopen(path, "r");
-
-    if (fp == NULL) {
-        printf("Error to access the file \"%s\"\n", path);
-        exit(0);
-    }
-
-    // Skip header
-    fgets(row, STRING_BUFFER_SIZE, fp);
-
+    //
     // Get beams
-    while(!(fgets(row, STRING_BUFFER_SIZE, fp) == NULL)){
+    //--
+    for(i = 1; !(rows[i] == NULL); i++){
         //
         // Wave vector direction
         //--
-        rest = row;
-        token = strtok_r(rest, DELIM, &rest);
-
-        if(!token){
-            printf("Invalid parameter \"k_dic\" in the file \"%s\"\n", path);
-            exit(0);
-        } else {
-            beams[num_beams].k_dic = r3_normalize(get_double_array(token, &n));
-        }
+        token = strtok_r(rows[i], DELIM, &saveptr);
+        beams[num_beams].k_dic = r3_normalize(get_double_array(token, &n));
         //--
 
         //
         // Polarization vector
         //--
-        token = strtok_r(rest, DELIM, &rest); // Value
-
-        if(!token){
-            printf("Invalid parameter \"eps\" in the file \"%s\"\n", path);
-            exit(0);
-        } else beams[num_beams].eps = r3_normalize(get_double_array(token, &n));
+        token = strtok_r(NULL, DELIM, &saveptr); // Value
+        beams[num_beams].eps = r3_normalize(get_double_array(token, &n));
         //--
 
         num_beams++;
     }
+    //--
 
     c_beams = (beam_t *) calloc(num_beams, sizeof(beam_t));
     for(n = 0; n < num_beams; n++) c_beams[n] = beams[n];
 
     beams_setup.num = num_beams;
     beams_setup.beams = c_beams;
-
-    // Close file
-    fclose(fp);
 
     // Release memory
     free(beams);
@@ -1211,17 +1036,16 @@ int print_params(atom_t atom, conditions_t conds, beams_setup_t beams_setup, env
     // Conditions
     printf("Conditions\n--\n");
     printf("T_0 = %f\n", conds.T_0);
-    printf("max_time [ms] = %f\n", conds.max_time / (2*PI*atom.transition.gamma));
+    printf("max_time [ms] = %f\n", conds.max_time / (atom.transition.gamma));
     printf("r_max = %f\n", conds.r_max);
     printf("num_bins = %d\n", conds.num_bins);
-    printf("wait_time [ms] = %f\n", conds.wait_time / (2*PI*atom.transition.gamma));
-    printf("time interval [ms] = %f\n", conds.dt / (2*PI*atom.transition.gamma));
+    printf("wait_time [ms] = %f\n", conds.wait_time / (atom.transition.gamma));
+    printf("time interval [ms] = %f\n", conds.dt / (atom.transition.gamma));
     printf("\n");
 
     // Environment
     printf("Environment\n--\n");
     printf("B_0 = %f\n", env.B_0);
-    r3_operator_print(env.B_basis, "B_basis");
     printf("local_B = %f\n", env.local_B);
     printf("delta = %f\n", env.delta);
     printf("s_0 = %f\n", env.s_0);
@@ -1237,7 +1061,6 @@ int print_params(atom_t atom, conditions_t conds, beams_setup_t beams_setup, env
         r3_print(beams_setup.beams[i].eps, "eps");
         printf("--\n");
     }
-
     printf("\n");
 
     return 0;
@@ -1567,4 +1390,60 @@ char *str_replace(char *orig, char *rep, char *with){
     strcpy(tmp, orig);
 
     return result;
+}
+
+char **read_lines(char *path){
+    //
+    // Variables
+    int i = 0, j = 0, k = 0;
+    FILE *fp;
+    char *row, *aux_row;
+    char **rows;
+
+    // Alocate memory
+    rows = (char**) calloc(MAX_LINES, sizeof(char*));
+
+    // Open file
+    if((fp = fopen(path, "r"))){
+        // Read lines
+        while(!feof(fp)){
+            // Allocate memory
+            aux_row = (char*) calloc(STRING_BUFFER_SIZE, sizeof(char));
+            row = (char*) calloc(STRING_BUFFER_SIZE, sizeof(char));
+
+            // Try to read line
+            if(fgets(row, STRING_BUFFER_SIZE, fp) != NULL){
+                // Get row length and remove \n
+                k = 0;
+                for(j = 0; row[j] != '\0'; j++) {
+                    if(row[j] != '\n'){
+                        aux_row[k] = row[j];
+                        k += 1;
+                    }
+                }
+
+                // Copy the read row
+                rows[i] = (char*) calloc(k+1, sizeof(char));
+                strcpy(rows[i], aux_row);
+
+                i += 1;
+            } else break;
+
+            // Release memory
+            free(row);
+            free(aux_row);
+        }
+
+        // Indicate the file ending
+        rows[i+1] = (char*) calloc(3, sizeof(char));
+        rows[i+1] = NULL;
+
+        // Close file
+        fclose(fp); 
+    } else {
+        printf("File \"%s\" does not exist\n", path);
+        exit(0);
+    }
+
+    return rows;
 }

@@ -204,7 +204,7 @@ class View:
         #
         # Set style
         plt.style.use('seaborn-whitegrid')
-        plt.tight_layout()
+        #plt.tight_layout()
         plt.rcParams.update({
                 "figure.figsize": (7,6),\
                 "font.size":14,\
@@ -245,7 +245,7 @@ class View:
             #
             # Set style
             plt.style.use('seaborn-whitegrid')
-            plt.tight_layout()
+            #plt.tight_layout()
             plt.rcParams.update({
                     "figure.figsize": (7,6),\
                     "font.size":14,\
@@ -302,7 +302,7 @@ class View:
         #
         # Set style
         plt.style.use('seaborn-whitegrid')
-        plt.tight_layout()
+        #plt.tight_layout()
         plt.rcParams.update({
                 "figure.figsize": (7,6),\
                 "font.size":14,\
@@ -351,7 +351,7 @@ class View:
         #
         # Set style
         plt.style.use('seaborn-whitegrid')
-        plt.tight_layout()
+        #plt.tight_layout()
         plt.rcParams.update({
                 "figure.figsize": (7,6),\
                 "font.size":12,\

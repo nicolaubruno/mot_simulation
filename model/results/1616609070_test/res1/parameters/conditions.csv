@@ -1,0 +1,6 @@
+max_time,10000.0
+r_max,1.5
+num_sim,2
+num_bins,128
+wait_time,1000.0
+dt,2.0

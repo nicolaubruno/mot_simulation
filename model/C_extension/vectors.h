@@ -73,7 +73,7 @@ complex_t *r3_to_c3(double *v);
 complex_t **r3_oper_to_c3_oper(double **A);
 
 // Empty C3 operator
-complex_t **c3_operator_zeros();
+complex_t **c3_operator_zeros(void);
 
 // Complex conjugate operator
 complex_t **c3_operator_dagger(complex_t **A);

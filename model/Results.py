@@ -255,9 +255,9 @@ class Results:
 
             #
             # Frequencies
-            self._pos_hist[0]["freqs"] = df['x'].to_numpy()
-            self._pos_hist[1]["freqs"] = df['y'].to_numpy()
-            self._pos_hist[2]["freqs"] = df['z'].to_numpy()
+            self._pos_hist[0]["freqs"] = np.array(df['x'])
+            self._pos_hist[1]["freqs"] = np.array(df['y'])
+            self._pos_hist[2]["freqs"] = np.array(df['z'])
 
             #
             # Densities and bins of marginal histograms
@@ -428,11 +428,11 @@ class Results:
             if self.loop["var"] == "delta":
                 self.env["delta"] = float(self.loop["values"][i])
 
-            self.atom.to_csv(params_dir + "atom.csv")
-            self.transition.to_csv(params_dir + "transition.csv")
+            self.atom.to_csv(params_dir + "atom.csv", header="atom")
+            self.transition.to_csv(params_dir + "transition.csv", header="transition")
             self.beams.to_csv(params_dir + "beams.csv", index=False)
-            self.conds.to_csv(params_dir + "conditions.csv")
-            self.env.to_csv(params_dir + "environment.csv")
+            self.conds.to_csv(params_dir + "conditions.csv", header="conditions")
+            self.env.to_csv(params_dir + "environment.csv", header="environment")
 
             # Release memory
             del res_dir, params_dir
