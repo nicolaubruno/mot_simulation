@@ -1139,7 +1139,7 @@ double scattering_rate(atom_t atom, polarized_beam_t beam, conditions_t conds, e
     //printf("zeeman_shift = %f\n", zeeman_shift);
 
     // Scattering rate
-    R = ((gamma * 1e3)/2) * s / (1 + s + 4*(delta*delta)/(gamma*gamma)); // Hz
+    R = ((2*PI*gamma * 1e3)/2) * s / (1 + s + 4*(delta*delta)/(gamma*gamma)); // Hz
 
     // Release //memory  
     for(i = 0; i < 3; i++) free(C[i]); 
