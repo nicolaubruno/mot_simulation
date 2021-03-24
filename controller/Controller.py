@@ -105,40 +105,41 @@ class Controller:
                 # Print simulation status
                 self.__view.simulation_header(header=False)
 
+                # Set progress bars
                 pbars = []
                 for i in range(loop_num):
                     desc = "Atoms simulated" if loop_num == 1 else self.__simulation.results.loop["var"] + " = " + ("%.2f" % self.__simulation.results.loop["values"][i])
                     pbars.append(tqdm(total=self.__simulation.results.conds["num_sim"], desc=desc, position=i))
 
+                #
                 # Run simulation
+                #--
                 for i in range(loop_num):
-                    #
                     # Open new simulation for each looping value
                     if i > 0: self.__simulation.open(self.__simulation.results.code, i, opt)
 
                     #
-                    # Loop all atoms
+                    # Simulate atoms
+                    #--
                     while self.__simulation.atoms_simulated < self.__simulation.results.conds["num_sim"]:
-                        if opt == 0: times = int(512 / self.__simulation.results.conds["num_bins"])
-                        else: times = int(1024 / self.__simulation.results.conds["num_bins"])
-                        if times < 1: times = 1
-
-                        #
                         # Simulate atoms
-                        times = self.__simulation.run(times)
+                        times = self.__simulation.run()
                         
                         pbars[i].update(times)
+                    #--
 
                     # Save simulation
                     self.__simulation.save()
+                #--
 
+                # Close progress bars
                 for i in range(loop_num): pbars[i].close()
 
                 #
                 # Release memory
                 gc.collect()
 
-                # Information of the simulation
+                # Information about the simulation
                 self.__view.simulation_header(clear_screen=True)
 
         #

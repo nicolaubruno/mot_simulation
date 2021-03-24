@@ -23,7 +23,7 @@ class Simulation:
     ''' Attributes '''
 
     __slots__ = [
-        "_pos_freqs_arr", "_atoms_simulated", "_option", "_results", "_transitions", "_time"
+        "_pos_freqs_arr", "_atoms_simulated", "_option", "_results", "_transitions", "_parallel_tasks"
     ]
 
     #
@@ -49,18 +49,18 @@ class Simulation:
         return self._transitions
 
     #
-    # Average time
-    @property
-    def time(self):
-        return self._time
-    
-
-    #
     # Simulation option
     @property
     def option(self):
         return self._option
     
+    #
+    # Parallel tasks
+    @property
+    def parallel_tasks(self):
+        return self._parallel_tasks
+    
+
     #
     # (Object) Results to be built in the simulation
     @property
@@ -76,8 +76,8 @@ class Simulation:
         # Set-up initial values
         self._atoms_simulated = -1
         self._transitions = np.zeros(3);
-        self._time = 0;
         self._results = None
+        self._parallel_tasks = 0
 
     #
     def new(self, shortname = '', opt = 0):
@@ -90,8 +90,7 @@ class Simulation:
         
         #
         # Check simulation option
-        # 
-
+        #--
         available_opts = {
             0 : "3D distribution",\
             1 : "Marginal distributions"
@@ -102,46 +101,50 @@ class Simulation:
 
         # Release memory
         del available_opts
+        #--
 
         #
         # Simulate 3D distribution (Heavy option)
+        #--
         if self.option == 0:
             #
             # Frequencies of positions (1D-array)
             self._pos_freqs_arr = np.zeros(self.results.conds["num_bins"]**3)
+        #--
 
         #
         # Simulate marginal distributions (Lightweight option)
+        #--
         elif self.option == 1:
             #
             # Frequencies of positions (3D-array)
             self._pos_freqs_arr = np.zeros((3, self.results.conds["num_bins"]))
+        #--
 
-        #
         # Setup relevant variables
         self._atoms_simulated = 0
 
-        #
         # Transitions
         self._transitions = np.zeros(3)
 
-        #
-        # Time
-        self._time = 0
+        # Parallel tasks
+        self._parallel_tasks = int(self.results.conds["parallel_tasks"])
 
         #
         # Release memory
         gc.collect()
 
     #
-    def run(self, times):
+    def run(self):
         #
         # Check simulation status
         if self.atoms_simulated < self.results.conds["num_sim"]:
             #
             # Check number of executions
-            if (self.atoms_simulated + times) > self.results.conds["num_sim"]:
+            if (self.atoms_simulated + self.parallel_tasks) > self.results.conds["num_sim"]:
                 times = 1
+            else:
+                times = self.parallel_tasks
 
             # 
             # Arguments to the pool 
@@ -172,13 +175,11 @@ class Simulation:
                                 self._pos_freqs_arr[i][j] += freqs[i][j]
 
                 #
-                # Add time
-                self._time += time
-
-                #
                 # Add transitions
+                #--
                 for i in range(3):
                     self._transitions[i] += trans[i]
+                #--
 
                 #
                 # Release memory
@@ -201,14 +202,12 @@ class Simulation:
 
     #
     def open(self, code, loop_idx = 0, opt = 0):
-        #
         # Get results
         self._results = Results(code, loop_idx=loop_idx)
 
         #
         # Check simulation option
-        # 
-
+        # --
         available_opts = {
             0 : "3D distribution",\
             1 : "Marginal distributions"
@@ -219,26 +218,33 @@ class Simulation:
 
         # Release memory
         del available_opts
+        #--
 
         #
         # Simulate 3D distribution (Heavy option)
+        #--
         if self.option == 0:
             #
             # Frequencies of positions (1D-array)
             del self._pos_freqs_arr
             self._pos_freqs_arr = np.zeros(self.results.conds["num_bins"]**3)
+        #--
 
         #
         # Simulate marginal distributions (Lightweight option)
+        #--
         elif self.option == 1:
             #
             # Frequencies of positions (3D-array)
             del self._pos_freqs_arr
             self._pos_freqs_arr = np.zeros((3, self.results.conds["num_bins"]))
+        #--
 
-        #
         # Setup relevant variables
         self._atoms_simulated = 0
+
+        # Parallel tasks
+        self._paralell_tasks = int(self.results.conds["parallel_tasks"])
 
         # Release memory
         gc.collect()
