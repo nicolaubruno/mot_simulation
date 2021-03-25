@@ -76,75 +76,101 @@ class Controller:
         self._menu_level = 1
 
         #
-        # Get shortname
-        shortname = self.__call_input("Insert a short name for the simulation")
-        if shortname == -1: self._menu_level -= 1
+        # Select a result group
+        while self.menu_level == 1:
+            # Get result group
+            header = "Select a results group"
+            results_group = self.__call_menu(self.__simulation.available_results_groups(), header)
 
-        #
-        # Chose a parameter
-        if self.menu_level == 1:
-            opts = {
-                1: "Marginal distributions",\
-                2: "Complete 3D distribution"
-            }
+            # Check back option
+            if self.menu_level < 1:
+                break
 
-            opt = self.__call_menu(opts, "Choose a simulation option:")
-            if opt ==  -1: self._menu_level -= 1
-            elif opt == 2: opt = 0
-            else:
-                # Create a new simulation
-                self.__simulation.new(shortname, opt)
+            # Set menu level
+            self._menu_level += 1
 
-                # Check looping
-                loop_num = len(self.__simulation.results.loop["values"])
-                if loop_num == 0: loop_num = 1
-
-                # Update time
-                check_time = dt.now().timestamp()
-
-                # Print simulation status
-                self.__view.simulation_header(header=False)
-
-                # Set progress bars
-                pbars = []
-                for i in range(loop_num):
-                    desc = "Atoms simulated" if loop_num == 1 else self.__simulation.results.loop["var"] + " = " + ("%.2f" % self.__simulation.results.loop["values"][i])
-                    pbars.append(tqdm(total=self.__simulation.results.conds["num_sim"], desc=desc, position=i))
+            #
+            # Get result code
+            while self.menu_level == 2:
+                #
+                # Get shortname
+                shortname = self.__call_input("Insert a short name for the simulation")
+                if shortname == -1: self._menu_level -= 1
 
                 #
-                # Run simulation
-                #--
-                for i in range(loop_num):
-                    # Open new simulation for each looping value
-                    if i > 0: self.__simulation.open(self.__simulation.results.code, i, opt)
+                # Back option
+                if self.menu_level < 2:
+                    break
+
+                #
+                # Chose a parameter
+                opts = {
+                    1: "Marginal distributions",\
+                    2: "Complete 3D distribution"
+                }
+
+                opt = self.__call_menu(opts, "Choose a simulation option:")
+
+                #
+                # Back option
+                if self.menu_level < 2:
+                    break
+
+                if opt == 2: opt = 0
+                else:
+                    # Create a new simulation
+                    self.__simulation.new(shortname, opt, results_group)
+
+                    # Check looping
+                    loop_num = len(self.__simulation.results.loop["values"])
+                    if loop_num == 0: loop_num = 1
+
+                    # Update time
+                    check_time = dt.now().timestamp()
+
+                    # Print simulation status
+                    self.__view.simulation_header(header=False)
+
+                    # Set progress bars
+                    pbars = []
+                    for i in range(loop_num):
+                        desc = "Atoms simulated" if loop_num == 1 else self.__simulation.results.loop["var"] + " = " + ("%.2f" % self.__simulation.results.loop["values"][i])
+                        pbars.append(tqdm(total=self.__simulation.results.conds["num_sim"], desc=desc, position=i))
 
                     #
-                    # Simulate atoms
+                    # Run simulation
                     #--
-                    while self.__simulation.atoms_simulated < self.__simulation.results.conds["num_sim"]:
+                    for i in range(loop_num):
+                        # Open new simulation for each looping value
+                        if i > 0: self.__simulation.open(self.__simulation.results.code, i, opt)
+
+                        #
                         # Simulate atoms
-                        times = self.__simulation.run()
-                        
-                        pbars[i].update(times)
+                        #--
+                        while self.__simulation.atoms_simulated < self.__simulation.results.conds["num_sim"]:
+                            # Simulate atoms
+                            times = self.__simulation.run()
+                            
+                            pbars[i].update(times)
+                        #--
+
+                        # Save simulation
+                        self.__simulation.save()
                     #--
 
-                    # Save simulation
-                    self.__simulation.save()
-                #--
+                    # Close progress bars
+                    for i in range(loop_num): pbars[i].close()
 
-                # Close progress bars
-                for i in range(loop_num): pbars[i].close()
+                    #
+                    # Release memory
+                    gc.collect()
+
+                    # Information about the simulation
+                    self.__view.simulation_header(clear_screen=True)
 
                 #
-                # Release memory
-                gc.collect()
-
-                # Information about the simulation
-                self.__view.simulation_header(clear_screen=True)
-
-        #
-        # Set menu level
-        self._menu_level = 0
+                # Set menu level
+                self._menu_level = 0
 
     #
     def view_parameters(self):
@@ -196,182 +222,182 @@ class Controller:
         self._menu_level = 1
 
         #
-        # Menu level 1
+        # Check results group
         while self.menu_level == 1:
-            #
-            # Show the first results
-            self.__view.results_history(10)
+            # Get result group
+            header = "Select a results group"
+            results_group = self.__call_menu(self.__simulation.available_results_groups(), header)
 
-            #
-            # Get code
-            def val_fun(code): 
-                check = code.isdigit()
-                check = check or (code[0] == "-" and code[1:].isdigit())
+            # Check back option
+            if self.menu_level < 1:
+                break
 
-                if check:
-                    check = self.__simulation.check_results_code(code)
-
-                return check
-            
-            code = self.__call_input("Insert simulation code", header=False, clear_screen=False, validation=val_fun)
-            code = int(code)
-
-            if code == -1:
-                self._menu_level -= 1
-
-            #
             # Set menu level
             self._menu_level += 1
 
             #
-            # Menu level 2
-            while self._menu_level == 2:
-                #
-                # Result
-                res = Results(code)
+            # Get result code
+            while self.menu_level == 2:
+                # Get code
+                header = "Select a simulation code"
+                code = self.__call_menu(self.__simulation.available_results(results_group), header, order_command=True)
+
+                # Check back option
+                if self.menu_level < 2:
+                    break
+
+                # Set menu level
+                self._menu_level += 1
 
                 #
-                # Header
-                header = "Simulation " + str(res.code) + " " + res.name
-
-                #
-                # Options
-                options = {
-                    1: "Position histogram",\
-                    2: "Centre of mass"
-                }
-
-                #
-                # Add options
-                if res.loop["var"] == "delta":
-                    options[3] = "R.M.S Clouds sizes"
-
-                if res.pos_3Dhist["dens"] is not None:
-                    options[4] = "Heat map"
-                
-                opt = self.__call_menu(options, header)
-
-                #
-                # Position histogram
-                if opt == 1:
+                # View option
+                while self._menu_level == 3:
                     #
-                    # Set menu level
-                    self._menu_level += 1
-                    while self.menu_level == 3:
-                        #
-                        # Check loop
-                        if bool(res.loop["var"]):
-                            header = "Choose an option"
+                    # Result
+                    res = Results(code)
 
-                            idx = [i+1 for i in range(len(res.loop["values"]))]
-                            loop_idx = [res.loop["var"] + " = " + ("%.2f" % res.loop["values"][i]) for i in range(len(res.loop["values"]))]
-                            opts = dict(zip(idx, loop_idx))
+                    #
+                    # Header
+                    header = "Simulation " + str(res.code) + " " + res.name
 
-                            opt = self.__call_menu(opts, header)
-                            opt = int(opt)
+                    #
+                    # Options
+                    options = {
+                        1: "Position histogram",\
+                        2: "Centre of mass"
+                    }
 
-                            if opt != -1: 
-                                res.loop_idx(opt-1)
-                                self._menu_level += 1
+                    #
+                    # Add options
+                    if res.loop["var"] == "delta":
+                        options[3] = "R.M.S Clouds sizes"
 
-                        else: self._menu_level += 1
+                    if res.pos_3Dhist["dens"] is not None:
+                        options[4] = "Heat map"
+                    
+                    opt = self.__call_menu(options, header)
 
+                    #
+                    # Position histogram
+                    if opt == 1:
                         #
                         # Set menu level
+                        self._menu_level += 1
                         while self.menu_level == 4:
-                            opts = {
-                                1 : 'x-axis',\
-                                2 : 'y-axis',\
-                                3 : 'z-axis'
-                            }
-                            
-                            if len(res.loop["var"]) > 0:
-                                header = "(" +res.loop["var"] + " = "
-                                header += ("%.2f" % res.loop["values"][res.loop["active"]])
-                                header += ") Choose the axis"
+                            #
+                            # Check loop
+                            if bool(res.loop["var"]):
+                                header = "Choose an option"
+
+                                idx = [i+1 for i in range(len(res.loop["values"]))]
+                                loop_idx = [res.loop["var"] + " = " + ("%.2f" % res.loop["values"][i]) for i in range(len(res.loop["values"]))]
+                                opts = dict(zip(idx, loop_idx))
+
+                                opt = self.__call_menu(opts, header)
+                                opt = int(opt)
+
+                                if opt != -1: 
+                                    res.loop_idx(opt-1)
+                                    self._menu_level += 1
+
+                            else: self._menu_level += 1
+
+                            #
+                            # Set menu level
+                            while self.menu_level == 5:
+                                opts = {
+                                    1 : 'x-axis',\
+                                    2 : 'y-axis',\
+                                    3 : 'z-axis'
+                                }
+                                
+                                if len(res.loop["var"]) > 0:
+                                    header = "(" +res.loop["var"] + " = "
+                                    header += ("%.2f" % res.loop["values"][res.loop["active"]])
+                                    header += ") Choose the axis"
+
+                                else:
+                                    header = "Choose the axis"
+
+                                opt = self.__call_menu(opts, header)
+
+                                if (opt == "-1") and not (res.loop["var"]):
+                                    self._menu_level -= 1
+
+                                elif opt != "-1": 
+                                    self.__view.pos_marg_hist(res, int(opt)-1)
+
+                    #
+                    # Centre of mass
+                    elif opt == 2:
+                        #
+                        # Set menu level
+                        self._menu_level += 1
+                        while self.menu_level == 4:
+                            if res.loop["var"] == "delta":
+                                self.__view.mass_centre(res)
+                                self._menu_level -= 1
+
+                            elif not res.loop["var"]:
+                                self.__view.mass_centre(res)
+                                opt = self.__call_input("Enter with any key to continue", header = False,clear_screen=False)
+                                if opt != "-1": self._menu_level -= 1
 
                             else:
-                                header = "Choose the axis"
+                                self._menu_level -= 1
+
+                    #
+                    # R.M.S. Clouds size
+                    elif opt == 3:
+                        #
+                        # Set menu level
+                        self._menu_level += 1
+
+                        #
+                        # Menu level 3
+                        while self.menu_level == 4:
+                            if res.loop["var"] == "delta":
+                                self.__view.cloud_size(res)
+                                self._menu_level -= 1
+
+                            elif not res.loop["var"]:
+                                self.__view.cloud_size(res)
+                                opt = self.__call_input("Enter with any key to continue", header = False, clear_screen=False)
+                                if opt != "-1": self._menu_level -= 1
+
+                            else:
+                                self._menu_level -= 1
+
+                    #
+                    # Heat map
+                    elif opt == 4:
+                        #
+                        # Set menu level
+                        self._menu_level += 1
+
+                        #
+                        # Menu level 3
+                        while self.menu_level == 4:
+                            #
+                            # Axis
+                            opts = {
+                                1:"xy-axis",\
+                                2:"xz-axis",\
+                                3:"yz-axis"
+                            }
+
+                            header = "Choose axis"
 
                             opt = self.__call_menu(opts, header)
 
-                            if (opt == "-1") and not (res.loop["var"]):
-                                self._menu_level -= 1
+                            if opt > 0:
+                                axis = 3 - opt
+                                self.__view.heatmap(res, axis, 0)
 
-                            elif opt != "-1": 
-                                self.__view.pos_marg_hist(res, int(opt)-1)
-
-                #
-                # Centre of mass
-                elif opt == 2:
-                    #
-                    # Set menu level
-                    self._menu_level += 1
-                    while self.menu_level == 3:
-                        if res.loop["var"] == "delta":
-                            self.__view.mass_centre(res)
-                            self._menu_level -= 1
-
-                        elif not res.loop["var"]:
-                            self.__view.mass_centre(res)
-                            opt = self.__call_input("Enter with any key to continue", header = False,clear_screen=False)
-                            if opt != "-1": self._menu_level -= 1
-
-                        else:
-                            self._menu_level -= 1
-
-                #
-                # R.M.S. Clouds size
-                elif opt == 3:
-                    #
-                    # Set menu level
-                    self._menu_level += 1
-
-                    #
-                    # Menu level 3
-                    while self.menu_level == 3:
-                        if res.loop["var"] == "delta":
-                            self.__view.cloud_size(res)
-                            self._menu_level -= 1
-
-                        elif not res.loop["var"]:
-                            self.__view.cloud_size(res)
-                            opt = self.__call_input("Enter with any key to continue", header = False, clear_screen=False)
-                            if opt != "-1": self._menu_level -= 1
-
-                        else:
-                            self._menu_level -= 1
-
-                #
-                # Heat map
-                elif opt == 4:
-                    #
-                    # Set menu level
-                    self._menu_level += 1
-
-                    #
-                    # Menu level 3
-                    while self.menu_level == 3:
-                        #
-                        # Axis
-                        opts = {
-                            1:"xy-axis",\
-                            2:"xz-axis",\
-                            3:"yz-axis"
-                        }
-
-                        header = "Choose axis"
-
-                        opt = self.__call_menu(opts, header)
-
-                        if opt > 0:
-                            axis = 3 - opt
-                            self.__view.heatmap(res, axis, 0)
-
-                        else: self._menu_level -= 1
+                            else: self._menu_level -= 1
 
     #
-    def __call_menu(self, options, header = ''):
+    def __call_menu(self, options, header = '', clear_screen = True, order_command = False):
         #
         # Variables
         call = True
@@ -382,7 +408,7 @@ class Controller:
         while call:
             #
             # Get option
-            opt = self.__view.terminal_menu(options, header=header, footer=msg)
+            opt = self.__view.terminal_menu(options, header=header, footer=msg, clear_screen=clear_screen)
             msg = "Invalid code! "
             call = False
 
@@ -398,6 +424,12 @@ class Controller:
             elif opt == "-1":
                 self._menu_level -= 1
 
+            elif opt[:2] == "_o" and len(opt) > 2:
+                opts_keys = list(options.keys())
+                if ((int(opt[2:]) - 1) < len(opts_keys)) and int(opt[2:]) > 0:
+                    opt = opts_keys[int(opt[2:]) - 1]
+                else: call = True
+
             # Check value
             elif len(opt) > 0 and (opt.isdigit() or (opt[0] == "-" and opt[1:].isdigit())):
                 opt = int(opt)
@@ -410,7 +442,7 @@ class Controller:
         return opt
 
     #
-    def __call_input(self, description, header = True, clear_screen=True, validation=None):
+    def __call_input(self, description, header = True, clear_screen=True, validation=None, back_opt=True):
         #
         # Get value
         opt = self.__view.terminal_input(description, header=header, clear_screen=clear_screen)
@@ -421,7 +453,7 @@ class Controller:
             print('\nExiting ...\n')
             exit(0)
 
-        elif opt == "-1":
+        elif opt == "-1" and back_opt:
             self._menu_level -= 1
 
         elif (validation is not None) and (opt != "-1"):

@@ -85,7 +85,7 @@ class Results:
     ''' Methods '''
 
     #
-    def __init__(self, code, name = '', loop_idx = 0):
+    def __init__(self, code, name = '', loop_idx = 0, results_group = None):
         #
         # Set loop variable
         self._loop = {
@@ -97,6 +97,7 @@ class Results:
         #
         # Root dir
         self._root_dir = "model/results/"
+        if results_group is not None: self._root_dir += "group_" + results_group + "/"
 
         #
         # Identification
@@ -152,7 +153,7 @@ class Results:
             self._directory += "res1/"
 
         # Parameters directory
-        params_dir =  self._directory + "parameters/"
+        params_dir = self.directory + "parameters/"
 
         #
         # Read parameters
@@ -312,24 +313,16 @@ class Results:
 
             if act_code == self.code:
                 self._name = name  
+                self._directory = path.path + "/"
                 break
 
     #
     def __get_loop(self):
-        #
-        # Get root directory            
-        root_dir = self.root_dir + str(self.code)
-
-        if self.name:  
-            root_dir += '_' + self._name
-
-        root_dir += '/'
-
         # Variables
         i = 0
 
         # Scan results directory
-        obj_scandir = os.scandir(root_dir)
+        obj_scandir = os.scandir(self.directory)
 
         for obj_dir in obj_scandir:
             if i == 0: 
@@ -598,16 +591,34 @@ class Results:
 
         for path in obj_scandir:
             str_splited = path.name.split("_")
-            sim_code = int(str_splited[0])
 
-            name = ""
-            for j in range(1, len(str_splited)):
-                if j == 1: name += str_splited[j]
-                else: name += '_' + str_splited[j]
+            if(str_splited[0] == "group"):
+                group_dir = os.scandir(path.path)
 
-            if sim_code == int(code):
-                ret = True
-                break
+                for res_dir in group_dir:
+                    res_name = res_dir.name.split("_")
+                    sim_code = int(res_name[0])
+
+                    name = ""
+                    for j in range(1, len(res_name)):
+                        if j == 1: name += res_name[j]
+                        else: name += '_' + res_name[j]
+
+                    if sim_code == int(code):
+                        self._root_dir = path.path + "/"
+                        ret = True
+                        break
+            else:
+                sim_code = int(str_splited[0])
+
+                name = ""
+                for j in range(1, len(str_splited)):
+                    if j == 1: name += str_splited[j]
+                    else: name += '_' + str_splited[j]
+
+                if sim_code == int(code):
+                    ret = True
+                    break
 
         return ret  
 

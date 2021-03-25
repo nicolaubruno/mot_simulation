@@ -27,10 +27,6 @@ class Simulation:
     ]
 
     #
-    # Simulation parameters
-    #
-
-    #
     # (Array) Position histogram array
     @property
     def pos_freqs_arr(self):
@@ -59,7 +55,6 @@ class Simulation:
     @property
     def parallel_tasks(self):
         return self._parallel_tasks
-    
 
     #
     # (Object) Results to be built in the simulation
@@ -80,13 +75,16 @@ class Simulation:
         self._parallel_tasks = 0
 
     #
-    def new(self, shortname = '', opt = 0):
+    def new(self, shortname = '', opt = 0, results_group = None):
         #
         # Create a directory to save the results
         #
 
         # Empty results
-        self._results = Results(int(dt.now().timestamp()), shortname.strip())
+        if results_group is not None and results_group > 1:
+            results_group = self.available_results_groups()[results_group]
+
+        self._results = Results(int(dt.now().timestamp()), shortname.strip(), results_group=results_group)
         
         #
         # Check simulation option
@@ -244,7 +242,7 @@ class Simulation:
         self._atoms_simulated = 0
 
         # Parallel tasks
-        self._paralell_tasks = int(self.results.conds["parallel_tasks"])
+        self._parallel_tasks = int(self.results.conds["parallel_tasks"])
 
         # Release memory
         gc.collect()
@@ -289,20 +287,63 @@ class Simulation:
         return res
 
     #
-    def available_results(self, max_num_results=10):
+    # Get available result groups
+    def available_results_groups(self):
         #
         # Variables
-        res = []
+        i = 2
+        res = {1:"root"}
+
+        #
+        # List all results groups directories
+        #--
+        groups_dir = os.scandir("model/results/")
+        for group_dir in groups_dir:
+            # Check if the results group is valid
+            if group_dir.is_dir():
+                str_splited = group_dir.name.split("_")
+
+                if(str_splited[0] == "group"):
+                    name = ""
+                    for j in range(1, len(str_splited)):
+                        if j == 1: name += str_splited[j]
+                        else: name += '_' + str_splited[j]
+
+                    res[i] = name
+                    i += 1
+        #--
+
+        return res
+
+    #
+    # Get available results
+    def available_results(self, results_group):
+        #
+        # Variables
+        res = {}
+        available_groups = self.available_results_groups()
         check = True
 
         #
+        # Get results dir
+        #--
+        if results_group == 1:
+            path = "model/results/"
+
+        else:
+            path = "model/results/group_" + available_groups[results_group]
+        #--
+
+        #
         # List all results directories
-        results_dir = os.scandir("model/results/")
+        #--
+        results_dir = os.scandir(path)
         for res_dir_item in results_dir:
             #
             # Check if the results is valid
-            if res_dir_item.is_dir():
+            if res_dir_item.is_dir() and (len(res_dir_item.name) > 6) and not (res_dir_item.name[:5] == "group"):
                 res_dir = os.scandir(res_dir_item.path)
+                print(res_dir_item.name)
 
                 check = True
                 for res_item in res_dir:
@@ -325,9 +366,10 @@ class Simulation:
                         if j == 1: name += str_splited[j]
                         else: name += '_' + str_splited[j]
 
-                    res.append([code, name])
+                    res[code] = name
+        #--
 
-        return sorted(res, key=lambda res: -res[0])[:max_num_results]
+        return {key: value for key, value in sorted(res.items(), key=(lambda x: -x[0]))}
 
     #
     # Check if results code exists

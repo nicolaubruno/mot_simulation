@@ -1,8 +1,0 @@
-,conditions
-T_0,20.0
-max_time,50000.0
-r_max,1.5
-num_sim,2000
-num_bins,128
-wait_time,5000.0
-dt,2.0

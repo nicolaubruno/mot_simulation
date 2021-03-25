@@ -52,7 +52,7 @@ class View:
         self._header += " 0 -> Exit\n"
 
     #
-    def terminal_menu(self, options, header = None, footer = None, clear_screen = True):
+    def terminal_menu(self, options, header = None, footer = None, clear_screen = True, show_main_header = True):
         #
         # Clear screen
         if clear_screen:
@@ -60,8 +60,8 @@ class View:
             else: os.system('clear')
 
         #
-        # Show header 
-        print(self.header)
+        # Show headers 
+        if show_main_header: print(self.header)
         if header is not None: print(header + self.separator)
 
         #
@@ -186,6 +186,33 @@ class View:
         #
         # Show results
         print('Results history' + self.separator)
+
+        for i, val in enumerate(res):
+            print(str(i + 1), end='')
+            print(" - (" + str(val[0]) + ")", end='')
+            print(' ' + str(dt.fromtimestamp(val[0])), end='')
+            print(' ' + val[1], end='')
+            print()
+    
+    #
+    # Print the results groups
+    def results_groups(self):
+        #
+        # Get results
+        res = self.__simulation.available_results_groups()
+
+        #
+        # Clear screen
+        if os.name == 'nt': os.system('cls')
+        else: os.system('clear')
+
+        #
+        # Show header 
+        print(self.header)
+
+        #
+        # Show groups
+        print('Results groups' + self.separator)
 
         for i, val in enumerate(res):
             print(str(i + 1), end='')
