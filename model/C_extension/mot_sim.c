@@ -613,16 +613,18 @@ int set_pos_hist(int only_marginals, results_t *res, conditions_t conds){
 double move(atom_t *atom, beams_setup_t beams_setup, conditions_t conds, environment_t env){
     //
     // Variables
-    int i, j, chosen_beam;
+    int i, j, chosen_beam = -1;
     double *B, *eB;
     double vel_mod, *a_B, *rd_v;
     double *pol_amp, *probs, p = 0;
     int pol_opt[] = {+1, -1, 0};  
-    double dt;
+    double fixed_dt, dt;
+    double aux_R = 0, aux_dt = 0;
     polarized_beam_t *beams;
 
     // Time interval
-    dt = conds.dt / (atom->transition.gamma*1e3);
+    fixed_dt = conds.dt / (atom->transition.gamma*1e3);
+    dt = fixed_dt;
 
     //
     // Direction of the magnetic field magnetic field
@@ -651,17 +653,36 @@ double move(atom_t *atom, beams_setup_t beams_setup, conditions_t conds, environ
             beams[3*i+j].k_dic = beams_setup.beams[i].k_dic;
             beams[3*i+j].eps = pol_opt[j];
 
+            // Scattering rate
+            aux_R = scattering_rate(*atom, beams[3*i+j], conds, env, B);
+
             // Probability of the atom to absorb
-            probs[3*i+j] = dt * scattering_rate(*atom, beams[3*i+j], conds, env, B);
+            probs[3*i+j] = fixed_dt * aux_R;
             p += probs[3*i+j];
+
+            // Check random time
+            if(aux_R > 0) {
+                aux_dt = random_exp(1 / aux_R);
+                
+                if(aux_dt < fixed_dt && aux_dt < dt) {
+                    dt = aux_dt;
+                    chosen_beam = 3*i+j;
+                }
+            }
+
         }
     }
 
-    // Probability of the transition does not happen
-    probs[3*beams_setup.num] = 1 - p;
+    //
+    // Check chosen beam
+    //--
+    if(chosen_beam == -1){
+        // Probability of the transition does not happen
+        probs[3*beams_setup.num] = 1 - p;
 
-    // Chose a beam to be absorbed or not
-    chosen_beam = random_pick(probs, 3*beams_setup.num+1);
+        // Chose a beam to be absorbed or not
+        chosen_beam = random_pick(probs, 3*beams_setup.num+1);
+    }
     //--
 
     //

@@ -7,9 +7,6 @@ from model import Simulation, Results
 from view import View
 
 from datetime import datetime as dt
-#from threading import Thread
-from multiprocessing import Process
-from pathos.multiprocessing import ProcessPool as Pool
 from tqdm import tqdm
 
 #
@@ -116,57 +113,58 @@ class Controller:
                 if self.menu_level < 2:
                     break
 
+                # Check option
                 if opt == 2: opt = 0
-                else:
-                    # Create a new simulation
-                    self.__simulation.new(shortname, opt, results_group)
 
-                    # Check looping
-                    loop_num = len(self.__simulation.results.loop["values"])
-                    if loop_num == 0: loop_num = 1
+                # Create a new simulation
+                self.__simulation.new(shortname, opt, results_group)
 
-                    # Update time
-                    check_time = dt.now().timestamp()
+                # Check looping
+                loop_num = len(self.__simulation.results.loop["values"])
+                if loop_num == 0: loop_num = 1
 
-                    # Print simulation status
-                    self.__view.simulation_header(header=False)
+                # Update time
+                check_time = dt.now().timestamp()
 
-                    # Set progress bars
-                    pbars = []
-                    for i in range(loop_num):
-                        desc = "Atoms simulated" if loop_num == 1 else self.__simulation.results.loop["var"] + " = " + ("%.2f" % self.__simulation.results.loop["values"][i])
-                        pbars.append(tqdm(total=self.__simulation.results.conds["num_sim"], desc=desc, position=i))
+                # Print simulation status
+                self.__view.simulation_header(header=False)
+
+                # Set progress bars
+                pbars = []
+                for i in range(loop_num):
+                    desc = "Atoms simulated" if loop_num == 1 else self.__simulation.results.loop["var"] + " = " + ("%.2f" % self.__simulation.results.loop["values"][i])
+                    pbars.append(tqdm(total=self.__simulation.results.conds["num_sim"], desc=desc, position=i))
+
+                #
+                # Run simulation
+                #--
+                for i in range(loop_num):
+                    # Open new simulation for each looping value
+                    if i > 0: self.__simulation.open(self.__simulation.results.code, i, opt)
 
                     #
-                    # Run simulation
+                    # Simulate atoms
                     #--
-                    for i in range(loop_num):
-                        # Open new simulation for each looping value
-                        if i > 0: self.__simulation.open(self.__simulation.results.code, i, opt)
-
-                        #
+                    while self.__simulation.atoms_simulated < self.__simulation.results.conds["num_sim"]:
                         # Simulate atoms
-                        #--
-                        while self.__simulation.atoms_simulated < self.__simulation.results.conds["num_sim"]:
-                            # Simulate atoms
-                            times = self.__simulation.run()
-                            
-                            pbars[i].update(times)
-                        #--
-
-                        # Save simulation
-                        self.__simulation.save()
+                        times = self.__simulation.run()
+                        
+                        pbars[i].update(times)
                     #--
 
-                    # Close progress bars
-                    for i in range(loop_num): pbars[i].close()
+                    # Save simulation
+                    self.__simulation.save()
+                #--
 
-                    #
-                    # Release memory
-                    gc.collect()
+                # Close progress bars
+                for i in range(loop_num): pbars[i].close()
 
-                    # Information about the simulation
-                    self.__view.simulation_header(clear_screen=True)
+                #
+                # Release memory
+                gc.collect()
+
+                # Information about the simulation
+                self.__view.simulation_header(clear_screen=True)
 
                 #
                 # Set menu level

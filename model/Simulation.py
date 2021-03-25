@@ -5,8 +5,7 @@ import numpy as np
 import pandas as pd
 import mot_sim as C_ext
 
-from multiprocessing import cpu_count
-from multiprocessing import Pool
+from multiprocessing import Pool, cpu_count
 from datetime import datetime as dt
 from model.Results import Results
 from random import randint
