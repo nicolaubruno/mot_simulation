@@ -396,7 +396,7 @@ class View:
 
         #
         # Plot simulated date
-        l = float(res.conds['r_max'])
+        l = float(res.conds['max_r'])
         plt.imshow(hist, cmap="Blues", vmin=np.min(hist), vmax=np.max(hist), extent=[-l, l, -l, l])
 
         #

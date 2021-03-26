@@ -22,7 +22,7 @@ class Simulation:
     ''' Attributes '''
 
     __slots__ = [
-        "_pos_freqs_arr", "_atoms_simulated", "_option", "_results", "_transitions", "_parallel_tasks"
+        "_pos_freqs_arr", "_vel_freqs_arr", "_atoms_simulated", "_option", "_results", "_transitions", "_parallel_tasks"
     ]
 
     #
@@ -30,6 +30,12 @@ class Simulation:
     @property
     def pos_freqs_arr(self):
         return self._pos_freqs_arr
+
+    #
+    # (Array) Velocity histogram array
+    @property
+    def vel_freqs_arr(self):
+        return self._vel_freqs_arr
     
     #
     # Atoms simulated
@@ -105,8 +111,9 @@ class Simulation:
         #--
         if self.option == 0:
             #
-            # Frequencies of positions (1D-array)
+            # Frequencies (1D-array)
             self._pos_freqs_arr = np.zeros(self.results.conds["num_bins"]**3)
+            self._vel_freqs_arr = np.zeros(self.results.conds["num_bins"]**3)
         #--
 
         #
@@ -116,6 +123,7 @@ class Simulation:
             #
             # Frequencies of positions (3D-array)
             self._pos_freqs_arr = np.zeros((3, self.results.conds["num_bins"]))
+            self._vel_freqs_arr = np.zeros((3, self.results.conds["num_bins"]))
         #--
 
         # Setup relevant variables
@@ -158,18 +166,21 @@ class Simulation:
                 #
                 # Add frequencies
                 for k in range(times):
-                    freqs = res[k][0]
-                    time = res[k][1]
-                    trans = res[k][2]
+                    pos_freqs = res[k][0]
+                    vel_freqs = res[k][1]
+                    time = res[k][2]
+                    trans = res[k][3]
 
                     if self.option == 0:
                         for i in range(self.results.conds["num_bins"]**3):
-                            self._pos_freqs_arr[i] += freqs[i]
+                            self._pos_freqs_arr[i] += pos_freqs[i]
+                            self._vel_freqs_arr[i] += vel_freqs[i]
 
                     elif self.option == 1:                
                         for i in range(3):
                             for j in range(self.results.conds["num_bins"]):
-                                self._pos_freqs_arr[i][j] += freqs[i][j]
+                                self._pos_freqs_arr[i][j] += pos_freqs[i][j]
+                                self._vel_freqs_arr[i][j] += vel_freqs[i][j]
 
                 #
                 # Add transitions
@@ -180,7 +191,8 @@ class Simulation:
 
                 #
                 # Release memory
-                del freqs
+                del pos_freqs
+                del vel_freqs
                 del args_pool
                 del seed
 
@@ -222,9 +234,12 @@ class Simulation:
         #--
         if self.option == 0:
             #
-            # Frequencies of positions (1D-array)
+            # Frequencies (1D-array)
             del self._pos_freqs_arr
+            del self._vel_freqs_arr
+
             self._pos_freqs_arr = np.zeros(self.results.conds["num_bins"]**3)
+            self._vel_freqs_arr = np.zeros(self.results.conds["num_bins"]**3)
         #--
 
         #
@@ -232,9 +247,12 @@ class Simulation:
         #--
         elif self.option == 1:
             #
-            # Frequencies of positions (3D-array)
+            # Frequencies (3D-array)
             del self._pos_freqs_arr
+            del self._vel_freqs_arr
+
             self._pos_freqs_arr = np.zeros((3, self.results.conds["num_bins"]))
+            self._vel_freqs_arr = np.zeros((3, self.results.conds["num_bins"]))
         #--
 
         # Setup relevant variables
@@ -252,9 +270,10 @@ class Simulation:
         # Check file
         if self.option == 0:
             self.results.add_positions(self.pos_freqs_arr)
+            self.results.add_velocities(self.vel_freqs_arr)
 
         elif self.option == 1:
-            self.results.add_marginal_positions(self.pos_freqs_arr)
+            self.results.add_marginals(self.pos_freqs_arr, self.vel_freqs_arr)
 
         #
         # Release memory

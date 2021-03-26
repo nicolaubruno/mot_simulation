@@ -11,12 +11,11 @@
 // --
 
 results_t simulate_atom(char *params_path, int only_marginals, long seed_time){
-    //
     // Variables
     int i;
-    double r, dt = 0, passed_time = 0;     // Dynamics
-    int get_values = 0;             // Simulation dynamics
-    results_t res;                  // Results
+    double r, v, dt = 0, passed_time = 0;
+    int get_values = 0;
+    results_t res;
 
     // Seed random variable
     srand(time(0) + seed_time);
@@ -33,14 +32,20 @@ results_t simulate_atom(char *params_path, int only_marginals, long seed_time){
     // Set initial values
     res.time = 0;
     res.transitions = (int*) calloc(3, sizeof(int));
-    set_pos_hist(only_marginals, &res, conds);
+    set_hist(only_marginals, &res, conds);
+
+    //print_results(res, atom, only_marginals);
+    //exit(0);
 
     // Distance from origin
-    r = sqrt(r3_inner_product(atom.pos, atom.pos));
+    r = r3_mod(atom.pos);
+
+    // Speed of the atom
+    v = r3_mod(atom.vel);
 
     //
     // Iterations
-    while((passed_time < conds.max_time) && (r < conds.r_max)){
+    while((passed_time < conds.max_time) && (r < conds.max_r) && (v < conds.max_v)){
         //print_status(atom, res);
 
         // Move atom
@@ -52,6 +57,9 @@ results_t simulate_atom(char *params_path, int only_marginals, long seed_time){
         // Distance from origin
         r = r3_mod(atom.pos);
 
+        // Speed of the atom
+        v = r3_mod(atom.vel);
+
         //
         // Waiting the equilibrium
         if(passed_time > conds.wait_time){
@@ -61,14 +69,24 @@ results_t simulate_atom(char *params_path, int only_marginals, long seed_time){
 
         //
         // Update results
-        if(get_values == 1 && r < conds.r_max){
-            if(only_marginals)
-                for(i = 0; i < 3; i++) update_hist(&res.pos_hist[i], atom.pos[i]);
-            else update_hist_3d(&res.pos_3Dhist, atom.pos);
+        if(get_values == 1 && r < conds.max_r){
+            if(only_marginals){
+                for(i = 0; i < 3; i++) {
+                    update_hist(&res.pos_hist[i], atom.pos[i]);
+                    if(v < conds.max_v) update_hist(&res.vel_hist[i], atom.vel[i]);
+                }
+            }
+            else {
+                update_hist_3d(&res.pos_3Dhist, atom.pos);
+                if(v < conds.max_v) update_hist_3d(&res.vel_3Dhist, atom.vel);
+            }
         }
+
+        //if(((int) (res.time / conds.max_time)*100) % 10 == 0 && res.time > 0)
+        //    print_status(atom, res);
     }
 
-    //print_results(atom, res);
+    //print_results(res, atom, only_marginals);
 
     return res;
 }
@@ -147,10 +165,10 @@ atom_t get_atom(conditions_t conds, environment_t env, char *params_path){
     rd_v = r3_normalize(rd_v); // Normalization
     //--
 
-    if(env.w < conds.r_max)
+    if(env.w < conds.max_r)
         atom.pos = r3_scalar_product(random_norm(0, env.w/2), rd_v); // cm
     else 
-        atom.pos = r3_scalar_product(random_norm(0, conds.r_max/2), rd_v); // cm
+        atom.pos = r3_scalar_product(random_norm(0, conds.max_r/2), rd_v); // cm
     //--
 
     //
@@ -344,10 +362,24 @@ conditions_t get_conditions(char *params_path){
     token = strtok_r(NULL, DELIM, &saveptr); // Value
 
     // Python module
-    if(Py_MODULE) conditions.r_max = atof(str_replace(token, ".", ","));
+    if(Py_MODULE) conditions.max_r = atof(str_replace(token, ".", ","));
 
     // C Program
-    else conditions.r_max = atof(token);
+    else conditions.max_r = atof(token);
+    //--
+
+    //
+    // Maximum speed
+    //--
+    i += 1;
+    token = strtok_r(rows[i], DELIM, &saveptr); // Variable name
+    token = strtok_r(NULL, DELIM, &saveptr); // Value
+
+    // Python module
+    if(Py_MODULE) conditions.max_v = atof(str_replace(token, ".", ","));
+
+    // C Program
+    else conditions.max_v = atof(token);
     //--
 
     // Skip parameter (number of simulations)
@@ -561,7 +593,7 @@ beams_setup_t get_beams(char *params_path){
     return beams_setup;
 }
 
-int set_pos_hist(int only_marginals, results_t *res, conditions_t conds){
+int set_hist(int only_marginals, results_t *res, conditions_t conds){
     // Variables
     int i, j, k;
 
@@ -570,12 +602,20 @@ int set_pos_hist(int only_marginals, results_t *res, conditions_t conds){
     //--
     if(only_marginals){
         res->pos_hist = (histogram_t*) calloc(3, sizeof(histogram_t));
+        res->vel_hist = (histogram_t*) calloc(3, sizeof(histogram_t));
 
         for(i = 0; i < 3; i++){
+            // Position
             res->pos_hist[i].num_bins = conds.num_bins;
-            res->pos_hist[i].bin_size = 2 * conds.r_max / res->pos_hist[i].num_bins;
-            res->pos_hist[i].coord0 = - conds.r_max;
+            res->pos_hist[i].bin_size = 2 * conds.max_r / res->pos_hist[i].num_bins;
+            res->pos_hist[i].coord0 = - conds.max_r;
             res->pos_hist[i].freqs = (int*) calloc(res->pos_hist[i].num_bins, sizeof(int));
+
+            // Velocity
+            res->vel_hist[i].num_bins = conds.num_bins;
+            res->vel_hist[i].bin_size = 2 * conds.max_v / res->vel_hist[i].num_bins;
+            res->vel_hist[i].coord0 = - conds.max_v;
+            res->vel_hist[i].freqs = (int*) calloc(res->vel_hist[i].num_bins, sizeof(int));
         }
     //--
 
@@ -583,16 +623,31 @@ int set_pos_hist(int only_marginals, results_t *res, conditions_t conds){
     // Complete histograms
     //--
     } else{
+        // Position
         res->pos_3Dhist.num_bins = (int*) calloc(3, sizeof(int));
         res->pos_3Dhist.bins_size = (double*) calloc(3, sizeof(double));
         res->pos_3Dhist.coord0 = (double*) calloc(3, sizeof(double));
 
+        // Velocity
+        res->vel_3Dhist.num_bins = (int*) calloc(3, sizeof(int));
+        res->vel_3Dhist.bins_size = (double*) calloc(3, sizeof(double));
+        res->vel_3Dhist.coord0 = (double*) calloc(3, sizeof(double));
+
         for(i = 0; i < 3; i++){
+            // Position
             res->pos_3Dhist.num_bins[i] = conds.num_bins;
-            res->pos_3Dhist.bins_size[i] = 2 * conds.r_max / res->pos_3Dhist.num_bins[i];
-            res->pos_3Dhist.coord0[i] = - conds.r_max;
+            res->pos_3Dhist.bins_size[i] = 2 * conds.max_r / res->pos_3Dhist.num_bins[i];
+            res->pos_3Dhist.coord0[i] = - conds.max_r;
+
+            // Velocity
+            res->vel_3Dhist.num_bins[i] = conds.num_bins;
+            res->vel_3Dhist.bins_size[i] = 2 * conds.max_v / res->vel_3Dhist.num_bins[i];
+            res->vel_3Dhist.coord0[i] = - conds.max_v;
         }
 
+        //
+        // Position
+        //--
         res->pos_3Dhist.freqs = (int***) calloc(res->pos_3Dhist.num_bins[0], sizeof(int**));
 
         for(i = 0; i < res->pos_3Dhist.num_bins[0]; i++){
@@ -604,6 +659,23 @@ int set_pos_hist(int only_marginals, results_t *res, conditions_t conds){
                 }
             }
         }
+        //--
+
+        //
+        // Velocity
+        //--
+        res->vel_3Dhist.freqs = (int***) calloc(res->vel_3Dhist.num_bins[0], sizeof(int**));
+
+        for(i = 0; i < res->vel_3Dhist.num_bins[0]; i++){
+            res->vel_3Dhist.freqs[i] = (int**) calloc(res->vel_3Dhist.num_bins[1], sizeof(int*));
+            for(j = 0; j < res->vel_3Dhist.num_bins[1]; j++){
+                res->vel_3Dhist.freqs[i][j] = (int*) calloc(res->vel_3Dhist.num_bins[2], sizeof(int));
+                for(k = 0; k < res->vel_3Dhist.num_bins[2]; k++){
+                   res->vel_3Dhist.freqs[i][j][k] = 0; 
+                }
+            }
+        }
+        //--
     }
     //--
 
@@ -1011,20 +1083,30 @@ int print_status(atom_t atom, results_t res){
     return 1;
 }
 
-int print_results(atom_t atom, results_t res){
+int print_results(results_t res, atom_t atom, int only_marginals){
     // Variables
     int i, j;
 
     printf("Simulation status\n--\n");
-    printf("total time [ms] = %f\n\n", res.time / (2*PI*atom.transition.gamma));
+    printf("total time [ms] = %f\n\n", res.time / (atom.transition.gamma));
 
-    for(i = 0; i < 3;i++){
-        printf("dist[%d] = [\n", i+1);
-        for(j = 0; j < res.pos_hist[i].num_bins; j++)
-            printf("%d ", res.pos_hist[i].freqs[j]);
-        printf("]\n\n");
+    if(only_marginals){
+        for(i = 0; i < 3;i++){
+            printf("pos[%d] = [\n", i+1);
+            for(j = 0; j < res.pos_hist[i].num_bins; j++)
+                printf("%d ", res.pos_hist[i].freqs[j]);
+            printf("]\n\n");
+        }
+        printf("\n");
+
+        for(i = 0; i < 3;i++){
+            printf("vel[%d] = [\n", i+1);
+            for(j = 0; j < res.vel_hist[i].num_bins; j++)
+                printf("%d ", res.vel_hist[i].freqs[j]);
+            printf("]\n\n");
+        }
+        printf("\n");
     }
-    printf("\n");
 
     return 0;
 }
@@ -1056,9 +1138,10 @@ int print_params(atom_t atom, conditions_t conds, beams_setup_t beams_setup, env
 
     // Conditions
     printf("Conditions\n--\n");
-    printf("T_0 = %f\n", conds.T_0);
+    printf("T_0 [uK] = %f\n", conds.T_0);
     printf("max_time [ms] = %f\n", conds.max_time / (atom.transition.gamma));
-    printf("r_max = %f\n", conds.r_max);
+    printf("max_r [cm] = %f\n", conds.max_r);
+    printf("max_v [cm/s] = %f\n", conds.max_v);
     printf("num_bins = %d\n", conds.num_bins);
     printf("wait_time [ms] = %f\n", conds.wait_time / (atom.transition.gamma));
     printf("time interval [ms] = %f\n", conds.dt / (atom.transition.gamma));
@@ -1066,11 +1149,11 @@ int print_params(atom_t atom, conditions_t conds, beams_setup_t beams_setup, env
 
     // Environment
     printf("Environment\n--\n");
-    printf("B_0 = %f\n", env.B_0);
-    printf("local_B = %f\n", env.local_B);
-    printf("delta = %f\n", env.delta);
+    printf("B_0 [G/cm] = %f\n", env.B_0);
+    printf("local_B [G/cm] = %f\n", env.local_B);
+    printf("delta [1/gamma] = %f\n", env.delta);
     printf("s_0 = %f\n", env.s_0);
-    printf("w = %f\n", env.w);
+    printf("w [cm] = %f\n", env.w);
     printf("g_bool = %d\n", env.g_bool);
     printf("\n");
 
@@ -1232,12 +1315,12 @@ int update_hist(histogram_t *hist, double val){
     double lower_lim, upper_lim;
 
     // Add frequency
-    for(bin = 0; bin < (*hist).num_bins; bin++){
-        lower_lim = (*hist).coord0 + bin * (*hist).bin_size;
-        upper_lim = lower_lim + (*hist).bin_size;
+    for(bin = 0; bin < hist->num_bins; bin++){
+        lower_lim = hist->coord0 + bin * hist->bin_size;
+        upper_lim = lower_lim + hist->bin_size;
 
         if((val >= lower_lim) && (val < upper_lim)){
-            (*hist).freqs[bin] += 1;
+            hist->freqs[bin] += 1;
             break;
         }
     }

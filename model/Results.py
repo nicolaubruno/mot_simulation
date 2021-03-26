@@ -52,16 +52,28 @@ class Results:
         return self._name
 
     #
-    # 3D-Histogram of the positions
+    # 3D-Histogram of positions
     @property
     def pos_3Dhist(self):
         return self._pos_3Dhist
     
     #
-    # Marginal histograms of the positions
+    # Marginal histograms of positions
     @property
     def pos_hist(self):
         return self._pos_hist
+
+    #
+    # 3D-Histogram of velocities
+    @property
+    def vel_3Dhist(self):
+        return self._vel_3Dhist
+    
+    #
+    # Marginal histograms of velocities
+    @property
+    def vel_hist(self):
+        return self._vel_hist
     
     #
     # Looping status
@@ -97,7 +109,8 @@ class Results:
         #
         # Root dir
         self._root_dir = "model/results/"
-        if results_group is not None: self._root_dir += "group_" + results_group + "/"
+        if results_group is not None and results_group != 1: 
+            self._root_dir += "group_" + results_group + "/"
 
         #
         # Identification
@@ -192,18 +205,29 @@ class Results:
     #
     # Get distributions
     def __get_dists(self):
-        # 3D-Histograms of the positions
+        #
+        # 3D-Histograms
+        #--
         self._pos_3Dhist = {
             'freqs': None,\
             'dens': None,\
             'bins': None
         }
 
-        # Marginal histograms of the positions
+
+        self._vel_3Dhist = {
+            'freqs': None,\
+            'dens': None,\
+            'bins': None
+        }
+        #--
+
+        # Marginal histograms
         self._pos_hist = [{"freqs":[], "dens":[], "bins":[]} for i in range(3)]
+        self._vel_hist = [{"freqs":[], "dens":[], "bins":[]} for i in range(3)]
 
         #
-        # 3D-Histograms of the positions
+        # 3D-Histograms of positions
         path = self.directory + 'positions.csv'
         if os.path.exists(path):
             #
@@ -219,11 +243,11 @@ class Results:
             
             #
             # Bins
-            self._pos_3Dhist["bins"] = np.zeros((3, self.conds["num_bins"])) - float(self.conds['r_max'])
+            self._pos_3Dhist["bins"] = np.zeros((3, self.conds["num_bins"])) - float(self.conds['max_r'])
             
             for i in range(3):
                 for j in range(self.conds['num_bins']):
-                    delta = 2*float(self.conds['r_max']) / float(self.conds['num_bins'])
+                    delta = 2*float(self.conds['max_r']) / float(self.conds['num_bins'])
                     self._pos_3Dhist["bins"][i][j] += j*delta
 
             #
@@ -241,15 +265,60 @@ class Results:
 
                 #
                 # Marginal bins
-                self._pos_hist[i]["bins"] = - np.ones(self.conds['num_bins']) * float(self.conds['r_max'])
-                delta = 2*float(self.conds['r_max']) / float(self.conds['num_bins'])
+                self._pos_hist[i]["bins"] = - np.ones(self.conds['num_bins']) * float(self.conds['max_r'])
+                delta = 2*float(self.conds['max_r']) / float(self.conds['num_bins'])
 
                 for j in range(self.conds['num_bins']):
                     self._pos_hist[i]["bins"][j] += j*delta
 
         #
+        # 3D-Histograms of velocities
+        path = self.directory + 'velocities.csv'
+        if os.path.exists(path):
+            #
+            # Read histogram file
+            self._vel_3Dhist["freqs"] = pd.read_csv(path, index_col=0, squeeze=True).to_numpy().reshape((self.conds['num_bins'], self.conds['num_bins'], self.conds['num_bins']))
+
+            #
+            # Filter frequencies considering the waist size as a threshold
+
+            #
+            # Densities
+            self._vel_3Dhist["dens"] = self.vel_3Dhist["freqs"] / np.sum(self.vel_3Dhist["freqs"])
+            
+            #
+            # Bins
+            self._vel_3Dhist["bins"] = np.zeros((3, self.conds["num_bins"])) - float(self.conds['max_v'])
+            
+            for i in range(3):
+                for j in range(self.conds['num_bins']):
+                    delta = 2*float(self.conds['max_r']) / float(self.conds['num_bins'])
+                    self._vel_3Dhist["bins"][i][j] += j*delta
+
+            #
+            # Marginal frequencies
+            self._vel_hist[0]["freqs"] = np.sum(self.vel_3Dhist["freqs"], axis=(1, 2))
+            self._vel_hist[1]["freqs"] = np.sum(self.vel_3Dhist["freqs"], axis=(0, 2))
+            self._vel_hist[2]["freqs"] = np.sum(self.vel_3Dhist["freqs"], axis=(0, 1))
+
+            #
+            # Defined marginals
+            for i in range(3):
+                #
+                # Marginal densities
+                self._vel_hist[i]["dens"] = self._vel_hist[i]["freqs"] / np.sum(self._vel_hist[i]["freqs"])
+
+                #
+                # Marginal bins
+                self._vel_hist[i]["bins"] = - np.ones(self.conds['num_bins']) * float(self.conds['max_v'])
+                delta = 2*float(self.conds['max_v']) / float(self.conds['num_bins'])
+
+                for j in range(self.conds['num_bins']):
+                    self._vel_hist[i]["bins"][j] += j*delta
+
+        #
         # Marginal histograms of the positions
-        elif os.path.exists(self.directory + 'marginals.csv'):
+        if os.path.exists(self.directory + 'marginals.csv'):
             #
             # Read file
             df = pd.read_csv(self.directory + 'marginals.csv', index_col=0)
@@ -260,40 +329,27 @@ class Results:
             self._pos_hist[1]["freqs"] = np.array(df['y'])
             self._pos_hist[2]["freqs"] = np.array(df['z'])
 
+            self._vel_hist[0]["freqs"] = np.array(df['vx'])
+            self._vel_hist[1]["freqs"] = np.array(df['vy'])
+            self._vel_hist[2]["freqs"] = np.array(df['vz'])
+
             #
             # Densities and bins of marginal histograms
             for i in range(3):
                 # Densities
                 self._pos_hist[i]["dens"] = self._pos_hist[i]["freqs"] / np.sum(self._pos_hist[i]["freqs"])
+                self._vel_hist[i]["dens"] = self._vel_hist[i]["freqs"] / np.sum(self._vel_hist[i]["freqs"])
 
                 #
                 # Bins
-                self._pos_hist[i]["bins"] = - np.ones(self.conds['num_bins']) * float(self.conds['r_max'])
-                delta = 2*float(self.conds['r_max']) / float(self.conds['num_bins'])
+                self._pos_hist[i]["bins"] = - np.ones(self.conds['num_bins']) * float(self.conds['max_r'])
+                self._vel_hist[i]["bins"] = - np.ones(self.conds['num_bins']) * float(self.conds['max_v'])
+                pos_delta = 2*float(self.conds['max_r']) / float(self.conds['num_bins'])
+                vel_delta = 2*float(self.conds['max_v']) / float(self.conds['num_bins'])
 
                 for j in range(self.conds['num_bins']):
-                    self._pos_hist[i]["bins"][j] += j*delta
-                    
-            '''
-            #
-            # Filter frequencies and densities
-            # considering the waist size as a threshold
-            for i in range(3):
-                initial_bin = -1
-                final_bin = -1
-
-                for j in range(self.conds["num_bins"]):
-                    if (self.pos_hist[i]["bins"][j] >= self.env["w"]) and (initial_bin == -1):
-                        initial_bin = j
-
-                    elif (self.pos_hist[i]["bins"][j] >= self.env["w"]) and (final_bin == -1):
-                        final_bin = j
-                        break
-
-                self._pos_hist[i]["bins"] = self.pos_hist[i]["bins"][initial_bin:final_bin]
-                self._pos_hist[i]["freqs"] = self._pos_hist[i]["freqs"][initial_bin:final_bin]
-                self._pos_hist[i]["dens"] = self._pos_hist[i]["dens"][initial_bin:final_bin]
-            '''
+                    self._pos_hist[i]["bins"][j] += j*pos_delta
+                    self._vel_hist[i]["bins"][j] += j*vel_delta
     
     #
     def __get_name(self):
@@ -684,7 +740,7 @@ class Results:
         #
         # Add marginal distribution files
         pos_freqs_arr = [self.pos_hist[i]["freqs"] for i in range(3)]
-        self.add_marginal_positions(pos_freqs_arr)
+        self.add_marginals(pos_freqs_arr, self.vel_freqs_arr)
 
         #
         # Release memory
@@ -697,31 +753,67 @@ class Results:
         gc.collect()
 
     #
-    # Add marginal positions
-    def add_marginal_positions(self, pos_freqs_arr):
-        indexes = [i+1 for i in range(self.conds['num_bins'])]
-        columns = ["x", "y", "z"]
+    # Add 3D velocities histogram
+    def add_velocities(self, vel_freqs_arr):
+        #
+        # Transform the 3D-array in a 1D-array
+        indexes = []
+        values = []
 
-        data = {
-            'x': pos_freqs_arr[0],\
-            'y': pos_freqs_arr[1],\
-            'z': pos_freqs_arr[2]
-        }
+        for i in range(self.conds['num_bins']):
+            for j in range(self.conds['num_bins']):
+                for k in range(self.conds['num_bins']):
+                    indexes.append("[%d,%d,%d]" % (i+1, j+1, k+1))
+                    values.append(vel_freqs_arr[self.conds['num_bins']**2 * i + self.conds['num_bins']*j + k])
 
-        path = self.directory + "marginals.csv"
-        pos_freqs = pd.DataFrame(data).astype("int32")
-        pos_freqs.fillna(0, inplace=True)
-        pos_freqs.to_csv(path)
+        values = np.array(values)
+
+        #
+        # Save file
+        path = self.directory + "/velocities.csv"
+        vel_freqs = pd.Series(values, index=indexes).astype("int32")
+        vel_freqs.fillna(0, inplace=True)
+        vel_freqs.to_csv(path)
+
+        #
+        # Update distributions
+        self.__get_dists()
+
+        #
+        # Add marginal distribution files
+        vel_freqs_arr = [self.vel_hist[i]["freqs"] for i in range(3)]
+        self.add_marginals(self.pos_freqs_arr, vel_freqs_arr)
 
         #
         # Release memory
 
-        indexes.clear()
-        columns.clear()
-
+        del values
         del indexes
-        del columns
-        del pos_freqs
+        del vel_freqs
+        del path
+
+        gc.collect()
+
+    #
+    # Add marginal positions
+    def add_marginals(self, pos_freqs_arr, vel_freqs_arr):
+        data = {
+            'x': pos_freqs_arr[0],\
+            'y': pos_freqs_arr[1],\
+            'z': pos_freqs_arr[2],\
+            'vx': vel_freqs_arr[0],\
+            'vy': vel_freqs_arr[1],\
+            'vz': vel_freqs_arr[2]
+        }
+
+        path = self.directory + "marginals.csv"
+        freqs = pd.DataFrame(data).astype("int32")
+        freqs.fillna(0, inplace=True)
+        freqs.to_csv(path)
+
+        #
+        # Release memory
+        del freqs
         del data
         del path
 

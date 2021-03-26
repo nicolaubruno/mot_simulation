@@ -14,7 +14,7 @@ static PyObject* C_simulate_atom(PyObject *self, PyObject *args){
     PyObject *ret;
     results_t res;
     char *params_path;
-    PyObject *freqs;
+    PyObject *pos_freqs, *vel_freqs;
 
     //
     // Get parameters path
@@ -33,25 +33,28 @@ static PyObject* C_simulate_atom(PyObject *self, PyObject *args){
     // Only marginal distributions
     if(only_marginals){
         // Build values
-        freqs = build_pos_freqs(res.pos_hist);
+        pos_freqs = build_freqs(res.pos_hist);
+        vel_freqs = build_freqs(res.vel_hist);
 
         //
         // Release memory
         for(i = 0; i < 3; i++){
             free(res.pos_hist[i].freqs);
+            free(res.vel_hist[i].freqs);
         }
 
         free(res.pos_hist);
+        free(res.vel_hist);
 
     // 3D-Distributions
     } else {
         // Build values
-        freqs = build_pos_3Dfreqs(res.pos_3Dhist);
+        pos_freqs = build_3Dfreqs(res.pos_3Dhist);
+        vel_freqs = build_3Dfreqs(res.vel_3Dhist);
 
         //
         // Release memory
-        //
-
+        //--
         for(i = 0; i < res.pos_3Dhist.num_bins[0]; i++){
             for(j = 0; j < res.pos_3Dhist.num_bins[1]; j++){
                 free(res.pos_3Dhist.freqs[i][j]);
@@ -64,10 +67,25 @@ static PyObject* C_simulate_atom(PyObject *self, PyObject *args){
         free(res.pos_3Dhist.num_bins);
         free(res.pos_3Dhist.bins_size);
         free(res.pos_3Dhist.coord0);
+
+
+        for(i = 0; i < res.vel_3Dhist.num_bins[0]; i++){
+            for(j = 0; j < res.vel_3Dhist.num_bins[1]; j++){
+                free(res.vel_3Dhist.freqs[i][j]);
+            }
+
+            free(res.vel_3Dhist.freqs[i]);
+        }
+        
+        free(res.vel_3Dhist.freqs);
+        free(res.vel_3Dhist.num_bins);
+        free(res.vel_3Dhist.bins_size);
+        free(res.vel_3Dhist.coord0);
+        //--
     }
     //--
 
-    ret = Py_BuildValue("OiO", freqs, time, build_transitions(res.transitions));
+    ret = Py_BuildValue("OOiO", pos_freqs, vel_freqs, time, build_transitions(res.transitions));
 
     // Release memory
     //free(freqs);
@@ -81,7 +99,7 @@ PyMODINIT_FUNC PyInit_mot_sim(void){
 }
 
 // Convert the results in a PyObject list
-PyObject *build_pos_3Dfreqs(histogram_3d_t pos){
+PyObject *build_3Dfreqs(histogram_3d_t hist){
     //
     // Variables
     //
@@ -93,16 +111,16 @@ PyObject *build_pos_3Dfreqs(histogram_3d_t pos){
     // Build list
     //
 
-    dim_x = pos.num_bins[0];
-    dim_y = pos.num_bins[1];
-    dim_z = pos.num_bins[2];
+    dim_x = hist.num_bins[0];
+    dim_y = hist.num_bins[1];
+    dim_z = hist.num_bins[2];
 
     list = PyList_New(dim_x*dim_y*dim_z);
 
     for(i = 0; i < dim_x; i++){
         for(j = 0; j < dim_y; j++){
             for(k = 0; k < dim_z; k++){
-                PyList_SetItem(list, (dim_y*dim_z)*i + dim_z*j + k, Py_BuildValue("i", pos.freqs[i][j][k]));
+                PyList_SetItem(list, (dim_y*dim_z)*i + dim_z*j + k, Py_BuildValue("i", hist.freqs[i][j][k]));
             }
         }
     }
@@ -112,7 +130,7 @@ PyObject *build_pos_3Dfreqs(histogram_3d_t pos){
 }
 
 // Convert the results in a PyObject list
-PyObject *build_pos_freqs(histogram_t *pos){
+PyObject *build_freqs(histogram_t *hist){
     //
     // Variables
     //
@@ -127,11 +145,11 @@ PyObject *build_pos_freqs(histogram_t *pos){
     list = PyList_New(3);
 
     for(i = 0; i < 3; i++){
-        dim = pos[i].num_bins;
+        dim = hist[i].num_bins;
         item = PyList_New(dim);
 
         for(j = 0; j < dim; j++){
-            item2 = Py_BuildValue("i", pos[i].freqs[j]);
+            item2 = Py_BuildValue("i", hist[i].freqs[j]);
             PyList_SetItem(item, j, item2);
         }
         

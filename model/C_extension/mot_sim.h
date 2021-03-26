@@ -57,12 +57,13 @@ typedef struct{
 
 // Conditions
 typedef struct{
-    double T_0;         /* Initial temperature  */
-    double max_time;    /* Maximum time of simulation */
-    double r_max;       /* Maximum distance (threshold) */
+    double T_0;         /* Initial temperature [uK] */
+    double max_time;    /* Maximum time of simulation [1/gamma] */
+    double max_r;       /* Maximum distance (threshold) [cm] */
+    double max_v;       /* Maximum speed [cm/s] */
     int num_bins;       /* Number of bins in each histogram */
-    double wait_time;   /* Time to reach the equilibrium */
-    double dt;          /* Time interval [1/Gamma] */
+    double wait_time;   /* Time to reach the equilibrium [1/gamma] */
+    double dt;          /* Time interval [1/gamma] */
 } conditions_t;
 
 // Environment
@@ -121,8 +122,10 @@ typedef struct {
 
 // Results
 typedef struct{
-    histogram_3d_t pos_3Dhist;      /* Histogram of the position */
-    histogram_t *pos_hist;          /* Marginal histograms */
+    histogram_3d_t pos_3Dhist;      /* 3D-Histogram of position */
+    histogram_t *pos_hist;          /* Marginal positions histograms */
+    histogram_3d_t vel_3Dhist;      /* 3D-Histogram of velocity */
+    histogram_t *vel_hist;          /* Marginal velocities histograms */
     double time;                    /* Total time [s] */
     int *transitions;               /* Counter of occurred transitions */
 } results_t;
@@ -156,8 +159,8 @@ environment_t get_environment(char *params_path);
 // Get beams setup
 beams_setup_t get_beams(char *params_path);
 
-// Set position histogram
-int set_pos_hist(int only_marginals, results_t *res, conditions_t conds);
+// Set histograms
+int set_hist(int only_marginals, results_t *res, conditions_t conds);
 
 // Get polarizations amplitudes
 double *polarizations_amplitudes(beam_t beam, environment_t env, double *eB);
@@ -194,7 +197,7 @@ int print_params(atom_t atom, conditions_t conds, beams_setup_t beams, environme
 int print_status(atom_t atom, results_t res);
 
 // (Debug) Print results
-int print_results(atom_t atom, results_t res);
+int print_results(results_t res, atom_t atom, int only_marginals);
 
 // Get int array from string in the format [i1 i2 ... in]
 int *get_int_array(char *str, int *size);
