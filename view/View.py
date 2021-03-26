@@ -225,6 +225,13 @@ class View:
     # View position marginal histogram
     def pos_marg_hist(self, res, axis=0):
         #
+        # Gaussian function
+        gaussian = lambda x, mean, std_dev, amp: \
+            amp * np.exp(-((x - mean)/std_dev)**2 / 2)
+
+        mean, std_dev = res.mass_centre(axis=[axis], fixed_loop_idx=True)
+
+        #
         # Clear stored plots
         plt.clf()
 
@@ -245,15 +252,26 @@ class View:
         plt.xlabel(labels[axis] + " (cm)")
         plt.ylabel(r"density")
 
-        #
-        # Plot
         if axis in [0, 1, 2]:
             style={}
+            
+            # Plot histogram
             plt.bar(res.pos_hist[axis]["bins"], height=res.pos_hist[axis]["dens"], width=0.1, **style)
+
+            #
+            # Plot Gaussian Fit
+            #--
+            max_dens = np.max(res.pos_hist[axis]["dens"])
+            x = res.pos_hist[axis]["bins"]
+            y = [gaussian(xi, mean, std_dev, max_dens) for xi in x]
+
+            plt.plot(x, y, label="Gaussian fit", linestyle="--", marker="", color="black")
+            #-- 
 
         #
         # Set plot
         plt.grid(linestyle="--")
+        plt.legend(frameon=True)
 
         #
         # Show

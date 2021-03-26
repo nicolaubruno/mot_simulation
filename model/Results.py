@@ -1,8 +1,12 @@
 #
 # Libraries and modules
+#--
 import sys, os, gc
 import numpy as np
 import pandas as pd
+
+from scipy.optimize import curve_fit
+#--
 
 #
 class Results:
@@ -323,33 +327,37 @@ class Results:
             # Read file
             df = pd.read_csv(self.directory + 'marginals.csv', index_col=0)
 
+            # Check if velocity exists
+            check_vel = (('vx' in df.columns) and ('vy' in df.columns) and ('vz' in df.columns))
+
             #
             # Frequencies
             self._pos_hist[0]["freqs"] = np.array(df['x'])
             self._pos_hist[1]["freqs"] = np.array(df['y'])
             self._pos_hist[2]["freqs"] = np.array(df['z'])
 
-            self._vel_hist[0]["freqs"] = np.array(df['vx'])
-            self._vel_hist[1]["freqs"] = np.array(df['vy'])
-            self._vel_hist[2]["freqs"] = np.array(df['vz'])
+            if check_vel:
+                self._vel_hist[0]["freqs"] = np.array(df['vx'])
+                self._vel_hist[1]["freqs"] = np.array(df['vy'])
+                self._vel_hist[2]["freqs"] = np.array(df['vz'])
 
             #
             # Densities and bins of marginal histograms
             for i in range(3):
                 # Densities
                 self._pos_hist[i]["dens"] = self._pos_hist[i]["freqs"] / np.sum(self._pos_hist[i]["freqs"])
-                self._vel_hist[i]["dens"] = self._vel_hist[i]["freqs"] / np.sum(self._vel_hist[i]["freqs"])
+                if check_vel: self._vel_hist[i]["dens"] = self._vel_hist[i]["freqs"] / np.sum(self._vel_hist[i]["freqs"])
 
                 #
                 # Bins
                 self._pos_hist[i]["bins"] = - np.ones(self.conds['num_bins']) * float(self.conds['max_r'])
-                self._vel_hist[i]["bins"] = - np.ones(self.conds['num_bins']) * float(self.conds['max_v'])
+                if check_vel: self._vel_hist[i]["bins"] = - np.ones(self.conds['num_bins']) * float(self.conds['max_v'])
                 pos_delta = 2*float(self.conds['max_r']) / float(self.conds['num_bins'])
-                vel_delta = 2*float(self.conds['max_v']) / float(self.conds['num_bins'])
+                if check_vel: vel_delta = 2*float(self.conds['max_v']) / float(self.conds['num_bins'])
 
                 for j in range(self.conds['num_bins']):
                     self._pos_hist[i]["bins"][j] += j*pos_delta
-                    self._vel_hist[i]["bins"][j] += j*vel_delta
+                    if check_vel: self._vel_hist[i]["bins"][j] += j*vel_delta
     
     #
     def __get_name(self):
@@ -543,57 +551,79 @@ class Results:
             self.env["delta"] = self.loop["values"][self.loop["active"]]
 
     #
-    def mass_centre(self, axis=[0,1,2]):
-        # Variables
-        if len(self.loop["var"]) == 0:
-            r_c = [0,0,0]
-            std_r_c = [0,0,0]
+    def mass_centre(self, axis=[0,1,2], fixed_loop_idx = False):
 
-            for i in axis:
+        #
+        # Returns the best parameters to fit a Gaussian function
+        def fit_gaussian(x, y):
+            #
+            # Gaussian function
+            def gaussian(x, mean, std_dev): \
+                return np.max(y) * np.exp(-((x - mean)/std_dev)**2 / 2)
+
+            #
+            # Guess values
+            #--
+            guess_values = np.zeros(2)
+            guess_values[0] = np.sum(x*y) / np.sum(y)
+            guess_values[1] = np.sqrt(np.sum(y * (x - guess_values[0])**2) / np.sum(y))
+            #--
+            #--
+
+            popt, pcov = curve_fit(gaussian, x, y, guess_values)
+
+            return popt
+
+        #
+        # Without looping
+        #--
+        if len(self.loop["var"]) == 0 or fixed_loop_idx:
+            # Variables
+            if len(axis) == 1:
+                r_c, std_r_c = fit_gaussian(self.pos_hist[axis[0]]["bins"], self.pos_hist[axis[0]]["dens"])
+            
+            else:
+                r_c = np.zeros(len(axis))
+                std_r_c = np.zeros(len(axis))
+
                 #
-                # Get bins in the waist interval
-                first_idx = 0
-                last_idx = 0
+                # Fit a normal Gaussian function
+                for idx, val in enumerate(axis):
+                    r_c[idx], std_r_c[idx] = fit_gaussian(self.pos_hist[val]["bins"], self.pos_hist[val]["dens"])
+        #--
 
-                x = self.pos_hist[i]["bins"]
-                p = self.pos_hist[i]["dens"]
-                r_c[i] = np.sum(x*p)
-
-            for i in axis:
-                x2 = self.pos_hist[i]["bins"]*self.pos_hist[i]["bins"]
-                p = self.pos_hist[i]["dens"]
-                std_r_c[i] = np.sqrt(np.sum(x2*p) - r_c[i]**2)
-
+        #
+        # With looping
+        #--
         else:
+            #
+            # Set initial variables
+            #--
             if len(axis) == 1:
                 r_c = np.zeros(len(self.loop["values"]))
-                r_c_square = np.zeros(len(self.loop["values"]))
                 std_r_c = np.zeros(len(self.loop["values"]))
             
             else:
                 r_c = np.zeros((len(axis),len(self.loop["values"])))
-                r_c_square = np.zeros((len(axis),len(self.loop["values"])))
                 std_r_c = np.zeros((len(axis),len(self.loop["values"])))
+            #--
 
+            # Mass centre for each looping value
             for i in range(len(self.loop["values"])):
+                #
+                # Get looping values
                 self.loop_idx(i)
 
                 if len(axis) > 1:
                     for j in axis:
-                        x = self.pos_hist[j]["bins"]
-                        p = self.pos_hist[j]["dens"]
-
-                        r_c[j][i] = np.sum(x*p)
-                        r_c_square[j][i] = np.sum(x*x*p)
+                        r_c[j][i], std_r_c[j][i] = fit_gaussian(self.pos_hist[j]["bins"], self.pos_hist[j]["dens"])
 
                 else:
                     x = self.pos_hist[axis[0]]["bins"]
                     p = self.pos_hist[axis[0]]["dens"]
 
-                    r_c[i] = np.sum(x*p)
-                    r_c_square[i] = np.sum(x*x*p)
-
-            std_r_c = np.sqrt(r_c_square - r_c*r_c)
+                    r_c[i], std_r_c[i] = fit_gaussian(self.pos_hist[axis[0]]["bins"], self.pos_hist[axis[0]]["dens"])
+        #--
 
         return r_c, std_r_c      
 
