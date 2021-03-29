@@ -70,16 +70,26 @@ results_t simulate_atom(char *params_path, int only_marginals, long seed_time){
         //
         // Update results
         if(get_values == 1 && r < conds.max_r){
+            //
+            // Update position and velocity
+            //--
+            // Marginal histogram
             if(only_marginals){
                 for(i = 0; i < 3; i++) {
                     update_hist(&res.pos_hist[i], atom.pos[i]);
                     if(v < conds.max_v) update_hist(&res.vel_hist[i], atom.vel[i]);
                 }
             }
+
+            // 3D-Histograms
             else {
                 update_hist_3d(&res.pos_3Dhist, atom.pos);
                 if(v < conds.max_v) update_hist_3d(&res.vel_3Dhist, atom.vel);
             }
+            //--
+
+            // Update speed
+            update_hist(&res.speed_hist, v);
         }
 
         //if(((int) (res.time / conds.max_time)*100) % 10 == 0 && res.time > 0)
@@ -598,6 +608,15 @@ int set_hist(int only_marginals, results_t *res, conditions_t conds){
     int i, j, k;
 
     //
+    // Speed histogram
+    //--
+    res->speed_hist.num_bins = conds.num_bins;
+    res->speed_hist.bin_size = conds.max_v / res->speed_hist.num_bins;
+    res->speed_hist.coord0 = 0;
+    res->speed_hist.freqs = (int*) calloc(res->speed_hist.num_bins, sizeof(int));
+    //--
+
+    //
     // Only marginals
     //--
     if(only_marginals){
@@ -1091,6 +1110,9 @@ int print_results(results_t res, atom_t atom, int only_marginals){
     printf("total time [ms] = %f\n\n", res.time / (atom.transition.gamma));
 
     if(only_marginals){
+        //
+        // Position frequencies
+        //-
         for(i = 0; i < 3;i++){
             printf("pos[%d] = [\n", i+1);
             for(j = 0; j < res.pos_hist[i].num_bins; j++)
@@ -1098,7 +1120,11 @@ int print_results(results_t res, atom_t atom, int only_marginals){
             printf("]\n\n");
         }
         printf("\n");
+        //--
 
+        //
+        // Velocity frequencies
+        //--
         for(i = 0; i < 3;i++){
             printf("vel[%d] = [\n", i+1);
             for(j = 0; j < res.vel_hist[i].num_bins; j++)
@@ -1106,7 +1132,18 @@ int print_results(results_t res, atom_t atom, int only_marginals){
             printf("]\n\n");
         }
         printf("\n");
+        //--
     }
+
+    //
+    // Speed frequencies
+    //--
+    printf("speed[%d] = [\n", i+1);
+    for(j = 0; j < res.speed_hist.num_bins; j++)
+        printf("%d ", res.speed_hist.freqs[j]);
+    printf("]\n\n");
+    printf("\n");
+    //--
 
     return 0;
 }

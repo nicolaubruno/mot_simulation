@@ -278,23 +278,83 @@ class View:
         plt.show()
 
     #
+    # View velocity marginal histogram
+    def vel_marg_hist(self, res, axis=0):
+        #
+        # Gaussian function
+        gaussian = lambda x, mean, std_dev, amp: \
+            amp * np.exp(-((x - mean)/std_dev)**2 / 2)
+
+        mean, std_dev = res.average_velocity(axis=[axis], fixed_loop_idx=True)
+
+        #
+        # Clear stored plots
+        plt.clf()
+
+        #
+        # Set style
+        plt.style.use('seaborn-whitegrid')
+        #plt.tight_layout()
+        plt.rcParams.update({
+                "figure.figsize": (7,6),\
+                "font.size":14,\
+                "axes.titlepad":16
+            })
+
+        #
+        # Set labels
+        labels = ['x', 'y', 'z']
+        plt.title("Marginal histogram of velocities (" + labels[axis].upper() + "-axis)")
+        plt.xlabel(labels[axis] + " [cm/s]")
+        plt.ylabel(r"density")
+
+        if axis in [0, 1, 2]:
+            style={}
+            
+            # Plot histogram
+            plt.bar(res.vel_hist[axis]["bins"], height=res.vel_hist[axis]["dens"], width=0.9, **style)
+
+            #
+            # Plot Gaussian Fit
+            #--
+            max_dens = np.max(res.vel_hist[axis]["dens"])
+            x = res.vel_hist[axis]["bins"]
+            y = [gaussian(xi, mean, std_dev, max_dens) for xi in x]
+
+            plt.plot(x, y, label="Gaussian fit", linestyle="--", marker="", color="black")
+            #-- 
+
+        #
+        # Set plot
+        plt.grid(linestyle="--")
+        plt.legend(frameon=True)
+
+        #
+        # Show
+        plt.show()
+
+    #
     # Plot mass centre
     def mass_centre(self, res):
         r_c, std_r_c = res.mass_centre()
 
-        if len(res.loop["var"]) > 0:
+        #
+        # Mass centre as a function of laser detuning
+        if res.loop["var"] == "delta":
             #
             # Clear stored plots
             plt.clf()
 
             #
             # Set style
+            plt.figure(figsize=(5,4))
+            plt.style.use('seaborn-whitegrid')
+            plt.subplots_adjust(top=0.80, bottom=0.15, left=0.17)
             plt.style.use('seaborn-whitegrid')
             #plt.tight_layout()
             plt.rcParams.update({
-                    "figure.figsize": (7,6),\
                     "font.size":14,\
-                    "axes.titlepad":16
+                    "axes.titlepad":14
                 })
 
             style={
@@ -306,7 +366,7 @@ class View:
             #
             # Set labels
             labels = ['x', 'y', 'z']
-            plt.title("Centre of mass as a function of the laser detuning")
+            plt.title("Centre of mass as a\nfunction of the laser detuning")
             plt.xlabel(r"$ \Delta (2\pi \times MHz) $")
             plt.ylabel("position (cm)")
             delta = np.array(res.loop["values"])*(res.transition["gamma"]*1e-3)
@@ -324,8 +384,11 @@ class View:
 
             #
             # Show
+            plt.close(1)
             plt.show()
 
+        #
+        # Mass centre
         else:
             print()
             print("x = %f +- %f" % (r_c[0], std_r_c[0]))
@@ -334,54 +397,118 @@ class View:
             print()
 
     #
+    # Plot temperature
+    def temperature(self, res, method=0):
+        #
+        # Check looping
+        if len(res.loop["var"]) > 0:
+            # Data
+            temp = res.temperature(method = method)*1e6 # uK
+
+            # Clear stored plots
+            plt.clf()
+
+            #
+            # Set figure
+            plt.figure(figsize=(5,4))
+            plt.style.use('seaborn-whitegrid')
+            plt.subplots_adjust(top=0.80, bottom=0.15)
+            plt.rcParams.update({
+                    "font.size":14,\
+                    "axes.titlepad":14
+                })
+
+            # Check option
+            if res.loop["var"] == 'delta':
+                plt.title("Temperature as a function\nof the laser detuning")
+                plt.xlabel(r"$ \Delta (2\pi \times MHz) $")
+                x = np.array(res.loop["values"]).astype(float)*(res.transition["gamma"]*1e-3) # 2pi MHz
+
+            elif res.loop["var"] == 'max_time':
+                plt.title("Temperature as a function\nof the maximum simulation time")
+                plt.xlabel(r"$ t (ms) $")
+                x = np.array(res.loop["values"]).astype(float)/(res.transition["gamma"])
+
+            elif res.loop["var"] == 'T_0':
+                plt.title("Final temperature as a function\nof the initial temperature")
+                plt.xlabel(r"$ T_0 (\mu K) $")
+                x = np.array(res.loop["values"]).astype(float)
+
+            plt.ylabel(r"T [$\mu K$]")
+
+            # Plot temperature
+            plt.plot(x, temp, marker='o', linestyle='--')
+
+            # Plot Doppler temperature
+            plt.plot(x, res.doppler_temperature()*np.ones(len(x)), linestyle='--', marker='', color='black')
+
+            # Set plot
+            plt.grid(linestyle="--")
+
+            plt.close(1)
+
+            plt.show()
+
+        #
+        # Mass centre
+        else:
+            temp = res.temperature(fixed_loop_idx=True, method = method)*1e6 # uK
+            print()
+            print("T [uK] = %f" % (temp))
+            print("T_{doppler} [uK] = %f" % (res.doppler_temperature()))
+            print()
+
+    #
     # Plot r.m.s. cloud size
     def cloud_size(self, res):
-        #
-        # Get data
-        r_c, std_r_c = res.mass_centre()
+        if res.loop["var"] == 'delta':
+            #
+            # Get data
+            r_c, std_r_c = res.mass_centre()
 
-        #
-        # Clear stored plots
-        plt.clf()
+            #
+            # Clear stored plots
+            plt.clf()
 
-        #
-        # Set style
-        plt.style.use('seaborn-whitegrid')
-        #plt.tight_layout()
-        plt.rcParams.update({
-                "figure.figsize": (7,6),\
-                "font.size":14,\
-                "axes.titlepad":16
-            })
+            # Set figure
+            plt.figure(figsize=(5,4))
+            plt.style.use('seaborn-whitegrid')
+            plt.subplots_adjust(top=0.80, bottom=0.15, left=0.17)
+            plt.style.use('seaborn-whitegrid')
+            #plt.tight_layout()
+            plt.rcParams.update({
+                    "font.size":14,\
+                    "axes.titlepad":14
+                })
 
-        style={
-            "linestyle":'--'
-        }
+            style={
+                "linestyle":'--'
+            }
 
-        markers = ['o', '^', 's']
+            markers = ['o', '^', 's']
 
-        #
-        # Set labels
-        labels = [r'$\sigma_x$', r'$\sigma_y$', r'$\sigma_z$']
-        plt.title("R.M.S. cloud size as a function of the laser detuning")
-        plt.xlabel(r"$ \Delta (2\pi \times MHz) $")
-        plt.ylabel("Size (mm)")
-        delta = np.array(res.loop["values"])*(res.transition["gamma"]*1e-3)
+            # Set labels
+            labels = [r'$\sigma_x$', r'$\sigma_y$', r'$\sigma_z$']
+            plt.title("R.M.S. cloud size as a\nfunction of the laser detuning")
+            plt.xlabel(r"$ \Delta (2\pi \times MHz) $")
+            plt.ylabel("Size (mm)")
+            delta = np.array(res.loop["values"])*(res.transition["gamma"]*1e-3)
 
-        #
-        # Plot simulated date
-        for i in range(3):
-            plt.plot(delta, std_r_c[i], label=labels[i], marker=markers[i], **style)
+            # Plot simulated date
+            for i in range(3):
+                plt.plot(delta, std_r_c[i], label=labels[i], marker=markers[i], **style)
 
-        #
-        # Set plot
-        plt.grid(linestyle="--")
-        plt.legend(frameon=True)
+            # Set plot
+            plt.grid(linestyle="--")
+            plt.legend(frameon=True)
 
-        #
-        # Show
-        plt.show()
+            # Show
+            plt.close(1)
+            plt.show()
 
+        else:
+            print('Visualization not implemented')
+    
     #
     # Heat map
     def heatmap(self, res, axis, val):

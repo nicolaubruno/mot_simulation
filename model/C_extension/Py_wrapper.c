@@ -14,7 +14,7 @@ static PyObject* C_simulate_atom(PyObject *self, PyObject *args){
     PyObject *ret;
     results_t res;
     char *params_path;
-    PyObject *pos_freqs, *vel_freqs;
+    PyObject *pos_freqs, *vel_freqs, *speed_freqs;
 
     //
     // Get parameters path
@@ -27,7 +27,7 @@ static PyObject* C_simulate_atom(PyObject *self, PyObject *args){
     res = simulate_atom(params_path, only_marginals, time);
 
     //
-    // Frequencies
+    // Frequencies os position and velocity
     //--
 
     // Only marginal distributions
@@ -85,7 +85,11 @@ static PyObject* C_simulate_atom(PyObject *self, PyObject *args){
     }
     //--
 
-    ret = Py_BuildValue("OOiO", pos_freqs, vel_freqs, time, build_transitions(res.transitions));
+    // Frequencies of speed
+    speed_freqs = build_speed_hist(res.speed_hist);
+
+    // Return
+    ret = Py_BuildValue("OOOiO", pos_freqs, vel_freqs, speed_freqs, time, build_transitions(res.transitions));
 
     // Release memory
     //free(freqs);
@@ -154,6 +158,26 @@ PyObject *build_freqs(histogram_t *hist){
         }
         
         PyList_SetItem(list, i, item);
+    }
+
+    // Return
+    return list;
+}
+
+// Convert the results in a PyObject list
+PyObject *build_speed_hist(histogram_t hist){
+    // Variables
+    int i;
+    PyObject *list;
+
+    //
+    // Build list
+    //
+
+    list = PyList_New(hist.num_bins);
+
+    for(i = 0; i < hist.num_bins; i++){
+        PyList_SetItem(list, i, Py_BuildValue("i", hist.freqs[i]));
     }
 
     // Return

@@ -249,6 +249,7 @@ class Controller:
 
                 #
                 # View option
+                #--
                 while self._menu_level == 3:
                     #
                     # Result
@@ -260,23 +261,27 @@ class Controller:
 
                     #
                     # Options
-                    options = {
-                        1: "Position histogram",\
-                        2: "Centre of mass"
-                    }
+                    options = {}
 
                     #
                     # Add options
-                    if res.loop["var"] == "delta":
+                    if len(res.pos_hist[0]["freqs"]) > 0:
+                        options[1] = "Histogram of positions"
+                        options[2] = "Centre of mass"
                         options[3] = "R.M.S Clouds sizes"
 
+                    if len(res.vel_hist[0]["freqs"]) > 0:
+                        options[4] = "Histogram of velocities"
+                        options[5] = "Temperature"
+
                     if res.pos_3Dhist["dens"] is not None:
-                        options[4] = "Heat map"
+                        options[6] = "Heat map"
+
                     
                     opt = self.__call_menu(options, header)
 
                     #
-                    # Position histogram
+                    # Histogram of positions
                     if opt == 1:
                         #
                         # Set menu level
@@ -284,7 +289,7 @@ class Controller:
                         while self.menu_level == 4:
                             #
                             # Check loop
-                            if bool(res.loop["var"]):
+                            if len(res.loop["var"]) > 0:
                                 header = "Choose an option"
 
                                 idx = [i+1 for i in range(len(res.loop["values"]))]
@@ -367,8 +372,80 @@ class Controller:
                                 self._menu_level -= 1
 
                     #
-                    # Heat map
+                    # Histogram of velocities
                     elif opt == 4:
+                        #
+                        # Set menu level
+                        self._menu_level += 1
+                        while self.menu_level == 4:
+                            #
+                            # Check loop
+                            if bool(res.loop["var"]):
+                                header = "Choose an option"
+
+                                idx = [i+1 for i in range(len(res.loop["values"]))]
+                                loop_idx = [res.loop["var"] + " = " + ("%.2f" % float(res.loop["values"][i])) for i in range(len(res.loop["values"]))]
+                                opts = dict(zip(idx, loop_idx))
+
+                                opt = self.__call_menu(opts, header)
+                                opt = int(opt)
+
+                                if opt != -1: 
+                                    res.loop_idx(opt-1)
+                                    self._menu_level += 1
+
+                            else: self._menu_level += 1
+
+                            #
+                            # Set menu level
+                            while self.menu_level == 5:
+                                opts = {
+                                    1 : 'x-axis',\
+                                    2 : 'y-axis',\
+                                    3 : 'z-axis'
+                                }
+                                
+                                if len(res.loop["var"]) > 0:
+                                    header = "(" +res.loop["var"] + " = "
+                                    header += ("%.2f" % res.loop["values"][res.loop["active"]])
+                                    header += ") Choose the axis"
+
+                                else:
+                                    header = "Choose the axis"
+
+                                opt = self.__call_menu(opts, header)
+
+                                if (opt == "-1") and not (res.loop["var"]):
+                                    self._menu_level -= 1
+
+                                elif opt != "-1": 
+                                    self.__view.vel_marg_hist(res, int(opt)-1)
+
+                    #
+                    # Temperature
+                    elif opt == 5:
+                        #
+                        # Set menu level
+                        self._menu_level += 1
+
+                        #
+                        # Menu level 3
+                        while self.menu_level == 4:
+                            if len(res.loop["var"]) > 0:
+                                self.__view.temperature(res)
+                                self._menu_level -= 1
+
+                            elif not res.loop["var"]:
+                                self.__view.temperature(res)
+                                opt = self.__call_input("Enter with any key to continue", header = False, clear_screen=False)
+                                if opt != "-1": self._menu_level -= 1
+
+                            else:
+                                self._menu_level -= 1
+
+                    #
+                    # Heat map
+                    elif opt == 6:
                         #
                         # Set menu level
                         self._menu_level += 1
@@ -393,6 +470,7 @@ class Controller:
                                 self.__view.heatmap(res, axis, 0)
 
                             else: self._menu_level -= 1
+                #--
 
     #
     def __call_menu(self, options, header = '', clear_screen = True, order_command = False):

@@ -126,6 +126,7 @@ typedef struct{
     histogram_t *pos_hist;          /* Marginal positions histograms */
     histogram_3d_t vel_3Dhist;      /* 3D-Histogram of velocity */
     histogram_t *vel_hist;          /* Marginal velocities histograms */
+    histogram_t speed_hist;        /* Speed (velocity module) histogram */
     double time;                    /* Total time [s] */
     int *transitions;               /* Counter of occurred transitions */
 } results_t;
