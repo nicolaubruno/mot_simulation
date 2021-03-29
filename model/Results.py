@@ -324,7 +324,7 @@ class Results:
         if os.path.exists(path):
             #
             # Read histogram file
-            self._pos_3Dhist["freqs"] = pd.read_csv(path, index_col=0, squeeze=True).to_numpy().reshape((int(self.conds['num_bins']), int(self.conds['num_bins']), int(self.conds['num_bins'])))
+            self._pos_3Dhist["freqs"] = np.array(pd.read_csv(path, index_col=0, squeeze=True)).reshape((int(self.conds['num_bins']), int(self.conds['num_bins']), int(self.conds['num_bins'])))
 
             #
             # Filter frequencies considering the waist size as a threshold
@@ -371,7 +371,7 @@ class Results:
         if os.path.exists(path):
             #
             # Read histogram file
-            self._vel_3Dhist["freqs"] = pd.read_csv(path, index_col=0, squeeze=True).to_numpy().reshape((int(self.conds['num_bins']), int(self.conds['num_bins']), int(self.conds['num_bins'])))
+            self._vel_3Dhist["freqs"] = np.array(pd.read_csv(path, index_col=0, squeeze=True)).reshape((int(self.conds['num_bins']), int(self.conds['num_bins']), int(self.conds['num_bins'])))
 
             #
             # Filter frequencies considering the waist size as a threshold
@@ -460,7 +460,7 @@ class Results:
         if os.path.exists(path):
             #
             # Frequencies
-            self._speed_hist["freqs"] = pd.read_csv(path, index_col=0, squeeze=True).to_numpy()
+            self._speed_hist["freqs"] = np.array(pd.read_csv(path, index_col=0, squeeze=True))
 
             # Densities
             self._speed_hist["dens"] = self._speed_hist["freqs"] / np.sum(self._speed_hist["freqs"])

@@ -2,9 +2,9 @@
 T_0,30
 max_time,2e4
 max_r,1.5
-max_v,20
-num_sim,1e3
+max_v,110
+num_sim,1000
 num_bins,128
-wait_time,1e4
+wait_time,1 e4
 dt,1.0
 parallel_tasks,4
