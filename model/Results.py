@@ -1248,7 +1248,6 @@ class Results:
         self.__get_dists()
 
         # Release memory
-        del data
         del speed_freqs
         del path
 
