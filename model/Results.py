@@ -10,6 +10,7 @@ from scipy.optimize import curve_fit
 
 #
 class Results:
+
     ''' Attributes '''
 
     #
@@ -475,7 +476,7 @@ class Results:
                 self._speed_hist["bins"][j] += j*speed_delta
             #--
         #--
-    
+
     #
     def __get_name(self):
         #
@@ -1236,11 +1237,9 @@ class Results:
     #
     # Add frequencies in the histogram of speeds
     def add_speeds(self, speed_freqs_arr):
-        #
         # Save file
-
         path = self.directory + "/speeds.csv"
-        speed_freqs = pd.Series(speed_freqs_arr).astype("int32")
+        speed_freqs = pd.Series(speed_freqs_arr, name="speeds").astype("int32")
         speed_freqs.fillna(0, inplace=True)
         speed_freqs.to_csv(path)
 
@@ -1249,6 +1248,7 @@ class Results:
         self.__get_dists()
 
         # Release memory
+        del data
         del speed_freqs
         del path
 

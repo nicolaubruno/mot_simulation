@@ -92,7 +92,7 @@ static PyObject* C_simulate_atom(PyObject *self, PyObject *args){
     ret = Py_BuildValue("OOOiO", pos_freqs, vel_freqs, speed_freqs, time, build_transitions(res.transitions));
 
     // Release memory
-    //free(freqs);
+    free(res.speed_hist.freqs);
 
     return ret;
 }
