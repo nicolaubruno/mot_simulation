@@ -398,7 +398,7 @@ class View:
 
     #
     # Plot temperature
-    def temperature(self, res, method=2):
+    def temperature(self, res, method=1):
         #
         # Check looping
         if len(res.loop["var"]) > 0:
