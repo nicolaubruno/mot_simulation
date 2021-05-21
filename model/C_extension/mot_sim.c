@@ -775,7 +775,7 @@ double move(atom_t *atom, beams_setup_t beams_setup, performance_t perform, magn
 
     // Time interval
     max_dt = perform.dt / (2 * PI * atom->transition.gamma*1e3);
-    fixed_dt = 0.1 / (2 * PI * atom->transition.gamma*1e3);
+    fixed_dt = 0.5 / (2 * PI * atom->transition.gamma*1e3);
 
     // Get all scattering rates
     all_R = get_all_scatt_rate(beams_setup, B_params, *atom);

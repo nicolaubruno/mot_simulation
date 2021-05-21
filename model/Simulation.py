@@ -150,7 +150,7 @@ class Simulation:
 
             #
             # Parallel execution
-            with Pool(cpu_count(), maxtasksperchild=100) as pool:
+            with Pool(self.parallel_tasks, maxtasksperchild=100) as pool:
                 res = pool.map(simulate_atom, args_pool)
 
                 #
