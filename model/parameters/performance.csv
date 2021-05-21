@@ -8,4 +8,4 @@ num_sim,2e3
 num_bins,128
 wait_time,1e4
 dt,1.0
-parallel_tasks,2
+parallel_tasks,4

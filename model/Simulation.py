@@ -159,7 +159,6 @@ class Simulation:
                     pos_freqs = res[k][0]
                     vel_freqs = res[k][1]
                     time = res[k][2]
-                    trans = res[k][3]
 
                     #
                     # Add position and velocity frequencies

@@ -22,9 +22,6 @@ PyObject *build_freqs(histogram_t *pos);
 // Build a PyObject list of a 3D-histogram
 PyObject *build_3Dfreqs(histogram_3d_t pos);
 
-// Build PyObject list of occurred transitions
-PyObject *build_transitions(int *trans);
-
 //
 // Structures
 //

@@ -25,7 +25,6 @@ static PyObject* C_simulate_atom(PyObject *self, PyObject *args){
     //
     // Results
     res = simulate_atom(params_path, only_marginals, time);
-
     //
     // Position and velocity frequencies
     //--
@@ -45,7 +44,6 @@ static PyObject* C_simulate_atom(PyObject *self, PyObject *args){
 
         free(res.pos_hist);
         free(res.vel_hist);
-
     // 3D-Distributions
     } else {
         // Build values
@@ -86,7 +84,7 @@ static PyObject* C_simulate_atom(PyObject *self, PyObject *args){
     //--
 
     // Return
-    ret = Py_BuildValue("OOiO", pos_freqs, vel_freqs, time, build_transitions(res.transitions));
+    ret = Py_BuildValue("OOi", pos_freqs, vel_freqs, time);
 
     return ret;
 }
@@ -155,24 +153,5 @@ PyObject *build_freqs(histogram_t *hist){
     }
 
     // Return
-    return list;
-}
-
-// Build PyObject list of occurred transitions
-PyObject *build_transitions(int *trans){
-    //
-    // Variables
-    int i;
-    PyObject *list;
-
-    //
-    // Build list
-    //--
-    list = PyList_New(3);
-
-    for(i = 0; i < 3; i++)
-        PyList_SetItem(list, i, Py_BuildValue("i", trans[i]));
-    //--
-
     return list;
 }

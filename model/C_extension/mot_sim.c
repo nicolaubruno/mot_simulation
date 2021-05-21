@@ -29,12 +29,10 @@ results_t simulate_atom(char *params_path, int only_marginals, long seed_time){
     atom_t atom = get_atom(perform, B_params, params_path);
 
     // Print parameters
-    //print_params(atom, perform, beams_setup, env);
     //print_performance(perform);
     //print_magnetic_field(B_params);
     //print_beams(beams_setup);
     //print_atom(atom);
-    //exit(0);
 
     // Set initial values
     res.time = 0;
