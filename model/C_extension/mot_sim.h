@@ -18,7 +18,7 @@
 #define MAX_LINES 124
 #define DELIM ","
 #define MAX_BEAMS 16
-#define Py_MODULE 0
+#define Py_MODULE 1
 
 #define h 6.62607004        // Planck constant [10^{-34} J s]
 #define e 1.60217662        // Elementary charge [10^{-19} C]s
@@ -55,54 +55,46 @@ typedef struct{
     transition_t transition;    /* Optical transition */
 } atom_t;
 
-// Conditions
+// Performance
 typedef struct{
     double T_0;         /* Initial temperature [uK] */
+    int g_bool;         /* Gravity (1 - Considered, 0 - Do not consider) */
     double max_time;    /* Maximum time of simulation [1/gamma] */
     double max_r;       /* Maximum distance (threshold) [cm] */
     double max_v;       /* Maximum speed [cm/s] */
     int num_bins;       /* Number of bins in each histogram */
     double wait_time;   /* Time to reach the equilibrium [1/gamma] */
     double dt;          /* Time interval [1/gamma] */
-} conditions_t;
+} performance_t;
 
-// Environment
+// Magnetic field
 typedef struct{
     double B_0;         /* Magnetic Field gradient */
-    double **B_basis;   /* Basis with z-axis parallel to the axial direction of the magnetic field */
-    double local_B;     /* Local magnetic field gradient on the z direction */
-    double delta;       /* Laser detuning */
-    double s_0;         /* Peak of the saturation parameter */
-    double w;           /* Waist radius */
-    int g_bool;         /* Use gravity */
-} environment_t;
+    double **B_basis;   /* Reference basis of the magnetic field */
+    double *B_bias;     /* Bias of magnetic field */
+} magnetic_field_t;
 
 // Beam
 typedef struct {
-    double s_0;      /* Resonant saturation parameter */
-    double *k_dic;   /* Wave vector direction */
-    double *eps;     /* Polarization vector */
+    double *k_dir;      /* Wave vector direction */
+    double *pol_amp;    /* Polarization amplitudes */
+    double delta;       /* Laser detuning */
+    double s_0;         /* Peak of the saturation parameter */
+    double w;           /* Waist radius */ 
 } beam_t;
 
-// Polarized Beam
+// Sidebands
 typedef struct {
-    double s_0;      /* Resonant saturation parameter */
-    double *k_dic;   /* Wave vector direction */
-    int eps;         /* Polarization (+1, -1, 0) */
-} polarized_beam_t;
+    int num;      /* Number of sidebands */
+    int freq;     /* Resonant frequency of the sidebands */
+} sidebands_t;
 
 // Beams setup
 typedef struct {
-    int num;        /* Number of beams */
-    beam_t *beams;  /* All beams */
+    int num;                /* Number of beams */
+    beam_t *beams;          /* All beams */
+    sidebands_t sidebands;  /* Sidebands */
 } beams_setup_t;
-
-// Photon
-typedef struct{
-    int m;           /* Magnetic quantum number */
-    double *eK;         /* Wave vector direction */
-    double lambda;      /* Wavelength [nm] */
-} photon_t;
 
 // Histogram
 typedef struct {
@@ -126,8 +118,8 @@ typedef struct{
     histogram_t *pos_hist;          /* Marginal positions histograms */
     histogram_3d_t vel_3Dhist;      /* 3D-Histogram of velocity */
     histogram_t *vel_hist;          /* Marginal velocities histograms */
-    histogram_t speed_hist;         /* Speed (velocity module) histogram */
     double time;                    /* Total time [s] */
+    int atom_trapped;               /* 1 - Atom was trapped, 0 - Atom was not trapped */
     int *transitions;               /* Counter of occurred transitions */
 } results_t;
 
@@ -145,69 +137,79 @@ typedef struct{
 // Run simulation for a single atom
 results_t simulate_atom(char *params_path, int marginals, long seed_time);
 
-// Get atom
-atom_t get_atom(conditions_t conds, environment_t env, char *params_path);
+// Get parameters of performance
+performance_t get_performance(char *params_path);
 
-// Get transition
-transition_t get_transition(char *params_path);
-
-// Get conditions
-conditions_t get_conditions(char *params_path);
-
-// Get environment
-environment_t get_environment(char *params_path);
+// Get parameters of the magnetic field
+magnetic_field_t get_magnetic_field(char *params_path);
 
 // Get beams setup
 beams_setup_t get_beams(char *params_path);
 
-// Set histograms
-int set_hist(int only_marginals, results_t *res, conditions_t conds);
+// Get transition
+transition_t get_transition(char *params_path);
 
-// Get polarizations amplitudes
-double *polarizations_amplitudes(beam_t beam, environment_t env, double *eB);
+// Get atom
+atom_t get_atom(performance_t perform, magnetic_field_t B_params, char *params_path);
+
+// Set histograms
+int set_hist(int only_marginals, results_t *res, performance_t conds);
 
 // Apply movement on the atom due to photonic recoil, gravitational force and magnetic force
-double move(atom_t *atom, beams_setup_t beams_setup, conditions_t conds, environment_t env);
+double move(atom_t *atom, beams_setup_t beams_setup, performance_t conds, magnetic_field_t B_params);
+
+// Get magnetic field vector in the lab frame
+double *magnetic_field(magnetic_field_t B_params, double *r);
+
+// Get polarizations amplitudes
+int set_polarizations_amplitudes(beam_t *beam, double *eB);
+
+// Get a list of scattering rate for each beam considering all transitions and sidebands
+double *get_all_scatt_rate(beams_setup_t beams_setup, magnetic_field_t B_params, atom_t atom);
+
+// Get the sum of scattering rates over all possibilities
+double get_total_scatt_rate(beam_t beam, sidebands_t sidebands, double *B, atom_t atom);
+
+// Get magnetic acceleration
+double *magnetic_acceleration(atom_t atom, magnetic_field_t B_params);
+
+/**
+
+// Get environment
+environment_t get_environment(char *params_path);
 
 // Photon absorption event
-double photon_absorption(atom_t *atom, beams_setup_t beams_setup, conditions_t conds, environment_t env, double dt);
+double photon_absorption(atom_t *atom, beams_setup_t beams_setup, performance_t conds, environment_t env, double dt);
 
 // Photon emission event
 double photon_emission(atom_t *atom, environment_t env);
 
-// Get magnetic acceleration
-double *magnetic_acceleration(atom_t atom, environment_t env);
-
-// Get magnetic field vector in the lab frame
-double *magnetic_field(environment_t env, double *r);
-
 // Get scattering rate
-double scattering_rate(atom_t atom, polarized_beam_t beam, conditions_t conds, environment_t env, double *B);
+double scattering_rate(atom_t atom, polarized_beam_t beam, performance_t conds, environment_t env, double *B);
 
 // Get components of a vector v on the basis B given the components on basis A
 double *change_basis(double *v, double **A, double **B_basis);
+
+**/
 
 //
 // Utility functions
 //
 
-// (Debug) print parameters
-int print_params(atom_t atom, conditions_t conds, beams_setup_t beams, environment_t env);
+// Concatenate strings
+char *str_concatenate(char *str1, char *str2);
 
-// (Debug) Print simulation status
-int print_status(atom_t atom, results_t res);
+// Read lines from a file
+char **read_lines(char *path);
 
-// (Debug) Print results
-int print_results(results_t res, atom_t atom, int only_marginals);
-
-// Get int array from string in the format [i1 i2 ... in]
-int *get_int_array(char *str, int *size);
+// Replace a character in a string
+char* str_replace(char *orig, char *rep, char *with);
 
 // Get double array from string in the format [f1 f2 ... fn]
 double *get_double_array(char *str, int *size);
 
-// Concatenate strings
-char *str_concatenate(char *str1, char *str2);
+// Generate a orthonormal basis given a vector
+double **orthonormal_basis(double *v3);
 
 // Generate a double random number following a Gaussian distribution given a mean and a standard deviation
 double random_norm(double mean, double std_dev);
@@ -215,23 +217,46 @@ double random_norm(double mean, double std_dev);
 // Generate a double random number following a Exponential distribution given a mean
 double random_exp(double mean);
 
+// Pick randomly a element of an integer array given an array of probabilities
+int random_pick(double *probs, int size);
+
 // Update histogram
 int update_hist(histogram_t *hist, double val);
 
 // Update multidimensional histogram
 int update_hist_3d(histogram_3d_t *hist, double *vals);
 
+//
+// Debug
+
+// Print parameters of performance
+int print_performance(performance_t perform);
+
+// Print parameters of the magnetic field
+int print_magnetic_field(magnetic_field_t B_params);
+
+// Print parameters of the atom
+int print_atom(atom_t atom);
+
+// Print parameters of the beams
+int print_beams(beams_setup_t beams_setup);
+
+// Print results
+int print_results(results_t res, atom_t atom, int only_marginals);
+
+// Print simulation status
+int print_status(atom_t atom, results_t res);
+
+/**
+
+// (Debug) print parameters
+int print_params(atom_t atom, performance_t conds, beams_setup_t beams, environment_t env);
+
+
+// Get int array from string in the format [i1 i2 ... in]
+int *get_int_array(char *str, int *size);
+
 // Convert the components (module) of a polarization vector on the basis C to a basis D
 double *update_polarization_vector(double *eps, double **r3_C, double **r3_D);
 
-// Generate a orthonormal basis given a vector
-double **orthonormal_basis(double *v3);
-
-// Pick randomly a element of an integer array given an array of probabilities
-int random_pick(double *probs, int size);
-
-// Replace a character in a string
-char* str_replace(char *orig, char *rep, char *with);
-
-// Read lines from a file
-char **read_lines(char *path);
+**/

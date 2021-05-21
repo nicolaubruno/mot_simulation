@@ -119,12 +119,12 @@ class View:
 
         if not self.__simulation.results.loop["var"]:
             print()
-            print("Atoms simulated = %d / %d" % (self.__simulation.atoms_simulated, self.__simulation.results.conds['num_sim']))
+            print("Atoms simulated = %d / %d" % (self.__simulation.atoms_simulated, self.__simulation.results.perform['num_sim']))
             print()
 
         else:
             print()
-            print("Atoms simulated = %d / %d" % (self.__simulation.atoms_simulated, self.__simulation.results.conds['num_sim']))
+            print("Atoms simulated = %d / %d" % (self.__simulation.atoms_simulated, self.__simulation.results.perform['num_sim']))
             print("Loop " + str(self.__simulation.results.loop["active"]+1) + "/", end='')
             print(str(len(self.__simulation.results.loop['values'])) + " ", end='')
             print("(" + str(self.__simulation.results.loop["var"]) + " ", end='')
@@ -148,12 +148,12 @@ class View:
         print("Results " + str(self.__simulation.results.code) + " " + self.__simulation.results.name + self._separator)
 
         if not self.__simulation.results.loop["var"]:
-            print("Atoms simulated = %d / %d" % (self.__simulation.atoms_simulated, self.__simulation.results.conds['num_sim']))
+            print("Atoms simulated = %d / %d" % (self.__simulation.atoms_simulated, self.__simulation.results.perform['num_sim']))
             print()
 
         else:
             print()
-            print("Number of atoms simulated in each looping: " + str(self.__simulation.results.conds["num_sim"]))
+            print("Number of atoms simulated in each looping: " + str(self.__simulation.results.perform["num_sim"]))
             
             #
             # Looping
@@ -434,16 +434,22 @@ class View:
                 plt.xlabel(r"$ T_0 (\mu K) $")
                 x = np.array(res.loop["values"]).astype(float)
 
+            elif res.loop["var"] == 's_0':
+                plt.title("Final temperature as a function\nof the saturation parameter")
+                plt.xlabel(r"$ s_0 (I / I_s) $")
+                x = np.array(res.loop["values"]).astype(float)
+
             plt.ylabel(r"T [$\mu K$]")
 
             # Plot temperature
-            plt.plot(x, temp, marker='o', linestyle='--')
+            plt.plot(x, temp, label="Simulation", marker='o', linestyle='--')
 
             # Plot Doppler temperature
-            plt.plot(x, res.doppler_temperature()*np.ones(len(x)), linestyle='--', marker='', color='black')
+            plt.plot(x, res.doppler_temperature()*np.ones(len(x)), label="Doppler temperature", linestyle='--', marker='', color='black')
 
             # Set plot
             plt.grid(linestyle="--")
+            plt.legend(frameon=True)
 
             plt.close(1)
 
@@ -541,7 +547,7 @@ class View:
 
         #
         # Plot simulated date
-        l = float(res.conds['max_r'])
+        l = float(res.perform['max_r'])
         plt.imshow(hist, cmap="Blues", vmin=np.min(hist), vmax=np.max(hist), extent=[-l, l, -l, l])
 
         #

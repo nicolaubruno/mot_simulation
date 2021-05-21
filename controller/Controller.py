@@ -133,7 +133,7 @@ class Controller:
                 pbars = []
                 for i in range(loop_num):
                     desc = "Atoms simulated" if loop_num == 1 else self.__simulation.results.loop["var"] + " = " + ("%.2f" % self.__simulation.results.loop["values"][i])
-                    pbars.append(tqdm(total=self.__simulation.results.conds["num_sim"], desc=desc, position=i))
+                    pbars.append(tqdm(total=self.__simulation.results.perform["num_sim"], desc=desc, position=i))
 
                 #
                 # Run simulation
@@ -145,7 +145,7 @@ class Controller:
                     #
                     # Simulate atoms
                     #--
-                    while self.__simulation.atoms_simulated < self.__simulation.results.conds["num_sim"]:
+                    while self.__simulation.atoms_simulated < self.__simulation.results.perform["num_sim"]:
                         # Simulate atoms
                         times = self.__simulation.run()
                         
@@ -208,7 +208,7 @@ class Controller:
                 header = 'Beams setup\n\n' + self.__simulation.results.beams.to_string() + '\n'
 
             elif opt == 5:
-                header = 'Conditions\n\n' + self.__simulation.results.conds.to_string() + '\n'
+                header = 'Conditions\n\n' + self.__simulation.results.perform.to_string() + '\n'
 
             else:
                 self._menu_level = 0

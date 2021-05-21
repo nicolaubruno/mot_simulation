@@ -32,16 +32,16 @@ class Results:
         return self._transition
 
     #
-    # (Series) Conditions
+    # (Series) Performance
     @property
-    def conds(self):
-        return self._conds
+    def perform(self):
+        return self._perform
 
     #
-    # (Series) Environment
+    # (Series) Magnetic field
     @property
-    def env(self):
-        return self._env
+    def B_params(self):
+        return self._B_params
 
     #
     # (Dataframe)
@@ -195,24 +195,27 @@ class Results:
         self._transition['J_gnd'] = int(self.transition['J_gnd'])
         self._transition['J_exc'] = int(self.transition['J_exc'])
 
-        # Environment
-        self._env['B_0'] = float(self.env['B_0'])
-        self._env['local_B'] = float(self.env['local_B'])
-        self._env['delta'] = float(self.env['delta'])
-        self._env['s_0'] = float(self.env['s_0'])
-        self._env['w'] = float(self.env['w'])
-        self._env['g_bool'] = int(self.env['g_bool'])
+        # Magnetic field
+        self._B_params['B_0'] = float(self.B_params['B_0'])
 
-        # Conditions
-        self._conds['T_0'] = float(self.conds['T_0'])
-        self._conds['max_time'] = float(self.conds['max_time'])
-        self._conds['wait_time'] = float(self.conds['wait_time'])
-        self._conds['dt'] = float(self.conds['dt'])
-        self._conds['max_r'] = float(self.conds['max_r'])
-        self._conds['max_v'] = float(self.conds['max_v'])
-        self._conds['num_sim'] = int(self.conds['num_sim'])
-        self._conds['num_bins'] = int(self.conds['num_bins'])
-        self._conds['parallel_tasks'] = int(self.conds['parallel_tasks'])
+        # Performance
+        self._perform['T_0'] = float(self.perform['T_0'])
+        self._perform['max_time'] = float(self.perform['max_time'])
+        self._perform['wait_time'] = float(self.perform['wait_time'])
+        self._perform['dt'] = float(self.perform['dt'])
+        self._perform['max_r'] = float(self.perform['max_r'])
+        self._perform['max_v'] = float(self.perform['max_v'])
+        self._perform['num_sim'] = int(self.perform['num_sim'])
+        self._perform['num_bins'] = int(self.perform['num_bins'])
+        self._perform['parallel_tasks'] = int(self.perform['parallel_tasks'])
+
+        # Beams (main)
+        self._beams['main']['delta'] = float(self.beams['main']['delta'])
+        self._beams['main']['s_0'] = float(self.beams['main']['s_0'])
+        self._beams['main']['w'] = float(self.beams['main']['w'])
+
+        # Beams (sidebands)
+        self._beams['sidebands']['freq'] = float(self.beams['sidebands']['freq'])
 
         #
         # Cast loop
@@ -264,7 +267,6 @@ class Results:
         # Atom
         path = params_dir + "atom.csv"
         self._atom = pd.read_csv(path, header=0, index_col=0, squeeze=True).astype(object)
-        #self._atom['mass'] = float(float(self.atom['mass']))
 
         #
         # Transition
@@ -273,23 +275,32 @@ class Results:
 
         #
         # Beams
-        path = params_dir + "beams.csv"
-        self._beams = pd.read_csv(path, header=0)
-        self._beams.index += 1
+        #--
+        self._beams = {'main': None, 'setup': None, 'sidebands': None}
+
+        # Main
+        path = params_dir + "beams/main.csv"
+        self._beams['main'] = pd.read_csv(path, header=0, index_col=0, squeeze=True).astype(object)
+
+        # Setup
+        path = params_dir + "beams/setup.csv"
+        self._beams['setup'] = pd.read_csv(path, header=0)
+        self._beams['setup'].index += 1
+
+        # Sidebands
+        path = params_dir + "beams/sidebands.csv"
+        self._beams['sidebands'] = pd.read_csv(path, header=0, index_col=0, squeeze=True).astype(object)
+        #--
 
         #
-        # Conditions
-        path = params_dir + "conditions.csv"
-        self._conds = pd.read_csv(path, header=0, index_col=0, squeeze=True).astype(object)
-        #self._conds['num_sim'] = int(self._conds['num_sim'])
-        #self._conds['num_bins'] = int(self._conds['num_bins'])
+        # Performance
+        path = params_dir + "performance.csv"
+        self._perform = pd.read_csv(path, header=0, index_col=0, squeeze=True).astype(object)
 
         #
-        # Environment
-        path = params_dir + "environment.csv"
-        self._env = pd.read_csv(path, header=0, index_col=0, squeeze=True).astype(object)
-        #self._env["s_0"] = float(self._env["s_0"])
-        #self._env["w"] = float(self._env["w"])
+        # Magnetic field
+        path = params_dir + "magnetic_field.csv"
+        self._B_params = pd.read_csv(path, header=0, index_col=0, squeeze=True).astype(object)
 
     #
     # Get distributions
@@ -315,9 +326,6 @@ class Results:
         self._pos_hist = [{"freqs":[], "dens":[], "bins":[]} for i in range(3)]
         self._vel_hist = [{"freqs":[], "dens":[], "bins":[]} for i in range(3)]
 
-        # Histogram of speeds
-        self._speed_hist = {"freqs":[], "dens":[], "bins":[]}
-
         #
         # 3D-Histograms of positions
         #--
@@ -325,7 +333,7 @@ class Results:
         if os.path.exists(path):
             #
             # Read histogram file
-            self._pos_3Dhist["freqs"] = np.array(pd.read_csv(path, index_col=0, squeeze=True)).reshape((int(self.conds['num_bins']), int(self.conds['num_bins']), int(self.conds['num_bins'])))
+            self._pos_3Dhist["freqs"] = np.array(pd.read_csv(path, index_col=0, squeeze=True)).reshape((int(self.perform['num_bins']), int(self.perform['num_bins']), int(self.perform['num_bins'])))
 
             #
             # Filter frequencies considering the waist size as a threshold
@@ -336,11 +344,11 @@ class Results:
             
             #
             # Bins
-            self._pos_3Dhist["bins"] = np.zeros((3, int(self.conds['num_bins']))) - float(self.conds['max_r'])
+            self._pos_3Dhist["bins"] = np.zeros((3, int(self.perform['num_bins']))) - float(self.perform['max_r'])
             
             for i in range(3):
-                for j in range(int(self.conds['num_bins'])):
-                    delta = 2*float(self.conds['max_r']) / float(int(self.conds['num_bins']))
+                for j in range(int(self.perform['num_bins'])):
+                    delta = 2*float(self.perform['max_r']) / float(int(self.perform['num_bins']))
                     self._pos_3Dhist["bins"][i][j] += j*delta
 
             #
@@ -358,10 +366,10 @@ class Results:
 
                 #
                 # Marginal bins
-                self._pos_hist[i]["bins"] = - np.ones(int(self.conds['num_bins'])) * float(self.conds['max_r'])
-                delta = 2*float(self.conds['max_r']) / float(int(self.conds['num_bins']))
+                self._pos_hist[i]["bins"] = - np.ones(int(self.perform['num_bins'])) * float(self.perform['max_r'])
+                delta = 2*float(self.perform['max_r']) / float(int(self.perform['num_bins']))
 
-                for j in range(int(self.conds['num_bins'])):
+                for j in range(int(self.perform['num_bins'])):
                     self._pos_hist[i]["bins"][j] += j*delta
         #--
 
@@ -372,7 +380,7 @@ class Results:
         if os.path.exists(path):
             #
             # Read histogram file
-            self._vel_3Dhist["freqs"] = np.array(pd.read_csv(path, index_col=0, squeeze=True)).reshape((int(self.conds['num_bins']), int(self.conds['num_bins']), int(self.conds['num_bins'])))
+            self._vel_3Dhist["freqs"] = np.array(pd.read_csv(path, index_col=0, squeeze=True)).reshape((int(self.perform['num_bins']), int(self.perform['num_bins']), int(self.perform['num_bins'])))
 
             #
             # Filter frequencies considering the waist size as a threshold
@@ -383,11 +391,11 @@ class Results:
             
             #
             # Bins
-            self._vel_3Dhist["bins"] = np.zeros((3, int(self.conds['num_bins']))) - float(self.conds['max_v'])
+            self._vel_3Dhist["bins"] = np.zeros((3, int(self.perform['num_bins']))) - float(self.perform['max_v'])
             
             for i in range(3):
-                for j in range(int(self.conds['num_bins'])):
-                    delta = 2*float(self.conds['max_r']) / float(int(self.conds['num_bins']))
+                for j in range(int(self.perform['num_bins'])):
+                    delta = 2*float(self.perform['max_r']) / float(int(self.perform['num_bins']))
                     self._vel_3Dhist["bins"][i][j] += j*delta
 
             #
@@ -405,10 +413,10 @@ class Results:
 
                 #
                 # Marginal bins
-                self._vel_hist[i]["bins"] = - np.ones(int(self.conds['num_bins'])) * float(self.conds['max_v'])
-                delta = 2*float(self.conds['max_v']) / float(int(self.conds['num_bins']))
+                self._vel_hist[i]["bins"] = - np.ones(int(self.perform['num_bins'])) * float(self.perform['max_v'])
+                delta = 2*float(self.perform['max_v']) / float(int(self.perform['num_bins']))
 
-                for j in range(int(self.conds['num_bins'])):
+                for j in range(int(self.perform['num_bins'])):
                     self._vel_hist[i]["bins"][j] += j*delta
         #--
 
@@ -444,37 +452,14 @@ class Results:
 
                 #
                 # Bins
-                self._pos_hist[i]["bins"] = - np.ones(int(int(self.conds['num_bins']))) * float(self.conds['max_r'])
-                if check_vel: self._vel_hist[i]["bins"] = - np.ones(int(int(self.conds['num_bins']))) * float(self.conds['max_v'])
-                pos_delta = 2*float(self.conds['max_r']) / float(int(self.conds['num_bins']))
-                if check_vel: vel_delta = 2*float(self.conds['max_v']) / float(int(self.conds['num_bins']))
+                self._pos_hist[i]["bins"] = - np.ones(int(int(self.perform['num_bins']))) * float(self.perform['max_r'])
+                if check_vel: self._vel_hist[i]["bins"] = - np.ones(int(int(self.perform['num_bins']))) * float(self.perform['max_v'])
+                pos_delta = 2*float(self.perform['max_r']) / float(int(self.perform['num_bins']))
+                if check_vel: vel_delta = 2*float(self.perform['max_v']) / float(int(self.perform['num_bins']))
 
-                for j in range(int(self.conds['num_bins'])):
+                for j in range(int(self.perform['num_bins'])):
                     self._pos_hist[i]["bins"][j] += j*pos_delta
                     if check_vel: self._vel_hist[i]["bins"][j] += j*vel_delta
-        #--
-
-        #
-        # Histogram of speeds
-        #--
-        path = self.directory + 'speeds.csv'
-        if os.path.exists(path):
-            #
-            # Frequencies
-            self._speed_hist["freqs"] = np.array(pd.read_csv(path, index_col=0, header=None, squeeze=True))
-
-            # Densities
-            self._speed_hist["dens"] = self._speed_hist["freqs"] / np.sum(self._speed_hist["freqs"])
-
-            #
-            # Bins
-            #--
-            self._speed_hist["bins"] = np.zeros(int(self.conds['num_bins']))
-            speed_delta = float(self.conds['max_v']) / float(int(self.conds['num_bins']))
-
-            for j in range(int(self.conds['num_bins'])):
-                self._speed_hist["bins"][j] += j*speed_delta
-            #--
         #--
 
     #
@@ -526,24 +511,24 @@ class Results:
                     else: self._loop["var"] += '_' + var[j]
 
             #
-            # Check environment loopings
-            prohibited_variables = ["B_axial"]
+            # Magnetic field
+            prohibited_variables = ["B_axial", "B_bias"]
 
             if self.loop["var"] in prohibited_variables:
                 self._loop["var"] = ''
 
-            elif self.loop["var"] in self.env.index:
-                param = pd.read_csv(obj_dir.path + "/parameters/environment.csv", header=0, index_col=0, squeeze=True).astype(object) 
+            elif self.loop["var"] in self.B_params.index:
+                param = pd.read_csv(obj_dir.path + "/parameters/magnetic_field.csv", header=0, index_col=0, squeeze=True).astype(object) 
                 self._loop["values"].append(param[self.loop["var"]])
 
             #
-            # Check conditions loopings
-            if self.loop["var"] in self.conds.index:
-                param = pd.read_csv(obj_dir.path + "/parameters/conditions.csv", header=0, index_col=0, squeeze=True).astype(object) 
+            # Performance
+            if self.loop["var"] in self.perform.index:
+                param = pd.read_csv(obj_dir.path + "/parameters/performance.csv", header=0, index_col=0, squeeze=True).astype(object) 
                 self._loop["values"].append(param[self.loop["var"]])
 
             #
-            # Check atom loopings
+            # Atom
             prohibited_variables = ["symbol"]
 
             if self.loop["var"] in prohibited_variables:
@@ -554,9 +539,21 @@ class Results:
                 self._loop["values"].append(param[self.loop["var"]])
 
             #
-            # Check transition loopings
+            # Transition
             if self.loop["var"] in self.transition.index:
                 param = pd.read_csv(obj_dir.path + "/parameters/transition.csv", header=0, index_col=0, squeeze=True).astype(object) 
+                self._loop["values"].append(param[self.loop["var"]])
+
+            #
+            # Beams (main)
+            if self.loop["var"] in self.beams['main'].index:
+                param = pd.read_csv(obj_dir.path + "/parameters/beams/main.csv", header=0, index_col=0, squeeze=True).astype(object) 
+                self._loop["values"].append(param[self.loop["var"]])
+
+            #
+            # Beams (sidebands)
+            if self.loop["var"] in self.beams['sidebands'].index:
+                param = pd.read_csv(obj_dir.path + "/parameters/beams/sidebands.csv", header=0, index_col=0, squeeze=True).astype(object) 
                 self._loop["values"].append(param[self.loop["var"]])
 
             i += 1
@@ -619,7 +616,7 @@ class Results:
 
         #
         # Create directories for each result (looping)
-
+        #--
         # Create new attributes        
         self.__create_attr()
 
@@ -642,24 +639,25 @@ class Results:
 
             params_dir = res_dir + "parameters/"
             os.mkdir(params_dir)
+            os.mkdir(params_dir + "beams/")
 
             #
             # Add loop variable 
             if len(self.loop["var"]) > 0:
                 #
-                # Environment
+                # Magnetic field
                 #--
-                prohibited_variables = ["B_axial"]
-                if (self.loop["var"] in self.env.index) and not (self.loop["var"] in prohibited_variables):
-                    self.env[self.loop["var"]] = self.loop["values"][i]
+                prohibited_variables = ["B_axial", "B_bias"]
+                if (self.loop["var"] in self.B_params.index) and not (self.loop["var"] in prohibited_variables):
+                    self.B_params[self.loop["var"]] = self.loop["values"][i]
                 #--
 
                 #
-                # Conditions
+                # Performance
                 #--
                 prohibited_variables = []
-                if (self.loop["var"] in self.conds.index) and not (self.loop["var"] in prohibited_variables):
-                    self.conds[self.loop["var"]] = self.loop["values"][i]
+                if (self.loop["var"] in self.perform.index) and not (self.loop["var"] in prohibited_variables):
+                    self.perform[self.loop["var"]] = self.loop["values"][i]
                 #--
 
                 #
@@ -678,11 +676,30 @@ class Results:
                     self.transition[self.loop["var"]] = self.loop["values"][i]
                 #--
 
+                #
+                # Beams (main)
+                #--
+                prohibited_variables = []
+                if (self.loop["var"] in self.beams['main'].index) and not (self.loop["var"] in prohibited_variables):
+                    self.beams['main'][self.loop["var"]] = self.loop["values"][i]
+                #--
+
+                #
+                # Beams (sidebands)
+                #--
+                prohibited_variables = []
+                if (self.loop["var"] in self.beams['sidebands'].index) and not (self.loop["var"] in prohibited_variables):
+                    self.beams['sidebands'][self.loop["var"]] = self.loop["values"][i]
+                #--
+
             self.atom.to_csv(params_dir + "atom.csv", header="atom")
             self.transition.to_csv(params_dir + "transition.csv", header="transition")
-            self.beams.to_csv(params_dir + "beams.csv", index=False)
-            self.conds.to_csv(params_dir + "conditions.csv", header="conditions")
-            self.env.to_csv(params_dir + "environment.csv", header="environment")
+            self.perform.to_csv(params_dir + "performance.csv", header="performance")
+            self.B_params.to_csv(params_dir + "magnetic_field.csv", header="magnetic_field")
+
+            self.beams['main'].to_csv(params_dir + "beams/main.csv", header="beams_main")
+            self.beams['setup'].to_csv(params_dir + "beams/setup.csv", index=False)
+            self.beams['sidebands'].to_csv(params_dir + "beams/sidebands.csv", header="beams_sidebands")
 
             # Release memory
             del res_dir, params_dir
@@ -697,6 +714,7 @@ class Results:
             self._directory += '1'
 
         self._directory += '/'
+        #--
 
         # Release memory
         del num_res
@@ -719,21 +737,35 @@ class Results:
 
         #
         # Beams
-        path = params_dir + "beams.csv"
-        self._beams = pd.read_csv(path, header=0)
-        self._beams.index += 1
+        #--
+        self._beams = {'main': None, 'setup': None, 'sidebands': None}
+
+        # Main
+        path = params_dir + "/beams/main.csv"
+        self._beams['main'] = pd.read_csv(path, header=0, index_col=0, squeeze=True).astype(object)
+
+
+        # Setup
+        path = params_dir + "/beams/setup.csv"
+        self._beams['setup'] = pd.read_csv(path, header=0)
+        self._beams['setup'].index += 1
+
+        # Sidebands
+        path = params_dir + "/beams/sidebands.csv"
+        self._beams['sidebands'] = pd.read_csv(path, header=0, index_col=0, squeeze=True).astype(object)
+        #--
 
         #
         # Conditions
-        path = params_dir + "conditions.csv"
-        self._conds = pd.read_csv(path, header=0, index_col=0, squeeze=True).astype(object)
-        self._conds['num_sim'] = int(float(self._conds['num_sim']))
-        self._conds['num_bins'] = int(float(self._conds['num_bins']))
+        path = params_dir + "performance.csv"
+        self._perform = pd.read_csv(path, header=0, index_col=0, squeeze=True).astype(object)
+        self._perform['num_sim'] = int(float(self._perform['num_sim']))
+        self._perform['num_bins'] = int(float(self._perform['num_bins']))
         
         #
-        # Environment
-        path = params_dir + "environment.csv"
-        self._env = pd.read_csv(path, header=0, index_col=0, squeeze=True).astype(object)
+        # Magnetic field
+        path = params_dir + "magnetic_field.csv"
+        self._B_params = pd.read_csv(path, header=0, index_col=0, squeeze=True).astype(object)      
 
         # Check looping values
         self.__set_loop()
@@ -742,31 +774,31 @@ class Results:
     # Set looping values
     def __set_loop(self):
         #
-        # Check environment looping
-        prohibited_variables = ["B_axial"]
+        # Magnetic field
+        prohibited_variables = ["B_axial, B_bias"]
 
-        for idx in self.env.index:
+        for idx in self.B_params.index:
             if not (idx in prohibited_variables):
-                values = self.__get_loop_values(str(self.env[idx]))
+                values = self.__get_loop_values(str(self.B_params[idx]))
                 if len(values) > 0:
                     self._loop["var"] = idx
                     self._loop["values"] = values
-                    self._env[idx] = self.loop["values"][self.loop["active"]]
+                    self._B_params[idx] = self.loop["values"][self.loop["active"]]
 
         #
-        # Check conditions looping
+        # Performance
         prohibited_variables = []
 
-        for idx in self.conds.index:
+        for idx in self.perform.index:
             if not (idx in prohibited_variables):
-                values = self.__get_loop_values(str(self.conds[idx]))
+                values = self.__get_loop_values(str(self.perform[idx]))
                 if len(values) > 0:
                     self._loop["var"] = idx
                     self._loop["values"] = values
-                    self._conds[idx] = self.loop["values"][self.loop["active"]]
+                    self._perform[idx] = self.loop["values"][self.loop["active"]]
 
         #
-        # Check atom looping
+        # Atom
         prohibited_variables = ["symbol"]
 
         for idx in self.atom.index:
@@ -778,7 +810,7 @@ class Results:
                     self._atom[idx] = self.loop["values"][self.loop["active"]]
 
         #
-        # Check transition looping
+        # Transition
         prohibited_variables = []
 
         for idx in self.transition.index:
@@ -788,6 +820,30 @@ class Results:
                     self._loop["var"] = idx
                     self._loop["values"] = values
                     self._transition[idx] = self.loop["values"][self.loop["active"]]
+
+        #
+        # Beams (main)
+        prohibited_variables = []
+
+        for idx in self.beams['main'].index:
+            if not (idx in prohibited_variables):
+                values = self.__get_loop_values(str(self.beams['main'][idx]))
+                if len(values) > 0:
+                    self._loop["var"] = idx
+                    self._loop["values"] = values
+                    self._beams['main'][idx] = self.loop["values"][self.loop["active"]]
+
+        #
+        # Beams (sidebands)
+        prohibited_variables = []
+
+        for idx in self.beams['sidebands'].index:
+            if not (idx in prohibited_variables):
+                values = self.__get_loop_values(str(self.beams['sidebands'][idx]))
+                if len(values) > 0:
+                    self._loop["var"] = idx
+                    self._loop["values"] = values
+                    self._beams['sidebands'][idx] = self.loop["values"][self.loop["active"]]
 
     #
     def mass_centre(self, axis=[0,1,2], fixed_loop_idx = False):
@@ -1004,10 +1060,10 @@ class Results:
         if self.loop["var"] == "gamma" and fixed_loop_idx:
             temp = np.zeros(len(self.loop["values"]))
             for i, gamma in enumerate(self.loop["values"]):
-                temp[i] = 1e9*(self.ctes['hbar'] * gamma) / (2 * self.ctes['k_B']) # uK
+                temp[i] = 1e9*(self.ctes['hbar'] * gamma * np.sqrt(1 + self.results.beams['main']['s_0'])) / (2 * self.ctes['k_B']) # uK
 
         else:
-            temp = 1e9*(self.ctes['h'] * self.transition['gamma']) / (2 * self.ctes['k_B']) # uK
+            temp = 1e9*(self.ctes['h'] * self.transition['gamma'] * np.sqrt(1 + self.results.beams['main']['s_0'])) / (2 * self.ctes['k_B']) # uK
 
         return temp
 
@@ -1132,11 +1188,11 @@ class Results:
         indexes = []
         values = []
 
-        for i in range(int(self.conds['num_bins'])):
-            for j in range(int(self.conds['num_bins'])):
-                for k in range(int(self.conds['num_bins'])):
+        for i in range(int(self.perform['num_bins'])):
+            for j in range(int(self.perform['num_bins'])):
+                for k in range(int(self.perform['num_bins'])):
                     indexes.append("[%d,%d,%d]" % (i+1, j+1, k+1))
-                    values.append(pos_freqs_arr[int(self.conds['num_bins'])**2 * i + int(self.conds['num_bins'])*j + k])
+                    values.append(pos_freqs_arr[int(self.perform['num_bins'])**2 * i + int(self.perform['num_bins'])*j + k])
 
         values = np.array(values)
 
@@ -1175,11 +1231,11 @@ class Results:
         indexes = []
         values = []
 
-        for i in range(int(self.conds['num_bins'])):
-            for j in range(int(self.conds['num_bins'])):
-                for k in range(int(self.conds['num_bins'])):
+        for i in range(int(self.perform['num_bins'])):
+            for j in range(int(self.perform['num_bins'])):
+                for k in range(int(self.perform['num_bins'])):
                     indexes.append("[%d,%d,%d]" % (i+1, j+1, k+1))
-                    values.append(vel_freqs_arr[int(self.conds['num_bins'])**2 * i + int(self.conds['num_bins'])*j + k])
+                    values.append(vel_freqs_arr[int(self.perform['num_bins'])**2 * i + int(self.perform['num_bins'])*j + k])
 
         values = np.array(values)
 
@@ -1230,25 +1286,6 @@ class Results:
         # Release memory
         del freqs
         del data
-        del path
-
-        gc.collect()
-
-    #
-    # Add frequencies in the histogram of speeds
-    def add_speeds(self, speed_freqs_arr):
-        # Save file
-        path = self.directory + "/speeds.csv"
-        speed_freqs = pd.Series(speed_freqs_arr, name="speeds").astype("int32")
-        speed_freqs.fillna(0, inplace=True)
-        speed_freqs.to_csv(path)
-
-        #
-        # Update distributions
-        self.__get_dists()
-
-        # Release memory
-        del speed_freqs
         del path
 
         gc.collect()

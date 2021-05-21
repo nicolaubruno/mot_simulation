@@ -1,0 +1,11 @@
+,performance
+T_0,1.0
+g_bool,1
+max_time,2e4
+max_r,1.5
+max_v,40
+num_sim,2e3
+num_bins,128
+wait_time,1e4
+dt,1.0
+parallel_tasks,4

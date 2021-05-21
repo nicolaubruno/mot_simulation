@@ -15,27 +15,31 @@ results_t simulate_atom(char *params_path, int only_marginals, long seed_time){
     int i;
     double r, v, dt = 0, passed_time = 0;
     int get_values = 0;
+    double progress;
+    int last_progress = 0;
     results_t res;
 
     // Seed random variable
     srand(time(0) + seed_time);
 
     // Parameters of the simulation
-    conditions_t conds = get_conditions(params_path);
-    environment_t env = get_environment(params_path);
+    performance_t perform = get_performance(params_path);
+    magnetic_field_t B_params = get_magnetic_field(params_path);
     beams_setup_t beams_setup = get_beams(params_path);
-    atom_t atom = get_atom(conds, env, params_path);
+    atom_t atom = get_atom(perform, B_params, params_path);
 
-    //print_params(atom, conds, beams_setup, env);
+    // Print parameters
+    //print_params(atom, perform, beams_setup, env);
+    //print_performance(perform);
+    //print_magnetic_field(B_params);
+    //print_beams(beams_setup);
+    //print_atom(atom);
     //exit(0);
 
     // Set initial values
     res.time = 0;
-    res.transitions = (int*) calloc(3, sizeof(int));
-    set_hist(only_marginals, &res, conds);
-
-    //print_results(res, atom, only_marginals);
-    //exit(0);
+    res.atom_trapped = 0;
+    set_hist(only_marginals, &res, perform);
 
     // Distance from origin
     r = r3_mod(atom.pos);
@@ -45,11 +49,12 @@ results_t simulate_atom(char *params_path, int only_marginals, long seed_time){
 
     //
     // Iterations
-    while((passed_time < conds.max_time) && (r < conds.max_r) && (v < conds.max_v)){
+    //--
+    while((passed_time < perform.max_time) && (r < perform.max_r) && (v < perform.max_v)){
         //print_status(atom, res);
 
         // Move atom
-        dt = move(&atom, beams_setup, conds, env);
+        dt = move(&atom, beams_setup, perform, B_params);
 
         // Iterations numbers
         passed_time += dt; // 1 / gamma
@@ -62,14 +67,14 @@ results_t simulate_atom(char *params_path, int only_marginals, long seed_time){
 
         //
         // Waiting the equilibrium
-        if(passed_time > conds.wait_time){
+        if(passed_time > perform.wait_time){
             get_values = 1;
             res.time += dt; // 1 / gamma
         }
 
         //
         // Update results
-        if(get_values == 1 && r < conds.max_r){
+        if(get_values == 1 && r < perform.max_r){
             //
             // Update position and velocity
             //--
@@ -77,135 +82,372 @@ results_t simulate_atom(char *params_path, int only_marginals, long seed_time){
             if(only_marginals){
                 for(i = 0; i < 3; i++) {
                     update_hist(&res.pos_hist[i], atom.pos[i]);
-                    if(v < conds.max_v) update_hist(&res.vel_hist[i], atom.vel[i]);
+                    if(v < perform.max_v) update_hist(&res.vel_hist[i], atom.vel[i]);
                 }
             }
 
             // 3D-Histograms
             else {
                 update_hist_3d(&res.pos_3Dhist, atom.pos);
-                if(v < conds.max_v) update_hist_3d(&res.vel_3Dhist, atom.vel);
+                if(v < perform.max_v) update_hist_3d(&res.vel_3Dhist, atom.vel);
             }
             //--
-
-            // Update speed
-            update_hist(&res.speed_hist, v);
         }
 
-        //if(((int) (res.time / conds.max_time)*100) % 10 == 0 && res.time > 0)
-        //    print_status(atom, res);
+        progress = (100*passed_time / perform.max_time);
+        if((((int) progress) % 5) == 0 && res.time > 0 && last_progress < ((int) progress)){
+            //print_status(atom, res);
+            //printf("passed_time [1/Gamma] = %f\n", passed_time);
+            //printf("progress = %f\n\n", progress);
+            last_progress = (int) progress;
+        }
     }
+    //--
 
     //print_results(res, atom, only_marginals);
 
     return res;
 }
 
-atom_t get_atom(conditions_t conds, environment_t env, char *params_path){
+performance_t get_performance(char *params_path){
     //
     // Variables
-    // --
+    //
+
     int i = 0;
-    char *path, **rows;
-    char *token, *saveptr;
-    double std_dev, *rd_v;
-    atom_t atom;
-    //--
+    char *token, *saveptr, *path, **rows;
+    performance_t perform;
 
     // Read lines from the CSV file
-    path = str_concatenate(params_path, "atom.csv");
+    path = str_concatenate(params_path, "performance.csv");
     rows = read_lines(path);
 
     //
-    // Symbol
-    //--
-    i += 1;
-    token = strtok_r(rows[i], DELIM, &saveptr); // Variable name
-    token = strtok_r(NULL, DELIM, &saveptr); // Value
-
-    atom.symbol = (char *) malloc(strlen(token) * sizeof(char));
-    strcpy(atom.symbol, token);
-    //--
-
-    //
-    // Atomic number
+    // Initial temperature 
     //--
     i += 1;
     token = strtok_r(rows[i], DELIM, &saveptr); // Variable name
     token = strtok_r(NULL, DELIM, &saveptr); // Value
 
     // Python module
-    if(Py_MODULE) atom.Z = (int) atof(str_replace(token, ".", ","));
+    if(Py_MODULE) perform.T_0 = atof(str_replace(token, ".", ","));
 
     // C program
-    else atom.Z = (int) atof(token);
+    else perform.T_0 = atof(token);
     //--
 
     //
-    // Mass
+    // Gravity
     //--
     i += 1;
     token = strtok_r(rows[i], DELIM, &saveptr); // Variable name
     token = strtok_r(NULL, DELIM, &saveptr); // Value
 
     // Python module
-    if(Py_MODULE) atom.mass = atof(str_replace(token, ".", ","));
+    if(Py_MODULE) perform.g_bool = atoi(str_replace(token, ".", ","));
 
     // C program
-    else atom.mass = atof(token);
+    else perform.g_bool = atoi(token);
     //--
 
     //
-    // Initial position
+    // Maximum time of simulation
     //--
-    atom.pos = (double *) calloc(3, sizeof(double));
+    i += 1;
+    token = strtok_r(rows[i], DELIM, &saveptr); // Variable name
+    token = strtok_r(NULL, DELIM, &saveptr); // Value
 
-    //
-    // Random vector
-    //--
-    rd_v = (double*) calloc(3, sizeof(double));
-    
-    // Generate a random value for each direction
-    for(i = 0; i < 3; i++) {
-        rd_v[i] = ((double) rand()) / ((double) RAND_MAX);
-        if((((double) rand()) / ((double) RAND_MAX)) < 0.5) rd_v[i] = -rd_v[i];
-    }
+    // Python module
+    if(Py_MODULE) perform.max_time = atof(str_replace(token, ".", ","));
 
-    // Normalization
-    rd_v = r3_normalize(rd_v); // Normalization
-    //--
-
-    if(env.w < conds.max_r)
-        atom.pos = r3_scalar_product(random_norm(0, env.w/2), rd_v); // cm
-    else 
-        atom.pos = r3_scalar_product(random_norm(0, conds.max_r/2), rd_v); // cm
+    // C Program
+    else perform.max_time = atof(token);
     //--
 
     //
-    // Initial velocity of the atom
+    // Maximum distance
     //--
-    atom.vel = (double *) calloc(3, sizeof(double));
-    for(i = 0; i < 3; i++){
-        // Position
-        //atom.pos[i] = 0;
+    i += 1;
+    token = strtok_r(rows[i], DELIM, &saveptr); // Variable name
+    token = strtok_r(NULL, DELIM, &saveptr); // Value
 
-        // Velocity
-        std_dev = sqrt(k_B * conds.T_0 / (atom.mass * u)) * 10; // cm / s
-        atom.vel[i] = random_norm(0, std_dev); // cm / s
-    }
+    // Python module
+    if(Py_MODULE) perform.max_r = atof(str_replace(token, ".", ","));
+
+    // C Program
+    else perform.max_r = atof(token);
     //--
 
-    // Optical transition
-    atom.transition = get_transition(params_path);
+    //
+    // Maximum speed
+    //--
+    i += 1;
+    token = strtok_r(rows[i], DELIM, &saveptr); // Variable name
+    token = strtok_r(NULL, DELIM, &saveptr); // Value
 
-    // Initial state
-    atom.J = atom.transition.J_gnd;
-    atom.mJ = -atom.transition.J_gnd;
+    // Python module
+    if(Py_MODULE) perform.max_v = atof(str_replace(token, ".", ","));
+
+    // C Program
+    else perform.max_v = atof(token);
+    //--
+
+    // Skip parameter (number of simulations)
+    i += 1;
+
+    //
+    // Number of bins
+    //--
+    i += 1;
+    token = strtok_r(rows[i], DELIM, &saveptr); // Variable name
+    token = strtok_r(NULL, DELIM, &saveptr); // Value
+
+    // Python module
+    if(Py_MODULE) perform.num_bins = (int) atof(str_replace(token, ".", ","));
+
+    // C Program
+    else perform.num_bins = (int) atof(token);
+    //--
+
+    //
+    // Waiting time (time to reach the equilibrium)
+    //--
+    i += 1;
+    token = strtok_r(rows[i], DELIM, &saveptr); // Variable name
+    token = strtok_r(NULL, DELIM, &saveptr); // Value
+
+    // Python module
+    if(Py_MODULE) perform.wait_time = atof(str_replace(token, ".", ","));
+
+    // C Program
+    else perform.wait_time = atof(token);
+    //--
+
+    //
+    // Time interval
+    //--
+    i += 1;
+    token = strtok_r(rows[i], DELIM, &saveptr); // Variable name
+    token = strtok_r(NULL, DELIM, &saveptr); // Value
+
+    // Python module
+    if(Py_MODULE) perform.dt = atof(str_replace(token, ".", ","));
+
+    // C Program
+    else perform.dt = atof(token);
+    //--
 
     // Release memory
     free(path);
 
-    return atom;
+    return perform;
+}
+
+magnetic_field_t get_magnetic_field(char *params_path){
+    // Variables
+    int i = 0, n;
+    char *token, *saveptr, *path, **rows;
+    magnetic_field_t B_params;
+
+    // Read lines from the CSV file
+    path = str_concatenate(params_path, "magnetic_field.csv");
+    rows = read_lines(path);
+
+    //
+    // Magnetic field gradient
+    //--
+    i += 1;
+    token = strtok_r(rows[i], DELIM, &saveptr); // Variable name
+    token = strtok_r(NULL, DELIM, &saveptr); // Value
+    
+    // Python module
+    if(Py_MODULE) B_params.B_0 = atof(str_replace(token, ".", ","));
+
+    // C program
+    else B_params.B_0 = atof(token);
+    //--
+
+    //
+    // Magnetic field axial direction
+    //--
+    i += 1;
+    token = strtok_r(rows[i], DELIM, &saveptr); // Variable name
+    token = strtok_r(NULL, DELIM, &saveptr); // Value
+        
+    B_params.B_basis = orthonormal_basis(r3_normalize(get_double_array(token, &n)));
+    //--
+
+    //
+    // Bias of magnetic field
+    //--
+    i += 1;
+    token = strtok_r(rows[i], DELIM, &saveptr); // Variable name
+    token = strtok_r(NULL, DELIM, &saveptr); // Value
+
+    // Python module
+    if(Py_MODULE) B_params.B_bias = get_double_array(token, &n);
+
+    // C program
+    else B_params.B_bias = get_double_array(token, &n);
+    //--
+
+    // Release memory
+    free(path);
+
+    return B_params;
+}
+
+beams_setup_t get_beams(char *params_path){
+    // Variables
+    int i = 0, num_beams = 0, n;
+    char *token, *saveptr, *path, **rows;
+    beams_setup_t beams_setup;
+    double s_0, delta, w;
+    beam_t *beams = (beam_t*) calloc(MAX_BEAMS, sizeof(beam_t));
+    beam_t *c_beams;
+
+    //
+    // Get main parameters of the beams
+    //--
+    // Read lines from the CSV file
+    path = str_concatenate(params_path, "beams/main.csv");
+    rows = read_lines(path);
+    i = 0;
+
+    //
+    // Laser detuning
+    //--
+    i += 1;
+    token = strtok_r(rows[i], DELIM, &saveptr); // Variable name
+    token = strtok_r(NULL, DELIM, &saveptr); // Value
+
+    // Python module
+    if(Py_MODULE){
+        if(token[0] == '-') delta= -atof(str_replace(token+1, ".", ",")); 
+        else delta = atof(str_replace(token, ".", ","));
+    } 
+
+    // C program
+    else {
+        if(token[0] == '-') delta= -atof(token+1); 
+        else delta = atof(token);
+    }
+    //--
+
+    //
+    // Peak of the saturation parameter
+    //--
+    i += 1;
+    token = strtok_r(rows[i], DELIM, &saveptr); // Variable name
+    token = strtok_r(NULL, DELIM, &saveptr); // Value
+
+    // Python module
+    if(Py_MODULE) s_0 = atof(str_replace(token, ".", ","));
+
+    // C program
+    else s_0 = atof(token);
+    //--
+
+    //
+    // Waist Radius
+    //--
+    i += 1;
+    token = strtok_r(rows[i], DELIM, &saveptr); // Variable name
+    token = strtok_r(NULL, DELIM, &saveptr); // Value
+
+    // Python module
+    if(Py_MODULE) w = atof(str_replace(token, ".", ","));
+
+    // C program
+    else w = atof(token);
+    //--
+    //--
+
+    //
+    // Get all beams in the setup
+    //--
+    // Read lines from the CSV file
+    path = str_concatenate(params_path, "beams/setup.csv");
+    rows = read_lines(path);
+
+    //
+    // Get beams
+    //--
+    for(i = 1; !(rows[i] == NULL); i++){
+        //
+        // Wave vector direction
+        //--
+        token = strtok_r(rows[i], DELIM, &saveptr);
+        beams[num_beams].k_dir = r3_normalize(get_double_array(token, &n));
+        //--
+
+        //
+        // Polarization vector
+        //--
+        token = strtok_r(NULL, DELIM, &saveptr); // Value
+        beams[num_beams].pol_amp = r3_normalize(get_double_array(token, &n));
+        //--
+
+        // Add main parameters
+        beams[num_beams].s_0 = s_0;
+        beams[num_beams].delta = delta;
+        beams[num_beams].w = w;
+
+        num_beams++;
+    }
+    //--
+
+    c_beams = (beam_t *) calloc(num_beams, sizeof(beam_t));
+    for(n = 0; n < num_beams; n++) c_beams[n] = beams[n];
+
+    beams_setup.num = num_beams;
+    beams_setup.beams = c_beams;
+    //--
+
+    //
+    // Get sidebands
+    //--
+    // Read lines from the CSV file
+    path = str_concatenate(params_path, "beams/sidebands.csv");
+    rows = read_lines(path);
+    i = 0;
+
+    //
+    // Number of sidebands
+    //--
+    i += 1;
+    token = strtok_r(rows[i], DELIM, &saveptr); // Variable name
+    token = strtok_r(NULL, DELIM, &saveptr); // Value
+
+    // Python module
+    if(Py_MODULE)
+        beams_setup.sidebands.num = atoi(str_replace(token, ".", ","));
+
+    // C program
+    else beams_setup.sidebands.num = atoi(token);
+    //--
+
+    //
+    // Resonant frequency of the sidebands
+    //--
+    i += 1;
+    token = strtok_r(rows[i], DELIM, &saveptr); // Variable name
+    token = strtok_r(NULL, DELIM, &saveptr); // Value
+
+    // Python module
+    if(Py_MODULE) beams_setup.sidebands.freq = atof(str_replace(token, ".", ","));
+
+    // C program
+    else beams_setup.sidebands.freq = atof(token);
+    //--
+    //--
+
+    // Release memory
+    free(beams);
+    free(path);
+
+    // Return
+    return beams_setup;
 }
 
 transition_t get_transition(char *params_path){
@@ -323,298 +565,115 @@ transition_t get_transition(char *params_path){
     return transition;
 }
 
-conditions_t get_conditions(char *params_path){
+atom_t get_atom(performance_t perform, magnetic_field_t B_params, char *params_path){
     //
     // Variables
-    //
-
+    // --
     int i = 0;
-    char *token, *saveptr, *path, **rows;
-    conditions_t conditions;
+    char *path, **rows;
+    char *token, *saveptr;
+    double std_dev, *rd_v;
+    atom_t atom;
+    //--
 
     // Read lines from the CSV file
-    path = str_concatenate(params_path, "conditions.csv");
+    path = str_concatenate(params_path, "atom.csv");
     rows = read_lines(path);
 
     //
-    // Initial temperature 
+    // Symbol
+    //--
+    i += 1;
+    token = strtok_r(rows[i], DELIM, &saveptr); // Variable name
+    token = strtok_r(NULL, DELIM, &saveptr); // Value
+
+    atom.symbol = (char *) malloc(strlen(token) * sizeof(char));
+    strcpy(atom.symbol, token);
+    //--
+
+    //
+    // Atomic number
     //--
     i += 1;
     token = strtok_r(rows[i], DELIM, &saveptr); // Variable name
     token = strtok_r(NULL, DELIM, &saveptr); // Value
 
     // Python module
-    if(Py_MODULE) conditions.T_0 = atof(str_replace(token, ".", ","));
+    if(Py_MODULE) atom.Z = (int) atof(str_replace(token, ".", ","));
 
     // C program
-    else conditions.T_0 = atof(token);
+    else atom.Z = (int) atof(token);
     //--
 
     //
-    // Maximum time of simulation
+    // Mass
     //--
     i += 1;
     token = strtok_r(rows[i], DELIM, &saveptr); // Variable name
     token = strtok_r(NULL, DELIM, &saveptr); // Value
 
     // Python module
-    if(Py_MODULE) conditions.max_time = atof(str_replace(token, ".", ","));
+    if(Py_MODULE) atom.mass = atof(str_replace(token, ".", ","));
 
-    // C Program
-    else conditions.max_time = atof(token);
+    // C program
+    else atom.mass = atof(token);
     //--
 
     //
-    // Maximum distance
+    // Initial position
     //--
-    i += 1;
-    token = strtok_r(rows[i], DELIM, &saveptr); // Variable name
-    token = strtok_r(NULL, DELIM, &saveptr); // Value
-
-    // Python module
-    if(Py_MODULE) conditions.max_r = atof(str_replace(token, ".", ","));
-
-    // C Program
-    else conditions.max_r = atof(token);
-    //--
+    atom.pos = (double *) calloc(3, sizeof(double));
 
     //
-    // Maximum speed
+    // Random vector
     //--
-    i += 1;
-    token = strtok_r(rows[i], DELIM, &saveptr); // Variable name
-    token = strtok_r(NULL, DELIM, &saveptr); // Value
-
-    // Python module
-    if(Py_MODULE) conditions.max_v = atof(str_replace(token, ".", ","));
-
-    // C Program
-    else conditions.max_v = atof(token);
-    //--
-
-    // Skip parameter (number of simulations)
-    i += 1;
-
-    //
-    // Number of bins
-    //--
-    i += 1;
-    token = strtok_r(rows[i], DELIM, &saveptr); // Variable name
-    token = strtok_r(NULL, DELIM, &saveptr); // Value
-
-    // Python module
-    if(Py_MODULE) conditions.num_bins = (int) atof(str_replace(token, ".", ","));
-
-    // C Program
-    else conditions.num_bins = (int) atof(token);
-    //--
-
-    //
-    // Time to reach the equilibrium
-    //--
-    i += 1;
-    token = strtok_r(rows[i], DELIM, &saveptr); // Variable name
-    token = strtok_r(NULL, DELIM, &saveptr); // Value
-
-    // Python module
-    if(Py_MODULE) conditions.wait_time = atof(str_replace(token, ".", ","));
-
-    // C Program
-    else conditions.wait_time = atof(token);
-    //--
-
-    //
-    // Time interval
-    //--
-    i += 1;
-    token = strtok_r(rows[i], DELIM, &saveptr); // Variable name
-    token = strtok_r(NULL, DELIM, &saveptr); // Value
-
-    // Python module
-    if(Py_MODULE) conditions.dt = atof(str_replace(token, ".", ","));
-
-    // C Program
-    else conditions.dt = atof(token);
-    //--
-
-    // Release memory
-    free(path);
-
-    return conditions;
-}
-
-environment_t get_environment(char *params_path){
-    // Variables
-    int i = 0, n;
-    char *token, *saveptr, *path, **rows;
-    environment_t env;
-
-    // Read lines from the CSV file
-    path = str_concatenate(params_path, "environment.csv");
-    rows = read_lines(path);
-
-    //
-    // Magnetic field gradient
-    //--
-    i += 1;
-    token = strtok_r(rows[i], DELIM, &saveptr); // Variable name
-    token = strtok_r(NULL, DELIM, &saveptr); // Value
+    rd_v = (double*) calloc(3, sizeof(double));
     
-    // Python module
-    if(Py_MODULE) env.B_0 = atof(str_replace(token, ".", ","));
-
-    // C program
-    else env.B_0 = atof(token);
-    //--
-
-    //
-    // Magnetic field axial direction
-    //--
-    i += 1;
-    token = strtok_r(rows[i], DELIM, &saveptr); // Variable name
-    token = strtok_r(NULL, DELIM, &saveptr); // Value
-        
-    env.B_basis = orthonormal_basis(r3_normalize(get_double_array(token, &n)));
-    //--
-
-    //
-    // Local magnetic field gradient
-    //--
-    i += 1;
-    token = strtok_r(rows[i], DELIM, &saveptr); // Variable name
-    token = strtok_r(NULL, DELIM, &saveptr); // Value
-
-    // Python module
-    if(Py_MODULE) env.local_B = atof(str_replace(token, ".", ","));
-
-    // C program
-    else env.local_B = atof(token);
-    //--
-
-    //
-    // Laser detuning
-    //--
-    i += 1;
-    token = strtok_r(rows[i], DELIM, &saveptr); // Variable name
-    token = strtok_r(NULL, DELIM, &saveptr); // Value
-
-    // Python module
-    if(Py_MODULE){
-        if(token[0] == '-') env.delta= -atof(str_replace(token+1, ".", ",")); 
-        else env.delta = atof(str_replace(token, ".", ","));
-    } 
-
-    // C program
-    else {
-        if(token[0] == '-') env.delta= -atof(token+1); 
-        else env.delta = atof(token);
+    // Generate a random value for each direction
+    for(i = 0; i < 3; i++) {
+        rd_v[i] = ((double) rand()) / ((double) RAND_MAX);
+        if((((double) rand()) / ((double) RAND_MAX)) < 0.5) rd_v[i] = -rd_v[i];
     }
+
+    // Normalization
+    rd_v = r3_normalize(rd_v); // Normalization
+    //--
+
+    atom.pos = r3_scalar_product(random_norm(0, perform.max_r/2), rd_v); // cm
     //--
 
     //
-    // Peak of the saturation parameter
+    // Initial velocity of the atom
     //--
-    i += 1;
-    token = strtok_r(rows[i], DELIM, &saveptr); // Variable name
-    token = strtok_r(NULL, DELIM, &saveptr); // Value
+    atom.vel = (double *) calloc(3, sizeof(double));
+    for(i = 0; i < 3; i++){
+        // Position
+        atom.pos[i] = 0;
 
-    // Python module
-    if(Py_MODULE) env.s_0 = atof(str_replace(token, ".", ","));
-
-    // C program
-    else env.s_0 = atof(token);
-    //--
-
-    //
-    // Waist Radius
-    //--
-    i += 1;
-    token = strtok_r(rows[i], DELIM, &saveptr); // Variable name
-    token = strtok_r(NULL, DELIM, &saveptr); // Value
-
-    // Python module
-    if(Py_MODULE) env.w = atof(str_replace(token, ".", ","));
-
-    // C program
-    else env.w = atof(token);
+        // Velocity
+        std_dev = sqrt(k_B * perform.T_0 / (atom.mass * u)) * 10; // cm / s
+        atom.vel[i] = random_norm(0, std_dev); // cm / s
+        atom.vel[i] = 0;
+    }
+    //atom.pos[2] = -0.5;
     //--
 
-    //
-    // Gravity
-    //--
-    i += 1;
-    token = strtok_r(rows[i], DELIM, &saveptr); // Variable name
-    token = strtok_r(NULL, DELIM, &saveptr); // Value
+    // Optical transition
+    atom.transition = get_transition(params_path);
 
-    env.g_bool = atoi(token);
-    //--
+    // Initial state
+    atom.J = atom.transition.J_gnd;
+    atom.mJ = -atom.transition.J_gnd;
 
     // Release memory
     free(path);
 
-    return env;
+    return atom;
 }
 
-beams_setup_t get_beams(char *params_path){
-    // Variables
-    int i = 0, num_beams = 0, n;
-    char *token, *saveptr, *path, **rows;
-    beams_setup_t beams_setup;
-    beam_t *beams = (beam_t*) calloc(MAX_BEAMS, sizeof(beam_t));
-    beam_t *c_beams;
-
-    // Read lines from the CSV file
-    path = str_concatenate(params_path, "beams.csv");
-    rows = read_lines(path);
-
-    //
-    // Get beams
-    //--
-    for(i = 1; !(rows[i] == NULL); i++){
-        //
-        // Wave vector direction
-        //--
-        token = strtok_r(rows[i], DELIM, &saveptr);
-        beams[num_beams].k_dic = r3_normalize(get_double_array(token, &n));
-        //--
-
-        //
-        // Polarization vector
-        //--
-        token = strtok_r(NULL, DELIM, &saveptr); // Value
-        beams[num_beams].eps = r3_normalize(get_double_array(token, &n));
-        //--
-
-        num_beams++;
-    }
-    //--
-
-    c_beams = (beam_t *) calloc(num_beams, sizeof(beam_t));
-    for(n = 0; n < num_beams; n++) c_beams[n] = beams[n];
-
-    beams_setup.num = num_beams;
-    beams_setup.beams = c_beams;
-
-    // Release memory
-    free(beams);
-    free(path);
-
-    // Return
-    return beams_setup;
-}
-
-int set_hist(int only_marginals, results_t *res, conditions_t conds){
+int set_hist(int only_marginals, results_t *res, performance_t perform){
     // Variables
     int i, j, k;
-
-    //
-    // Speed histogram
-    //--
-    res->speed_hist.num_bins = conds.num_bins;
-    res->speed_hist.bin_size = conds.max_v / res->speed_hist.num_bins;
-    res->speed_hist.coord0 = 0;
-    res->speed_hist.freqs = (int*) calloc(res->speed_hist.num_bins, sizeof(int));
-    //--
 
     //
     // Only marginals
@@ -625,15 +684,15 @@ int set_hist(int only_marginals, results_t *res, conditions_t conds){
 
         for(i = 0; i < 3; i++){
             // Position
-            res->pos_hist[i].num_bins = conds.num_bins;
-            res->pos_hist[i].bin_size = 2 * conds.max_r / res->pos_hist[i].num_bins;
-            res->pos_hist[i].coord0 = - conds.max_r;
+            res->pos_hist[i].num_bins = perform.num_bins;
+            res->pos_hist[i].bin_size = 2 * perform.max_r / res->pos_hist[i].num_bins;
+            res->pos_hist[i].coord0 = - perform.max_r;
             res->pos_hist[i].freqs = (int*) calloc(res->pos_hist[i].num_bins, sizeof(int));
 
             // Velocity
-            res->vel_hist[i].num_bins = conds.num_bins;
-            res->vel_hist[i].bin_size = 2 * conds.max_v / res->vel_hist[i].num_bins;
-            res->vel_hist[i].coord0 = - conds.max_v;
+            res->vel_hist[i].num_bins = perform.num_bins;
+            res->vel_hist[i].bin_size = 2 * perform.max_v / res->vel_hist[i].num_bins;
+            res->vel_hist[i].coord0 = - perform.max_v;
             res->vel_hist[i].freqs = (int*) calloc(res->vel_hist[i].num_bins, sizeof(int));
         }
     //--
@@ -654,14 +713,14 @@ int set_hist(int only_marginals, results_t *res, conditions_t conds){
 
         for(i = 0; i < 3; i++){
             // Position
-            res->pos_3Dhist.num_bins[i] = conds.num_bins;
-            res->pos_3Dhist.bins_size[i] = 2 * conds.max_r / res->pos_3Dhist.num_bins[i];
-            res->pos_3Dhist.coord0[i] = - conds.max_r;
+            res->pos_3Dhist.num_bins[i] = perform.num_bins;
+            res->pos_3Dhist.bins_size[i] = 2 * perform.max_r / res->pos_3Dhist.num_bins[i];
+            res->pos_3Dhist.coord0[i] = - perform.max_r;
 
             // Velocity
-            res->vel_3Dhist.num_bins[i] = conds.num_bins;
-            res->vel_3Dhist.bins_size[i] = 2 * conds.max_v / res->vel_3Dhist.num_bins[i];
-            res->vel_3Dhist.coord0[i] = - conds.max_v;
+            res->vel_3Dhist.num_bins[i] = perform.num_bins;
+            res->vel_3Dhist.bins_size[i] = 2 * perform.max_v / res->vel_3Dhist.num_bins[i];
+            res->vel_3Dhist.coord0[i] = - perform.max_v;
         }
 
         //
@@ -701,87 +760,88 @@ int set_hist(int only_marginals, results_t *res, conditions_t conds){
     return 0;
 }
 
-double move(atom_t *atom, beams_setup_t beams_setup, conditions_t conds, environment_t env){
+double move(atom_t *atom, beams_setup_t beams_setup, performance_t perform, magnetic_field_t B_params){
     //
     // Variables
-    int i, j, chosen_beam = -1;
-    double *B, *eB;
-    double vel_mod, *a_B, *rd_v;
-    double *pol_amp, *probs, p = 0;
-    int pol_opt[] = {+1, -1, 0};  
-    double fixed_dt, dt;
-    double aux_R = 0, aux_dt = 0;
-    polarized_beam_t *beams;
+    int i, j;                                   // Auxiliary variables
+    double fixed_dt, dt = 0, aux_dt, max_dt;    // Times
+    double *probs, *all_R;                      // Absorption variables
+    int chosen_beam = 0;                        // Absorption variables
+    //double *a_B;                                // Magnetic acceleration
+    double *rd_v, vel_mod;                      // Photonic recoil
+
+    // Allocate variables
+    probs = (double*) calloc(beams_setup.num + 1, sizeof(double));
 
     // Time interval
-    fixed_dt = conds.dt / (atom->transition.gamma*1e3);
-    dt = fixed_dt;
+    max_dt = perform.dt / (2 * PI * atom->transition.gamma*1e3);
+    fixed_dt = 0.1 / (2 * PI * atom->transition.gamma*1e3);
+
+    // Get all scattering rates
+    all_R = get_all_scatt_rate(beams_setup, B_params, *atom);
 
     //
-    // Direction of the magnetic field magnetic field
+    // Method 1 - Exponential distribution sample
     //--
-    B = magnetic_field(env, atom->pos);
-    if(r3_mod(B) == 0){
-        eB = env.B_basis[2];
-    } else eB = r3_normalize(B);
-    //--
-
-    // Beams
-    beams = (polarized_beam_t*) calloc(3*beams_setup.num, sizeof(polarized_beam_t));
-    probs = (double*) calloc(3*beams_setup.num, sizeof(double));
-
-    //
-    // Get probabilities of each transition happen
-    // --
+    // Get time interval
     for(i = 0; i < beams_setup.num; i++){
-        // Polarizations amplitude
-        pol_amp = polarizations_amplitudes(beams_setup.beams[i], env, eB);
+        if(all_R[i] > 0){
+            aux_dt = random_exp(1 / all_R[i]);
 
-        // Check each polarization
-        for(j = 0; j < 3; j++){        
-            // Define polarized beam
-            beams[3*i+j].s_0 = pol_amp[j] * env.s_0;
-            beams[3*i+j].k_dic = beams_setup.beams[i].k_dic;
-            beams[3*i+j].eps = pol_opt[j];
-
-            // Scattering rate
-            aux_R = scattering_rate(*atom, beams[3*i+j], conds, env, B);
-
-            // Probability of the atom to absorb
-            probs[3*i+j] = fixed_dt * aux_R;
-            p += probs[3*i+j];
-
-            // Check random time
-            if(aux_R > 0) {
-                aux_dt = random_exp(1 / aux_R);
-                
-                if(aux_dt < fixed_dt && aux_dt < dt) {
-                    dt = aux_dt;
-                    chosen_beam = 3*i+j;
-                }
+            if(dt == 0 || aux_dt < dt){
+                chosen_beam = i+1;
+                dt = aux_dt;
             }
-
         }
     }
 
-    //
-    // Check chosen beam
+    if(chosen_beam == 0) dt = fixed_dt;
     //--
-    if(chosen_beam == -1){
-        // Probability of the transition does not happen
-        probs[3*beams_setup.num] = 1 - p;
 
-        // Chose a beam to be absorbed or not
-        chosen_beam = random_pick(probs, 3*beams_setup.num+1);
+    //printf("fixed_dt = %f\n", fixed_dt*(2 * PI * atom->transition.gamma*1e3));
+    //printf("dt = %f\n", dt*(2 * PI * atom->transition.gamma*1e3));
+    //printf("chosen_beam = %d\n\n", chosen_beam);
+    //exit(0);
+
+
+    //
+    // Method 2 - Fixed time interval
+    //--
+    // Check if method 1 wasn't successful
+    if(dt > max_dt && chosen_beam > 0){
+        // Get probabilities
+        probs[0] = 0;
+        for(i = 1; i < beams_setup.num+1; i++){
+            probs[i] = all_R[i-1] * fixed_dt;
+            probs[0] += probs[i];
+            //r3_print(beams_setup.beams[i-1].k_dir, "k");
+            //printf("prob[%d] = %f\n\n", i, probs[i]);
+        }
+        probs[0] = 1 - probs[0];
+        //printf("prob[0] = %f\n", probs[0]);
+
+        // Pick a beam
+        chosen_beam = random_pick(probs, beams_setup.num+1);
+        //printf("chosen_beam = %d\n", chosen_beam);
+        dt = fixed_dt;
     }
     //--
+
+
+    //printf("gamma [kHz/2pi] = %f\n", atom->transition.gamma);
+    //printf("max_dt = %f\n", max_dt*(2 * PI * atom->transition.gamma*1e3));
+    //printf("fixed_dt = %f\n", fixed_dt*(2 * PI * atom->transition.gamma*1e3));
+    //printf("dt = %f\n", dt*(2 * PI * atom->transition.gamma*1e3));
+    //printf("g * dt [m/s] = %f\n", g*dt);
+    //printf("chosen_beam = %d\n\n", chosen_beam);
 
     //
     // Movement
     //--
 
     // Magnetic acceleration
-    a_B = magnetic_acceleration(*atom, env);
+    //a_B = magnetic_acceleration(*atom, B_params);
+    //a_B = (double*) calloc(3, sizeof(3));
 
     //
     // Update position
@@ -791,11 +851,11 @@ double move(atom_t *atom, beams_setup_t beams_setup, conditions_t conds, environ
         atom->pos[i] += atom->vel[i] * dt;
 
         // Magnetic acceleration
-        atom->pos[i] += (a_B[i] * dt*dt) / 2;
+        //atom->pos[i] += (a_B[i] * dt*dt) / 2;
     }
 
     // Gravity
-    if(env.g_bool) 
+    if(perform.g_bool) 
         atom->pos[2] += -(g * dt*dt) / 2;
     // --
 
@@ -803,17 +863,17 @@ double move(atom_t *atom, beams_setup_t beams_setup, conditions_t conds, environ
     // Update velocity
     //--
     // Gravitational acceleration
-    if(env.g_bool)
+    if(perform.g_bool) 
         atom->vel[2] += - g * dt;
 
     // Magnetic acceleration
-    for(i = 0; i < 3; i++)
-        atom->vel[i] += a_B[i] * dt;
+    //for(i = 0; i < 3; i++)
+    //    atom->vel[i] += a_B[i] * dt;
 
     //
     // Photonic recoil
     //--
-    if(chosen_beam < 3*beams_setup.num){
+    if(chosen_beam > 0){
         //
         // Random vector
         //--
@@ -829,75 +889,25 @@ double move(atom_t *atom, beams_setup_t beams_setup, conditions_t conds, environ
 
         // Add velocity
         vel_mod = 1e4 * h / (atom->transition.lambda * atom->mass * u); // cm / s
-        atom->vel = r3_sum(atom->vel, r3_scalar_product(vel_mod, beams[chosen_beam].k_dic)); // cm / s
+        //r3_print(r3_scalar_product(vel_mod, beams_setup.beams[chosen_beam-1].k_dir), "Photon momentum");
+        atom->vel = r3_sum(atom->vel, r3_scalar_product(vel_mod, beams_setup.beams[chosen_beam-1].k_dir)); // cm / s
         atom->vel = r3_sum(atom->vel, r3_scalar_product(vel_mod, rd_v)); // cm / s
     }
     //--
-
     //--
-
-    // Release memory
-    free(beams);
+    //exit(0);
     
     // Convert time unit
-    dt = dt * (atom->transition.gamma*1e3);
+    dt = dt * (2 * PI * atom->transition.gamma*1e3);
     //printf("dt [ms] = %f\n", dt*1e3);
+
+    // Release memory
+    free(probs);
 
     return dt;
 }
 
-double *magnetic_acceleration(atom_t atom, environment_t env){
-    // Variables
-    int i;
-    double *a_B, *del_B, norm;  // Magnetic field
-    double g_lande;             // Transition
-    double *r_prime;
-
-    // Magnetic field gradient
-    if(r3_mod(atom.pos) > 0){
-        del_B = (double*) calloc(3, sizeof(double)); // G / cm
-        r_prime = (double*) calloc(3, sizeof(double)); // cm
-
-        for(i = 0; i < 3; i++)
-            r_prime[i] = r3_inner_product(atom.pos, env.B_basis[i]);
-
-        norm = sqrt(pow(r_prime[0], 2) * pow(r_prime[1], 2) + 4 * pow(r_prime[2], 2));
-
-        // Anti-helmholtz coils
-        for(i = 0; i < 3; i++){
-            del_B[i] = 0;
-            del_B[i] += env.B_basis[0][i] * r_prime[0] / (2 * norm);
-            del_B[i] += env.B_basis[1][i] * r_prime[1] / (2 * norm);
-            del_B[i] += - env.B_basis[2][i] * 2  * r_prime[2] / norm;
-            del_B[i] = env.B_0 * del_B[i];
-        }
-
-        // Local magnetic field
-        del_B[2] += env.local_B;
-
-        // Magnetic acceleration
-        a_B = (double*) calloc(3, sizeof(double)); // cm / s^2
-
-        // Atom state
-        if(atom.J == atom.transition.J_gnd)
-            g_lande = atom.transition.g_gnd;
-        else g_lande = atom.transition.g_exc;
-
-        for(i = 0; i < 3; i++)
-            a_B[i] = - mu_B * g_lande * atom.mJ * del_B[i] / (atom.mass * u) * 1e3; // cm / s^2
-
-        // Release memory
-        free(del_B);
-        free(r_prime);
-    } else {
-        a_B = (double*) calloc(3, sizeof(double)); // cm / s^2
-        for(i = 0; i < 3; i++) a_B[i] = 0;
-    }
-
-    return a_B;
-}
-
-double *magnetic_field(environment_t env, double *r){
+double *magnetic_field(magnetic_field_t B_params, double *r){
     //
     // Variables
     //
@@ -909,19 +919,19 @@ double *magnetic_field(environment_t env, double *r){
     r_prime = (double*) calloc(3, sizeof(double));
 
     for(i = 0; i < 3; i++)
-        r_prime[i] = r3_inner_product(r, env.B_basis[i]);
+        r_prime[i] = r3_inner_product(r, B_params.B_basis[i]);
 
     // Anti-Helmholtz coils
     for(i = 0; i < 3; i++){
         B[i] = 0;
-        B[i] += r_prime[0] * env.B_basis[0][i] / 2;
-        B[i] += r_prime[1] * env.B_basis[1][i] / 2;
-        B[i] += - r_prime[2] * env.B_basis[2][i];
-        B[i] = env.B_0 * B[i];
+        B[i] += r_prime[0] * B_params.B_basis[0][i] / 2;
+        B[i] += r_prime[1] * B_params.B_basis[1][i] / 2;
+        B[i] += - r_prime[2] * B_params.B_basis[2][i];
+        B[i] = B_params.B_0 * B[i];
     }
 
     // Local Magnetic field
-    B[2] += env.local_B * r[2];
+    B = r3_sum(B_params.B_bias, B);
 
     // Release memory
     free(r_prime);
@@ -929,17 +939,54 @@ double *magnetic_field(environment_t env, double *r){
     return B;
 }
 
-double *polarizations_amplitudes(beam_t beam, environment_t env, double *eB){
+double *get_all_scatt_rate(beams_setup_t beams_setup, magnetic_field_t B_params, atom_t atom){
+    // Variables
+    int i;
+    double *B, *eB;
+    double *all_R;
+    beam_t beam;
+
+    // Allocate memory
+    all_R = (double*) calloc(beams_setup.num, sizeof(double));
+
+    //
+    // Direction of the magnetic field
+    //--
+    B = magnetic_field(B_params, atom.pos);
+    if(r3_mod(B) == 0){
+        eB = B_params.B_basis[2];
+    } else eB = r3_normalize(B);
+    //--
+
+    //
+    // Check each beam
+    //--
+    for(i = 0; i < beams_setup.num; i++){
+        // Get beam
+        beam = beams_setup.beams[i];
+
+        // Polarizations
+        set_polarizations_amplitudes(&beam, eB);
+
+        // Get the sum of scattering rates over all possibilities
+        all_R[i] = get_total_scatt_rate(beam, beams_setup.sidebands, B, atom);
+    }
+    //--
+
+    return all_R;
+}
+
+int set_polarizations_amplitudes(beam_t *beam, double *eB){
     //
     // Variables
     int i, j;
-    double *eps_amp;
     double **R1, **R2;
+    double *pol_amp;
     complex_t **C1, **C2, **A_s_c, **A;
     complex_t *C1_eps, *C2_eps, *C2_s_eps;
 
     // Bases of the beam frame
-    R1 = orthonormal_basis(beam.k_dic);
+    R1 = orthonormal_basis(beam->k_dir);
     C1 = r3_oper_to_c3_oper(R1);
 
     // Bases of the B frame
@@ -976,7 +1023,7 @@ double *polarizations_amplitudes(beam_t beam, environment_t env, double *eB){
     // Get polarization amplitudes
     //--
     // Polarization on the Cartesian beam frame
-    C1_eps = c3_apply_operator(A_s_c, r3_to_c3(beam.eps));
+    C1_eps = c3_apply_operator(A_s_c, r3_to_c3(beam->pol_amp));
 
     // Polarization on the Cartesian B frame
     C2_eps = c3_apply_operator(A, C1_eps);
@@ -984,9 +1031,10 @@ double *polarizations_amplitudes(beam_t beam, environment_t env, double *eB){
     // Polarization on the Spherical B frame
     C2_s_eps = c3_apply_operator(c3_operator_dagger(A_s_c), C2_eps);
 
-    // Polarization amplitudes
-    eps_amp = (double*) calloc(3, sizeof(double));
-    for(i = 0; i < 3; i++) eps_amp[i] = pow(c_mod(C2_s_eps[i]), 2);
+    // Set Polarization amplitudes
+    pol_amp = (double*) calloc(3, sizeof(double));
+    for(i = 0; i < 3; i++) pol_amp[i] = pow(c_mod(C2_s_eps[i]), 2);
+    beam->pol_amp = pol_amp;
     //--
 
     //
@@ -1012,73 +1060,96 @@ double *polarizations_amplitudes(beam_t beam, environment_t env, double *eB){
     free(R2);
     //--
 
-    return eps_amp;
+    return 1;
 }
 
-double scattering_rate(atom_t atom, polarized_beam_t beam, conditions_t conds, environment_t env, double *B){
+double get_total_scatt_rate(beam_t beam, sidebands_t sidebands, double *B, atom_t atom){
     //
     // Variables
-    double R;                                           // Scattering rate
-    double r, s;                                        // Saturation parameter variables
-    double delta, gamma, doppler_shift, zeeman_shift;   // Detuning and Transition rate
-    double lambda;                                      // Resonant wave length
-    int mj_gnd, mj_exc;                                 // Zeeman shift
-    double g_gnd, g_exc;                                // Zeeman shift
-    double **C;                                         // Basis of the beam frame
-    int i;
+    double R = 0;                               // Total Scattering rate
+    double s, s_0, r;                           // Saturation parameter
+    double zeeman_shift, doppler_shift, delta;  // Detuning
+    double lambda, gamma, g_gnd, g_exc;         // Transition
+    int mj_gnd, mj_exc;                         // Transition
+    double **C;                                 // Basis of the beam frame
+    int pol[] = {+1, -1, 0};                    // All polarizations
+    int i, j, k;
 
+    //
+    // Initial Saturation parameter
+    //--
     // Basis of the beam frame
-    C = orthonormal_basis(r3_normalize(beam.k_dic));
-
-    //
-    // Saturation parameter
-    //
+    C = orthonormal_basis(r3_normalize(beam.k_dir));
 
     // Distance from the propagation axis
     r = pow(r3_inner_product(C[0], atom.pos), 2);
     r += pow(r3_inner_product(C[1], atom.pos), 2);
 
-    s = beam.s_0;
-    s = s * exp(-2 * pow((r / env.w), 2));
+    s_0 = beam.s_0;
+    s_0 = s_0 * exp(-2 * pow((r / beam.w), 2));
+    //--
 
-    //
-    // Detuning
-    delta = 0;
-    gamma = atom.transition.gamma; // kHz
+    // Transition
+    gamma = atom.transition.gamma; // kHz / 2pi
     lambda = atom.transition.lambda; // nm
 
-    // Laser detuning
-    delta += env.delta*gamma; // kHz
-    //printf("laser_detuning = %f\n", delta);
-
     // Doppler shift
-    doppler_shift = - 1e4 * r3_inner_product(atom.vel, C[2]) / lambda; // kHz
-    delta += doppler_shift;
+    doppler_shift = - 1e4 * r3_inner_product(atom.vel, C[2]) / lambda; // kHz / 2pi
     //printf("doppler_shift = %f\n", doppler_shift);
 
     //
-    // Zeeman shift
-    
-    // Ground state
-    mj_gnd = - atom.transition.J_gnd;
-    
-    // Excited state
-    mj_exc = mj_gnd + beam.eps;
+    // Check all possible transitions
+    //--
+    // Polarizations
+    //r3_print(beam.pol_amp, "pol_amp");
+    for(i = 0; i < 3; i++){
+        //
+        // Zeeman shift
+        //--
+        // Ground state
+        mj_gnd = - atom.transition.J_gnd;
+        
+        // Excited state
+        mj_exc = mj_gnd + pol[i];
 
-    // Landè factors
-    g_gnd = atom.transition.g_gnd;
-    g_exc = atom.transition.g_exc;
+        // Landè factors
+        g_gnd = atom.transition.g_gnd;
+        g_exc = atom.transition.g_exc;
 
-    // Compute shift
-    zeeman_shift = 1e3 * (mu_B / h) * r3_mod(B) * (g_gnd * mj_gnd - g_exc * mj_exc);  // kHz
-    delta += zeeman_shift;
-    //printf("|B| = %f\n", r3_mod(B));
-    //printf("zeeman_shift = %f\n", zeeman_shift);
+        // Compute shift
+        //printf("B = %f\n", r3_mod(B));
+        zeeman_shift = 1e3 * (mu_B / h) * r3_mod(B) * (g_gnd * mj_gnd - g_exc * mj_exc);  // kHz / 2pi
+        //--
 
-    // Scattering rate
-    R = ((2*PI*gamma * 1e3)/2) * s / (1 + s + 4*(delta*delta)/(gamma*gamma)); // Hz
+        // Saturation parameter considering sidebands
+        s = beam.pol_amp[i] * s_0 / (2*sidebands.num + 1);
+        //printf("s = %f\n", s);
 
-    // Release //memory  
+        // Main beam
+        delta = beam.delta*gamma; // kHz / 2pi
+        delta += zeeman_shift + doppler_shift;
+        //r3_print(beam.k_dir, "k");
+        //r3_print(beam.pol_amp, "eps");
+        //printf("Laser detuning [kHz / 2pi] = %f\n", beam.delta*gamma);
+        //printf("Doppler shift [kHz / 2pi] = %f\n", doppler_shift);
+        //printf("Zeeman shift [kHz / 2pi] = %f\n\n", zeeman_shift);
+        R += ((2*PI*gamma * 1e3)/2) * s / (1 + s + 4*(delta*delta)/(gamma*gamma)); // Hz
+        //printf("R = %f\n\n", R);
+
+        // Get all scattering rates due to the sidebands
+        for(j = 1; j < (sidebands.num + 1); j++){
+
+            for(k = -1; k < 2; k+=2){
+                // Detuning
+                delta = beam.delta + i*k*sidebands.freq; // kHz / 2pi
+                delta += zeeman_shift + doppler_shift;
+
+                R += ((2*PI*gamma * 1e3)/2) * s / (1 + s + 4*(delta*delta)/(gamma*gamma)); // Hz
+            }
+        }
+    }
+
+    // Release memory  
     for(i = 0; i < 3; i++) free(C[i]); 
     free(C);
 
@@ -1086,17 +1157,474 @@ double scattering_rate(atom_t atom, polarized_beam_t beam, conditions_t conds, e
     return R;
 }
 
+double *magnetic_acceleration(atom_t atom, magnetic_field_t B_params){
+    // Variables
+    int i;
+    double *a_B, *del_B, norm;  // Magnetic field
+    double g_lande;             // Transition
+    double *r_prime;
+
+    // Magnetic field gradient
+    if(r3_mod(atom.pos) > 0){
+        del_B = (double*) calloc(3, sizeof(double)); // G / cm
+        r_prime = (double*) calloc(3, sizeof(double)); // cm
+
+        for(i = 0; i < 3; i++)
+            r_prime[i] = r3_inner_product(atom.pos, B_params.B_basis[i]);
+
+        norm = sqrt(pow(r_prime[0], 2) * pow(r_prime[1], 2) + 4 * pow(r_prime[2], 2));
+
+        // Anti-helmholtz coils
+        for(i = 0; i < 3; i++){
+            del_B[i] = 0;
+            del_B[i] += B_params.B_basis[0][i] * r_prime[0] / (2 * norm);
+            del_B[i] += B_params.B_basis[1][i] * r_prime[1] / (2 * norm);
+            del_B[i] += - B_params.B_basis[2][i] * 2  * r_prime[2] / norm;
+            del_B[i] = B_params.B_0 * del_B[i];
+        }
+
+        // Magnetic field Bias
+        del_B = r3_sum(del_B, B_params.B_bias);
+
+        // Magnetic acceleration
+        a_B = (double*) calloc(3, sizeof(double)); // cm / s^2
+
+        // Atom state
+        if(atom.J == atom.transition.J_gnd)
+            g_lande = atom.transition.g_gnd;
+        else g_lande = atom.transition.g_exc;
+
+        for(i = 0; i < 3; i++)
+            a_B[i] = - mu_B * g_lande * atom.mJ * del_B[i] / (atom.mass * u) * 1e3; // cm / s^2
+
+        // Release memory
+        free(del_B);
+        free(r_prime);
+    } else {
+        a_B = (double*) calloc(3, sizeof(double)); // cm / s^2
+        for(i = 0; i < 3; i++) a_B[i] = 0;
+    }
+
+    return a_B;
+}
+
 //
 // Utility functions
 //
 
-int print_status(atom_t atom, results_t res){
-    printf("Simulation status\n--\n");
-    printf("total time (ms) = %f\n", 1e3*res.time / (2*PI*1e3 * atom.transition.gamma));
-    r3_print(atom.pos, "atom position (cm)");
-    r3_print(atom.vel, "atom velocity (cm / s)");
-    printf("distance from origin (cm) = %f\n", r3_mod(atom.pos));
-    printf("atom speed (cm / s) = %f\n", r3_mod(atom.vel));
+char *str_concatenate(char *str1, char *str2){
+    // Variables    
+    int i, j, size;
+    char *str;
+
+    //
+    // Concatenation
+    //
+
+    size = (int) (strlen(str1) + strlen(str2) - 1);
+    str = (char*) calloc(STRING_BUFFER_SIZE, sizeof(char));
+    
+    for(i = 0; i < ((int) strlen(str1)); i++)
+        str[i] = str1[i];
+
+    for(j = 0; j < ((int) strlen(str2)); j++)
+        str[i + j] = str2[j];
+
+    str[size+1] = '\0';
+
+    return str;
+}
+
+char **read_lines(char *path){
+    //
+    // Variables
+    int i = 0, j = 0, k = 0;
+    FILE *fp;
+    char *row, *aux_row;
+    char **rows;
+
+    // Alocate memory
+    rows = (char**) calloc(MAX_LINES, sizeof(char*));
+
+    // Open file
+    if((fp = fopen(path, "r"))){
+        // Read lines
+        while(!feof(fp)){
+            // Allocate memory
+            aux_row = (char*) calloc(STRING_BUFFER_SIZE, sizeof(char));
+            row = (char*) calloc(STRING_BUFFER_SIZE, sizeof(char));
+
+            // Try to read line
+            if(fgets(row, STRING_BUFFER_SIZE, fp) != NULL){
+                // Get row length and remove \n
+                k = 0;
+                for(j = 0; row[j] != '\0'; j++) {
+                    if(row[j] != '\n'){
+                        aux_row[k] = row[j];
+                        k += 1;
+                    }
+                }
+
+                // Copy the read row
+                rows[i] = (char*) calloc(k+1, sizeof(char));
+                strcpy(rows[i], aux_row);
+
+                i += 1;
+            } else break;
+
+            // Release memory
+            free(row);
+            free(aux_row);
+        }
+
+        // Indicate the file ending
+        rows[i+1] = (char*) calloc(3, sizeof(char));
+        rows[i+1] = NULL;
+
+        // Close file
+        fclose(fp); 
+    } else {
+        printf("File \"%s\" does not exist\n", path);
+        exit(0);
+    }
+
+    return rows;
+}
+
+char *str_replace(char *orig, char *rep, char *with){
+    char *result; // the return string
+    char *ins;    // the next insert point
+    char *tmp;    // varies
+    int len_rep;  // length of rep (the string to remove)
+    int len_with; // length of with (the string to replace rep with)
+    int len_front; // distance between rep and end of last rep
+    int count;    // number of replacements
+
+    // sanity checks and initialization
+    if (!orig || !rep)
+        return NULL;
+    len_rep = strlen(rep);
+    if (len_rep == 0)
+        return NULL; // empty rep causes infinite loop during count
+    if (!with)
+        with = "";
+    len_with = strlen(with);
+
+    // count the number of replacements needed
+    ins = orig;
+    for (count = 0; (tmp = strstr(ins, rep)); ++count) {
+        ins = tmp + len_rep;
+    }
+
+    tmp = result = malloc(strlen(orig) + (len_with - len_rep) * count + 1);
+
+    if (!result)
+        return NULL;
+
+    // first time through the loop, all the variable are set correctly
+    // from here on,
+    //    tmp points to the end of the result string
+    //    ins points to the next occurrence of rep in orig
+    //    orig points to the remainder of orig after "end of rep"
+    while (count--) {
+        ins = strstr(orig, rep);
+        len_front = ins - orig;
+        tmp = strncpy(tmp, orig, len_front) + len_front;
+        tmp = strcpy(tmp, with) + len_with;
+        orig += len_front + len_rep; // move to next "end of rep"
+    }
+    strcpy(tmp, orig);
+
+    return result;
+}
+
+double *get_double_array(char *str, int *size){
+    //
+    // Variables
+    //
+    int i, j, max_size = 124;
+    char *token;
+    double aux_arr[max_size];
+    double *arr;
+
+    str = str + 1;
+    str[strlen(str)-1] = '\0';
+    token = strtok_r(str, " ", &str);    
+
+    //
+    // Parse string
+    //
+
+    i = 0;
+    while(token && (i < max_size)){
+        // Py MODULE
+        if(Py_MODULE){
+            if(token[0] == '-') aux_arr[i] = -atof(str_replace(token+1, ".", ",")); 
+            else aux_arr[i] = atof(str_replace(token, ".", ","));
+        }
+
+        // C Program
+        else {
+            if(token[0] == '-') aux_arr[i] = -atof(token+1); 
+            else aux_arr[i] = atof(token);
+        }
+
+        token = strtok_r(str, " ", &str);
+        i++;
+    }
+
+    arr = (double *) malloc(i * sizeof(double));
+    for(j = 0; j < i; j++) arr[j] = aux_arr[j];
+
+    // Release memory
+    free(token);
+
+    return arr;
+}
+
+double **orthonormal_basis(double *v){
+    //
+    // Variables
+    //
+
+    int i;
+    double **B;             // Desired basis
+    double *v1, *v2, *v3;   // Auxiliary vectors
+
+    // Normalize vector v
+    v3 = r3_normalize(v);
+
+    // Generate a random vector  
+    v1 = (double*) calloc(3, sizeof(double));
+    for(i = 0; i < 3; i++) v1[i] = ((double) rand()) / ((double) RAND_MAX);
+
+    // Define a orthonormal vector
+    v2 = r3_scalar_product(r3_inner_product(v1, v3), v3);
+    v1 = r3_normalize(r3_diff(v1, v2));
+
+    // Define the last vector of the basis
+    v2 = r3_cross_product(v3, v1);
+
+    // Define basis
+    B = (double **) calloc(3, sizeof(double *));
+
+    for(i = 0; i < 3; i++)
+        B[i] = (double *) calloc(3, sizeof(double));
+
+    for(i = 0; i < 3; i++){
+        B[0][i] = v1[i];
+        B[1][i] = v2[i];
+        B[2][i] = v3[i];
+    }
+
+    // Free
+    free(v1);
+    free(v2);
+    free(v3);
+
+    // Return
+    return B;
+}
+
+double random_exp(double mean){
+    return (- mean * log(1 - ((double) rand()) / ((double) RAND_MAX)));
+}
+
+double random_norm(double mean, double std_dev){
+    //
+    // Variables
+    int i;
+    double *v, r, theta;     // Variables for Box-Muller method
+    double std_norm;         // Normal(0, 1)
+    double norm;             // Adjusted normal
+
+    v = (double*) calloc(2, sizeof(double));
+
+    //
+    // Box-Muller transform
+    //--
+    // Generate uniform random numbers
+    for(i = 0; i < 2; i++) v[i] = ((double) rand()) / ((double) RAND_MAX);
+
+    // Compute r
+    r = sqrt(-2 * log(v[0]));
+
+    // Generate theta
+    theta = 0.0;
+    while(theta == 0.0) theta = 2.0 * PI * v[1];
+
+    // Generate std_norm value
+    std_norm = r * cos(theta);
+
+    // Adjust std_norm
+    norm = (std_norm * std_dev) + mean;
+    //--
+
+    // Release memory
+    free(v);
+
+    return norm;
+}
+
+int random_pick(double *probs, int size){
+    //
+    // Variables
+    int i, picked = 0;
+    double module;
+    double rd_n;          // Random number
+    double *cum_probs;    // Cumulative probabilities
+    int *idx;
+
+    // Indexes
+    idx = (int*) calloc(size, sizeof(int));
+    for(i = 0; i < size; i++) idx[i] = i;
+
+    // Normalize probabilities
+    module = 0;
+    for(i = 0; i < size; i++) module += probs[i];
+    for(i = 0; i < size; i++) probs[i] = probs[i] / module;
+
+    // Generate a random number  
+    rd_n = ((double) rand()) / ((double) RAND_MAX);
+
+    // Cumulative probabilities
+    cum_probs = (double*) calloc(size, sizeof(double));
+    cum_probs[0] = probs[0];
+    for(i = 1; i < size; i++){
+        cum_probs[i] += cum_probs[i-1] + probs[i];
+    }
+
+    // Pick
+    for(i = 0; i < size; i++){
+        if(rd_n < cum_probs[i]){
+            picked = idx[i];
+            break;
+        }
+    }
+
+    // Release memory
+    free(cum_probs);
+    free(idx);
+
+    // Return
+    return picked;
+}
+
+int update_hist(histogram_t *hist, double val){
+    //
+    // Variables
+    //
+
+    int bin;
+    double lower_lim, upper_lim;
+
+    // Add frequency
+    for(bin = 0; bin < hist->num_bins; bin++){
+        lower_lim = hist->coord0 + bin * hist->bin_size;
+        upper_lim = lower_lim + hist->bin_size;
+
+        if((val >= lower_lim) && (val < upper_lim)){
+            hist->freqs[bin] += 1;
+            break;
+        }
+    }
+
+    return 1;
+}
+
+int update_hist_3d(histogram_3d_t *hist, double *vals){
+    //
+    // Variables
+    //
+
+    int i, bin, *coord, dim = 3;
+    double lower_lim, upper_lim;
+
+    // Coordinates
+    coord = (int*) calloc(dim, sizeof(int));
+
+    // Check each coordinate
+    for(i = 0; i < dim; i++){
+        // Add frequency
+        for(bin = 0; bin < (*hist).num_bins[i]; bin++){
+            lower_lim = (*hist).coord0[i] + bin * (*hist).bins_size[i];
+            upper_lim = lower_lim + (*hist).bins_size[i];
+
+            if((vals[i] >= lower_lim) && (vals[i] < upper_lim)){
+                coord[i] = bin;
+                break;
+            }
+        }  
+    }
+
+    (*hist).freqs[coord[0]][coord[1]][coord[2]] += 1;
+
+    // Release memory
+    free(coord);
+
+    return 1;
+}
+
+//
+// Debug
+
+int print_performance(performance_t perform){
+    printf("Performance\n--\n");
+    printf("T_0 [uK] = %f\n", perform.T_0);
+    printf("g_bool = %d\n", perform.g_bool);
+    printf("max_time [1/Gamma] = %f\n", perform.max_time);
+    printf("max_r [cm] = %f\n", perform.max_r);
+    printf("max_v [cm/s] = %f\n", perform.max_v);
+    printf("num_bins = %d\n", perform.num_bins);
+    printf("wait_time [1/Gamma] = %f\n", perform.wait_time);
+    printf("time interval [1/Gamma] = %f\n", perform.dt);
+    printf("\n");
+
+    return 1;
+}
+
+int print_magnetic_field(magnetic_field_t B_params){
+    printf("Magnetic field\n--\n");
+    printf("B_0 [G/cm] = %f\n", B_params.B_0);
+    r3_operator_print(B_params.B_basis, "B_basis");
+    r3_print(B_params.B_bias, "B_bias [G]");
+    printf("\n");
+
+    return 1;
+}
+
+int print_atom(atom_t atom){
+    printf("Atom\n--\n");
+    printf("symbol = %s\n", atom.symbol);
+    printf("Z = %d\n", atom.Z);
+    printf("mass [u] = %f\n", atom.mass);
+    r3_print(atom.pos, "pos [cm/s]");
+    r3_print(atom.vel, "vel [cm/s]");
+    printf("J = %d\n", atom.J);
+    printf("mJ = %d\n", atom.mJ);
+    printf("\n");
+
+    return 1;
+}
+
+int print_beams(beams_setup_t beams_setup){
+    // Variables
+    int i;
+
+    printf("\nSidebands\n");
+    printf("num = %d\n", beams_setup.sidebands.num);
+    printf("freq = %d\n", beams_setup.sidebands.freq);
+    printf("\n");
+    printf("All Beams\n--\n");
+    for(i = 0; i < beams_setup.num; i++){
+        printf("Beam %d\n", i+1);
+        printf("s_0 = %f\n", beams_setup.beams[i].s_0);
+        printf("delta [1/Gamma] = %f\n", beams_setup.beams[i].delta);
+        printf("w [cm] = %f\n", beams_setup.beams[i].w);
+        r3_print(beams_setup.beams[i].k_dir, "k");
+        r3_print(beams_setup.beams[i].pol_amp, "pol_amp");
+        printf("--\n");
+    }
     printf("\n");
 
     return 1;
@@ -1107,7 +1635,9 @@ int print_results(results_t res, atom_t atom, int only_marginals){
     int i, j;
 
     printf("Simulation status\n--\n");
-    printf("total time [ms] = %f\n\n", res.time / (atom.transition.gamma));
+    printf("total time [ms] = %f\n", res.time / (atom.transition.gamma));
+    printf("Atom trapped [ms] = %d\n", res.atom_trapped);
+    printf("\n");
 
     if(only_marginals){
         //
@@ -1135,20 +1665,25 @@ int print_results(results_t res, atom_t atom, int only_marginals){
         //--
     }
 
-    //
-    // Speed frequencies
-    //--
-    printf("speed[%d] = [\n", i+1);
-    for(j = 0; j < res.speed_hist.num_bins; j++)
-        printf("%d ", res.speed_hist.freqs[j]);
-    printf("]\n\n");
-    printf("\n");
-    //--
-
-    return 0;
+    return 1;
 }
 
-int print_params(atom_t atom, conditions_t conds, beams_setup_t beams_setup, environment_t env){
+int print_status(atom_t atom, results_t res){
+    printf("Simulation status\n--\n");
+    printf("total time (ms) = %f\n", 1e3*res.time / (2*PI*1e3 * atom.transition.gamma));
+    r3_print(atom.pos, "atom position (cm)");
+    r3_print(atom.vel, "atom velocity (cm / s)");
+    printf("distance from origin (cm) = %f\n", r3_mod(atom.pos));
+    printf("atom speed (cm / s) = %f\n", r3_mod(atom.vel));
+    printf("\n");
+
+    return 1;
+}
+
+
+/**
+
+int print_params(atom_t atom, performance_t perform, beams_setup_t beams_setup, environment_t env){
     // Variable
     int i;
 
@@ -1175,13 +1710,13 @@ int print_params(atom_t atom, conditions_t conds, beams_setup_t beams_setup, env
 
     // Conditions
     printf("Conditions\n--\n");
-    printf("T_0 [uK] = %f\n", conds.T_0);
-    printf("max_time [ms] = %f\n", conds.max_time / (atom.transition.gamma));
-    printf("max_r [cm] = %f\n", conds.max_r);
-    printf("max_v [cm/s] = %f\n", conds.max_v);
-    printf("num_bins = %d\n", conds.num_bins);
-    printf("wait_time [ms] = %f\n", conds.wait_time / (atom.transition.gamma));
-    printf("time interval [ms] = %f\n", conds.dt / (atom.transition.gamma));
+    printf("T_0 [uK] = %f\n", perform.T_0);
+    printf("max_time [ms] = %f\n", perform.max_time / (atom.transition.gamma));
+    printf("max_r [cm] = %f\n", perform.max_r);
+    printf("max_v [cm/s] = %f\n", perform.max_v);
+    printf("num_bins = %d\n", perform.num_bins);
+    printf("wait_time [ms] = %f\n", perform.wait_time / (atom.transition.gamma));
+    printf("time interval [ms] = %f\n", perform.dt / (atom.transition.gamma));
     printf("\n");
 
     // Environment
@@ -1243,348 +1778,4 @@ int *get_int_array(char *str, int *size){
 
     return arr;
 }
-
-double *get_double_array(char *str, int *size){
-    //
-    // Variables
-    //
-    int i, j, max_size = 124;
-    char *token;
-    double aux_arr[max_size];
-    double *arr;
-
-    str = str + 1;
-    str[strlen(str)-1] = '\0';
-    token = strtok_r(str, " ", &str);    
-
-    //
-    // Parse string
-    //
-
-    i = 0;
-    while(token && (i < max_size)){
-        if(token[0] == '-') aux_arr[i] = -atof(str_replace(token+1, ".", ",")); 
-        else aux_arr[i] = atof(str_replace(token, ".", ","));
-
-        token = strtok_r(str, " ", &str);
-        i++;
-    }
-
-    arr = (double *) malloc(i * sizeof(double));
-    for(j = 0; j < i; j++) arr[j] = aux_arr[j];
-
-    // Release memory
-    free(token);
-
-    return arr;
-}
-
-// Concatenate strings
-char *str_concatenate(char *str1, char *str2){
-    // Variables    
-    int i, j, size;
-    char *str;
-
-    //
-    // Concatenation
-    //
-
-    size = (int) (strlen(str1) + strlen(str2) - 1);
-    str = (char*) calloc(STRING_BUFFER_SIZE, sizeof(char));
-    
-    for(i = 0; i < ((int) strlen(str1)); i++)
-        str[i] = str1[i];
-
-    for(j = 0; j < ((int) strlen(str2)); j++)
-        str[i + j] = str2[j];
-
-    str[size+1] = '\0';
-
-    return str;
-}
-
-double random_norm(double mean, double std_dev){
-    //
-    // Variables
-    int i;
-    double *v, r, theta;     // Variables for Box-Muller method
-    double std_norm;         // Normal(0, 1)
-    double norm;             // Adjusted normal
-
-    v = (double*) calloc(2, sizeof(double));
-
-    //
-    // Box-Muller transform
-    //--
-    // Generate uniform random numbers
-    for(i = 0; i < 2; i++) v[i] = ((double) rand()) / ((double) RAND_MAX);
-
-    // Compute r
-    r = sqrt(-2 * log(v[0]));
-
-    // Generate theta
-    theta = 0.0;
-    while(theta == 0.0) theta = 2.0 * PI * v[1];
-
-    // Generate std_norm value
-    std_norm = r * cos(theta);
-
-    // Adjust std_norm
-    norm = (std_norm * std_dev) + mean;
-    //--
-
-    // Release memory
-    free(v);
-
-    return norm;
-}
-
-double random_exp(double mean){
-    return (- mean * log(1 - ((double) rand()) / ((double) RAND_MAX)));
-}
-
-int update_hist(histogram_t *hist, double val){
-    //
-    // Variables
-    //
-
-    int bin;
-    double lower_lim, upper_lim;
-
-    // Add frequency
-    for(bin = 0; bin < hist->num_bins; bin++){
-        lower_lim = hist->coord0 + bin * hist->bin_size;
-        upper_lim = lower_lim + hist->bin_size;
-
-        if((val >= lower_lim) && (val < upper_lim)){
-            hist->freqs[bin] += 1;
-            break;
-        }
-    }
-
-    return 1;
-}
-
-int update_hist_3d(histogram_3d_t *hist, double *vals){
-    //
-    // Variables
-    //
-
-    int i, bin, *coord, dim = 3;
-    double lower_lim, upper_lim;
-
-    // Coordinates
-    coord = (int*) calloc(dim, sizeof(int));
-
-    // Check each coordinate
-    for(i = 0; i < dim; i++){
-        // Add frequency
-        for(bin = 0; bin < (*hist).num_bins[i]; bin++){
-            lower_lim = (*hist).coord0[i] + bin * (*hist).bins_size[i];
-            upper_lim = lower_lim + (*hist).bins_size[i];
-
-            if((vals[i] >= lower_lim) && (vals[i] < upper_lim)){
-                coord[i] = bin;
-                break;
-            }
-        }  
-    }
-
-    (*hist).freqs[coord[0]][coord[1]][coord[2]] += 1;
-
-    // Release memory
-    free(coord);
-
-    return 1;
-}
-
-double **orthonormal_basis(double *v){
-    //
-    // Variables
-    //
-
-    int i;
-    double **B;             // Desired basis
-    double *v1, *v2, *v3;   // Auxiliary vectors
-
-    // Normalize vector v
-    v3 = r3_normalize(v);
-
-    // Generate a random vector  
-    v1 = (double*) calloc(3, sizeof(double));
-    for(i = 0; i < 3; i++) v1[i] = ((double) rand()) / ((double) RAND_MAX);
-
-    // Define a orthonormal vector
-    v2 = r3_scalar_product(r3_inner_product(v1, v3), v3);
-    v1 = r3_normalize(r3_diff(v1, v2));
-
-    // Define the last vector of the basis
-    v2 = r3_cross_product(v3, v1);
-
-    // Define basis
-    B = (double **) calloc(3, sizeof(double *));
-
-    for(i = 0; i < 3; i++)
-        B[i] = (double *) calloc(3, sizeof(double));
-
-    for(i = 0; i < 3; i++){
-        B[0][i] = v1[i];
-        B[1][i] = v2[i];
-        B[2][i] = v3[i];
-    }
-
-    // Free
-    free(v1);
-    free(v2);
-    free(v3);
-
-    // Return
-    return B;
-}
-
-int random_pick(double *probs, int size){
-    //
-    // Variables
-    int i, picked = 0;
-    double module;
-    double rd_n;          // Random number
-    double *cum_probs;    // Cumulative probabilities
-    int *idx;
-
-    // Indexes
-    idx = (int*) calloc(size, sizeof(int));
-    for(i = 0; i < size; i++) idx[i] = i;
-
-    // Normalize probabilities
-    module = 0;
-    for(i = 0; i < size; i++) module += probs[i];
-    for(i = 0; i < size; i++) probs[i] = probs[i] / module;
-
-    // Generate a random number  
-    rd_n = ((double) rand()) / ((double) RAND_MAX);
-
-    // Cumulative probabilities
-    cum_probs = (double*) calloc(size, sizeof(double));
-    cum_probs[0] = probs[0];
-    for(i = 1; i < size; i++){
-        cum_probs[i] += cum_probs[i-1] + probs[i];
-    }
-
-    // Pick
-    for(i = 0; i < size; i++){
-        if(rd_n < cum_probs[i]){
-            picked = idx[i];
-            break;
-        }
-    }
-
-    // Release memory
-    free(cum_probs);
-    free(idx);
-
-    // Return
-    return picked;
-}
-
-char *str_replace(char *orig, char *rep, char *with){
-    char *result; // the return string
-    char *ins;    // the next insert point
-    char *tmp;    // varies
-    int len_rep;  // length of rep (the string to remove)
-    int len_with; // length of with (the string to replace rep with)
-    int len_front; // distance between rep and end of last rep
-    int count;    // number of replacements
-
-    // sanity checks and initialization
-    if (!orig || !rep)
-        return NULL;
-    len_rep = strlen(rep);
-    if (len_rep == 0)
-        return NULL; // empty rep causes infinite loop during count
-    if (!with)
-        with = "";
-    len_with = strlen(with);
-
-    // count the number of replacements needed
-    ins = orig;
-    for (count = 0; (tmp = strstr(ins, rep)); ++count) {
-        ins = tmp + len_rep;
-    }
-
-    tmp = result = malloc(strlen(orig) + (len_with - len_rep) * count + 1);
-
-    if (!result)
-        return NULL;
-
-    // first time through the loop, all the variable are set correctly
-    // from here on,
-    //    tmp points to the end of the result string
-    //    ins points to the next occurrence of rep in orig
-    //    orig points to the remainder of orig after "end of rep"
-    while (count--) {
-        ins = strstr(orig, rep);
-        len_front = ins - orig;
-        tmp = strncpy(tmp, orig, len_front) + len_front;
-        tmp = strcpy(tmp, with) + len_with;
-        orig += len_front + len_rep; // move to next "end of rep"
-    }
-    strcpy(tmp, orig);
-
-    return result;
-}
-
-char **read_lines(char *path){
-    //
-    // Variables
-    int i = 0, j = 0, k = 0;
-    FILE *fp;
-    char *row, *aux_row;
-    char **rows;
-
-    // Alocate memory
-    rows = (char**) calloc(MAX_LINES, sizeof(char*));
-
-    // Open file
-    if((fp = fopen(path, "r"))){
-        // Read lines
-        while(!feof(fp)){
-            // Allocate memory
-            aux_row = (char*) calloc(STRING_BUFFER_SIZE, sizeof(char));
-            row = (char*) calloc(STRING_BUFFER_SIZE, sizeof(char));
-
-            // Try to read line
-            if(fgets(row, STRING_BUFFER_SIZE, fp) != NULL){
-                // Get row length and remove \n
-                k = 0;
-                for(j = 0; row[j] != '\0'; j++) {
-                    if(row[j] != '\n'){
-                        aux_row[k] = row[j];
-                        k += 1;
-                    }
-                }
-
-                // Copy the read row
-                rows[i] = (char*) calloc(k+1, sizeof(char));
-                strcpy(rows[i], aux_row);
-
-                i += 1;
-            } else break;
-
-            // Release memory
-            free(row);
-            free(aux_row);
-        }
-
-        // Indicate the file ending
-        rows[i+1] = (char*) calloc(3, sizeof(char));
-        rows[i+1] = NULL;
-
-        // Close file
-        fclose(fp); 
-    } else {
-        printf("File \"%s\" does not exist\n", path);
-        exit(0);
-    }
-
-    return rows;
-}
+**/
