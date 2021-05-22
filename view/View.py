@@ -398,7 +398,7 @@ class View:
 
     #
     # Plot temperature
-    def temperature(self, res, method=2):
+    def temperature(self, res, method=1):
         #
         # Check looping
         if len(res.loop["var"]) > 0:
@@ -418,26 +418,12 @@ class View:
                     "axes.titlepad":14
                 })
 
-            # Check option
-            if res.loop["var"] == 'delta':
-                plt.title("Temperature as a function\nof the laser detuning")
-                plt.xlabel(r"$ \Delta (2\pi \times MHz) $")
-                x = np.array(res.loop["values"]).astype(float)*(res.transition["gamma"]*1e-3) # 2pi MHz
+            # Looping info
+            info = self.info.loc[res.loop["var"]]
 
-            elif res.loop["var"] == 'max_time':
-                plt.title("Temperature as a function\nof the maximum simulation time")
-                plt.xlabel(r"$ t (ms) $")
-                x = np.array(res.loop["values"]).astype(float)/(res.transition["gamma"])
-
-            elif res.loop["var"] == 'T_0':
-                plt.title("Final temperature as a function\nof the initial temperature")
-                plt.xlabel(r"$ T_0 (\mu K) $")
-                x = np.array(res.loop["values"]).astype(float)
-
-            elif res.loop["var"] == 's_0':
-                plt.title("Final temperature as a function\nof the saturation parameter")
-                plt.xlabel(r"$ s_0 (I / I_s) $")
-                x = np.array(res.loop["values"]).astype(float)
+            plt.title("Temperature as a function\nof the " + info['name'].lower())
+            plt.xlabel(r"$ " + info['symbol'] + r" (" + info['unit'] + ") $")
+            x = np.array(res.loop["values"]).astype(float)
 
             plt.ylabel(r"T [$\mu K$]")
 

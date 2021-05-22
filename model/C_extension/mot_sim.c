@@ -289,6 +289,20 @@ magnetic_field_t get_magnetic_field(char *params_path){
     else B_params.B_bias = get_double_array(token, &n);
     //--
 
+    //
+    // Linear magnetic field gradient
+    //--
+    i += 1;
+    token = strtok_r(rows[i], DELIM, &saveptr); // Variable name
+    token = strtok_r(NULL, DELIM, &saveptr); // Value
+
+    // Python module
+    if(Py_MODULE) B_params.B_lin_grad = get_double_array(token, &n);
+
+    // C program
+    else B_params.B_lin_grad = get_double_array(token, &n);
+    //--
+
     // Release memory
     free(path);
 
@@ -646,14 +660,13 @@ atom_t get_atom(performance_t perform, magnetic_field_t B_params, char *params_p
     atom.vel = (double *) calloc(3, sizeof(double));
     for(i = 0; i < 3; i++){
         // Position
-        atom.pos[i] = 0;
+        //atom.pos[i] = 0;
 
         // Velocity
         std_dev = sqrt(k_B * perform.T_0 / (atom.mass * u)) * 10; // cm / s
         atom.vel[i] = random_norm(0, std_dev); // cm / s
-        atom.vel[i] = 0;
+        //atom.vel[i] = 0;
     }
-    //atom.pos[2] = -0.5;
     //--
 
     // Optical transition
@@ -761,38 +774,62 @@ int set_hist(int only_marginals, results_t *res, performance_t perform){
 double move(atom_t *atom, beams_setup_t beams_setup, performance_t perform, magnetic_field_t B_params){
     //
     // Variables
-    int i, j;                                   // Auxiliary variables
+    int i, j, k = 0;                            // Auxiliary variables
     double fixed_dt, dt = 0, aux_dt, max_dt;    // Times
-    double *probs, *all_R;                      // Absorption variables
-    int chosen_beam = 0;                        // Absorption variables
-    //double *a_B;                                // Magnetic acceleration
+    double *probs, *R;                          // Absorption variables
+    int chosen_beam = 0, num_transitions;       // Absorption variables
+    int *opt_beams;                             // Absorption variables
+    //double *a_B;                              // Magnetic acceleration
     double *rd_v, vel_mod;                      // Photonic recoil
 
     // Allocate variables
-    probs = (double*) calloc(beams_setup.num + 1, sizeof(double));
+    num_transitions = beams_setup.num*3*(2*beams_setup.sidebands.num +1);
+    probs = (double*) calloc(num_transitions + 1, sizeof(double));
+    opt_beams = (int*) calloc(num_transitions + 1, sizeof(int));
 
     // Time interval
     max_dt = perform.dt / (2 * PI * atom->transition.gamma*1e3);
     fixed_dt = 0.5 / (2 * PI * atom->transition.gamma*1e3);
 
     // Get all scattering rates
-    all_R = get_all_scatt_rate(beams_setup, B_params, *atom);
+    R = get_all_scatt_rate(beams_setup, B_params, *atom);
 
     //
     // Method 1 - Exponential distribution sample
     //--
     // Get time interval
     for(i = 0; i < beams_setup.num; i++){
-        if(all_R[i] > 0){
-            aux_dt = random_exp(1 / all_R[i]);
+        for(j = 0; j < 3*(2*beams_setup.sidebands.num + 1); j++){
+            if(R[k] > 0){
+                // Method 1 - Exponential distribution sample
+                aux_dt = random_exp(1 / R[k]);
+                if(dt == 0 || aux_dt < dt){
+                    chosen_beam = i+1;
+                    dt = aux_dt;
+                }
 
-            if(dt == 0 || aux_dt < dt){
-                chosen_beam = i+1;
-                dt = aux_dt;
+                //r3_print(beams_setup.beams[i].k_dir, "k");
+                //printf("R[%d] = %f\n", k+1,  R[k+1]);
+                //printf("probs[%d] = %f\n", k+1,  probs[k+1]);
+                //printf("dt = %f\n", aux_dt);
+                //printf("\n");
             }
+
+            // Method 2 - Fixed time interval
+            probs[k+1] = R[k] * fixed_dt;
+            probs[0] += probs[k+1];
+            opt_beams[k] = i;
+
+            k++;
         }
     }
 
+    if(chosen_beam > 0 && dt <= max_dt){
+        //r3_print(beams_setup.beams[chosen_beam - 1].k_dir, "k");
+        //printf("dt = %f (max_dt = %f)\n", dt, max_dt);
+        //printf("chosen_beam = %d\n\n", chosen_beam);
+    } //else printf("Any beam was chosen by the method 1\n\n");
+    
     if(chosen_beam == 0) dt = fixed_dt;
     //--
 
@@ -802,28 +839,22 @@ double move(atom_t *atom, beams_setup_t beams_setup, performance_t perform, magn
     //exit(0);
 
 
-    //
-    // Method 2 - Fixed time interval
-    //--
     // Check if method 1 wasn't successful
     if(dt > max_dt && chosen_beam > 0){
-        // Get probabilities
-        probs[0] = 0;
-        for(i = 1; i < beams_setup.num+1; i++){
-            probs[i] = all_R[i-1] * fixed_dt;
-            probs[0] += probs[i];
-            //r3_print(beams_setup.beams[i-1].k_dir, "k");
-            //printf("prob[%d] = %f\n\n", i, probs[i]);
-        }
-        probs[0] = 1 - probs[0];
-        //printf("prob[0] = %f\n", probs[0]);
-
+        //
+        // Apply method 2
+        //--
         // Pick a beam
-        chosen_beam = random_pick(probs, beams_setup.num+1);
-        //printf("chosen_beam = %d\n", chosen_beam);
+        chosen_beam = random_pick(probs, num_transitions+1);
         dt = fixed_dt;
-    }
-    //--
+
+        if(chosen_beam > 0){
+            chosen_beam = opt_beams[chosen_beam - 1] + 1;
+            //r3_print(beams_setup.beams[opt_beams[chosen_beam - 1]].k_dir, "k");
+            //printf("dt = %f\n", dt);
+        } //else printf("Any beam was chosen by the method 2\n");
+        //--
+    } //else printf("Any beam was chosen by the method 2\n");
 
 
     //printf("gamma [kHz/2pi] = %f\n", atom->transition.gamma);
@@ -922,13 +953,18 @@ double *magnetic_field(magnetic_field_t B_params, double *r){
     // Anti-Helmholtz coils
     for(i = 0; i < 3; i++){
         B[i] = 0;
+
+        // Linear magnetic field
         B[i] += r_prime[0] * B_params.B_basis[0][i] / 2;
         B[i] += r_prime[1] * B_params.B_basis[1][i] / 2;
         B[i] += - r_prime[2] * B_params.B_basis[2][i];
         B[i] = B_params.B_0 * B[i];
+
+        // Linear magnetic field gradient
+        B[i] += B_params.B_lin_grad[i]*r[i];
     }
 
-    // Local Magnetic field
+    // Bias magnetic field
     B = r3_sum(B_params.B_bias, B);
 
     // Release memory
@@ -937,18 +973,75 @@ double *magnetic_field(magnetic_field_t B_params, double *r){
     return B;
 }
 
-double *get_all_scatt_rate(beams_setup_t beams_setup, magnetic_field_t B_params, atom_t atom){
+double *magnetic_acceleration(atom_t atom, magnetic_field_t B_params){
     // Variables
     int i;
-    double *B, *eB;
-    double *all_R;
-    beam_t beam;
+    double *a_B, *del_B, norm;  // Magnetic field
+    double g_lande;             // Transition
+    double *r_prime;
+
+    // Magnetic field gradient
+    if(r3_mod(atom.pos) > 0){
+        del_B = (double*) calloc(3, sizeof(double)); // G / cm
+        r_prime = (double*) calloc(3, sizeof(double)); // cm
+
+        for(i = 0; i < 3; i++)
+            r_prime[i] = r3_inner_product(atom.pos, B_params.B_basis[i]);
+
+        norm = sqrt(pow(r_prime[0], 2) * pow(r_prime[1], 2) + 4 * pow(r_prime[2], 2));
+
+        // Anti-helmholtz coils
+        for(i = 0; i < 3; i++){
+            del_B[i] = 0;
+            del_B[i] += B_params.B_basis[0][i] * r_prime[0] / (2 * norm);
+            del_B[i] += B_params.B_basis[1][i] * r_prime[1] / (2 * norm);
+            del_B[i] += - B_params.B_basis[2][i] * 2  * r_prime[2] / norm;
+            del_B[i] = B_params.B_0 * del_B[i];
+        }
+
+        // Magnetic field Bias
+        del_B = r3_sum(del_B, B_params.B_bias);
+
+        // Magnetic acceleration
+        a_B = (double*) calloc(3, sizeof(double)); // cm / s^2
+
+        // Atom state
+        if(atom.J == atom.transition.J_gnd)
+            g_lande = atom.transition.g_gnd;
+        else g_lande = atom.transition.g_exc;
+
+        for(i = 0; i < 3; i++)
+            a_B[i] = - mu_B * g_lande * atom.mJ * del_B[i] / (atom.mass * u) * 1e3; // cm / s^2
+
+        // Release memory
+        free(del_B);
+        free(r_prime);
+    } else {
+        a_B = (double*) calloc(3, sizeof(double)); // cm / s^2
+        for(i = 0; i < 3; i++) a_B[i] = 0;
+    }
+
+    return a_B;
+}
+
+double *get_all_scatt_rate(beams_setup_t beams_setup, magnetic_field_t B_params, atom_t atom){
+    // Variables          
+    int i, j, k = 0, l, m;                                      // Auxiliary variables
+    double *B, *eB;                                             // Magnetic field     
+    double *R;                                                  // Scattering rates
+    double s, s_0, r;                                           // Saturation parameter
+    double zeeman_shift, doppler_shift, laser_detuning, delta;  // Detuning
+    double lambda, gamma, g_gnd, g_exc;                         // Transition
+    int mj_gnd, mj_exc;                                         // Transition
+    double **C;                                                 // Basis of the beam frame
+    int pol[] = {+1, -1, 0};                                    // All polarizations
+    beam_t beam;                                                // Beam     
 
     // Allocate memory
-    all_R = (double*) calloc(beams_setup.num, sizeof(double));
+    R = (double*) calloc(beams_setup.num*3*(2*beams_setup.sidebands.num + 1), sizeof(double));
 
     //
-    // Direction of the magnetic field
+    // Magnetic field
     //--
     B = magnetic_field(B_params, atom.pos);
     if(r3_mod(B) == 0){
@@ -966,12 +1059,112 @@ double *get_all_scatt_rate(beams_setup_t beams_setup, magnetic_field_t B_params,
         // Polarizations
         set_polarizations_amplitudes(&beam, eB);
 
-        // Get the sum of scattering rates over all possibilities
-        all_R[i] = get_total_scatt_rate(beam, beams_setup.sidebands, B, atom);
+        //
+        // Initial Saturation parameter
+        //--
+        // Basis of the beam frame
+        C = orthonormal_basis(r3_normalize(beam.k_dir));
+
+        // Distance from the propagation axis
+        r = pow(r3_inner_product(C[0], atom.pos), 2);
+        r += pow(r3_inner_product(C[1], atom.pos), 2);
+
+        s_0 = beam.s_0;
+        s_0 = s_0 * exp(-2 * pow((r / beam.w), 2));
+        //--
+
+        // Transition
+        gamma = atom.transition.gamma; // kHz / 2pi
+        lambda = atom.transition.lambda; // nm
+
+        // Doppler shift
+        doppler_shift = - 1e4 * r3_inner_product(atom.vel, C[2]) / lambda; // kHz / 2pi
+        //printf("doppler_shift = %f\n", doppler_shift);
+
+        //
+        // Check all possible transitions
+        //--
+        // Polarizations
+        for(j = 0; j < 3; j++){
+            //
+            // Zeeman shift
+            //--
+            // Ground state
+            mj_gnd = - atom.transition.J_gnd;
+            
+            // Excited state
+            mj_exc = mj_gnd + pol[j];
+
+            // Landè factors
+            g_gnd = atom.transition.g_gnd;
+            g_exc = atom.transition.g_exc;
+
+            // Compute shift
+            //printf("B = %f\n", r3_mod(B));
+            zeeman_shift = 1e3 * (mu_B / h) * r3_mod(B) * (g_gnd * mj_gnd - g_exc * mj_exc);  // kHz / 2pi
+            //--
+
+            // Saturation parameter considering sidebands
+            s = beam.pol_amp[j] * s_0 / (2*beams_setup.sidebands.num + 1);
+            //printf("s = %f\n", s);
+
+            // Main beam
+            laser_detuning = beam.delta*gamma; // kHz / 2pi
+            delta = laser_detuning + zeeman_shift + doppler_shift;
+            R[k] = ((2*PI*gamma * 1e3)/2) * s / (1 + s + 4*(delta*delta)/(gamma*gamma)); // Hz
+
+            //r3_print(beam.k_dir, "k");
+            //printf("pol = %d (eps = %f)\n", pol[j], beam.pol_amp[j]);
+            //printf("sideband %d\n", 0);
+            //printf("Laser detuning [kHz / 2pi] = %f\n", laser_detuning);
+            //printf("Doppler shift [kHz / 2pi] = %f\n", doppler_shift);
+            //printf("Zeeman shift [kHz / 2pi] = %f\n", zeeman_shift);
+            //printf("|B| = %f\n", r3_mod(B));
+            //printf("R[%d] = %f\n\n", k, R[k]);
+
+            k += 1;
+
+            // Get all scattering rates due to the sidebands
+            for(m = 0; m < beams_setup.sidebands.num; m++){
+                // Right sideband
+                laser_detuning = beam.delta*gamma + (m+1)*beams_setup.sidebands.freq; // kHz / 2pi
+                delta = laser_detuning + zeeman_shift + doppler_shift;
+                R[k] = ((2*PI*gamma * 1e3)/2) * s / (1 + s + 4*(delta*delta)/(gamma*gamma)); // Hz
+
+                //r3_print(beam.k_dir, "k");
+                //printf("pol = %d (eps = %f)\n", pol[j], beam.pol_amp[j]);
+                //printf("sideband %d (Right)\n", m+1);
+                //printf("Laser detuning [kHz / 2pi] = %f\n", laser_detuning);
+                //printf("Doppler shift [kHz / 2pi] = %f\n", doppler_shift);
+                //printf("Zeeman shift [kHz / 2pi] = %f\n", zeeman_shift);
+                //printf("R[%d] = %f\n\n", k, R[k]);
+
+                k += 1;
+
+                // Left sideband
+                laser_detuning = beam.delta*gamma - (m+1)*beams_setup.sidebands.freq; // kHz / 2pi
+                delta = laser_detuning + zeeman_shift + doppler_shift;
+                R[k] = ((2*PI*gamma * 1e3)/2) * s / (1 + s + 4*(delta*delta)/(gamma*gamma)); // Hz
+
+                //r3_print(beam.k_dir, "k");
+                //printf("pol = %d (eps = %f)\n", pol[j], beam.pol_amp[j]);
+                //printf("sideband %d (Left)\n", m+1);
+                //printf("Laser detuning [kHz / 2pi] = %f\n", laser_detuning);
+                //printf("Doppler shift [kHz / 2pi] = %f\n", doppler_shift);
+                //printf("Zeeman shift [kHz / 2pi] = %f\n", zeeman_shift);
+                //printf("R[%d] = %f\n\n", k, R[k]);
+
+                k += 1;
+            }
+        }
+
+        // Release memory  
+        for(l = 0; l < 3; l++) free(C[l]); 
+        free(C);
     }
     //--
 
-    return all_R;
+    return R;
 }
 
 int set_polarizations_amplitudes(beam_t *beam, double *eB){
@@ -1061,6 +1254,113 @@ int set_polarizations_amplitudes(beam_t *beam, double *eB){
     return 1;
 }
 
+/*
+
+double *get_scatt_rates(beam_t beam, sidebands_t sidebands, double *B, atom_t atom){
+    //
+    // Variables
+    double *R;                                  // Scattering rates
+    double s, s_0, r;                           // Saturation parameter
+    double zeeman_shift, doppler_shift, delta;  // Detuning
+    double lambda, gamma, g_gnd, g_exc;         // Transition
+    int mj_gnd, mj_exc;                         // Transition
+    double **C;                                 // Basis of the beam frame
+    int pol[] = {+1, -1, 0};                    // All polarizations
+    int i, j, k;
+
+    // Allocate memory
+    R = (double*) calloc(3*(2*sidebands.num + 1), sizeof(double));
+
+    //
+    // Initial Saturation parameter
+    //--
+    // Basis of the beam frame
+    C = orthonormal_basis(r3_normalize(beam.k_dir));
+
+    // Distance from the propagation axis
+    r = pow(r3_inner_product(C[0], atom.pos), 2);
+    r += pow(r3_inner_product(C[1], atom.pos), 2);
+
+    s_0 = beam.s_0;
+    s_0 = s_0 * exp(-2 * pow((r / beam.w), 2));
+    //--
+
+    // Transition
+    gamma = atom.transition.gamma; // kHz / 2pi
+    lambda = atom.transition.lambda; // nm
+
+    // Doppler shift
+    doppler_shift = - 1e4 * r3_inner_product(atom.vel, C[2]) / lambda; // kHz / 2pi
+    //printf("doppler_shift = %f\n", doppler_shift);
+
+    //
+    // Check all possible transitions
+    //--
+    // Indexes
+    k = 0;
+
+    // Polarizations
+    for(i = 0; i < 3; i++){
+        //
+        // Zeeman shift
+        //--
+        // Ground state
+        mj_gnd = - atom.transition.J_gnd;
+        
+        // Excited state
+        mj_exc = mj_gnd + pol[i];
+
+        // Landè factors
+        g_gnd = atom.transition.g_gnd;
+        g_exc = atom.transition.g_exc;
+
+        // Compute shift
+        //printf("B = %f\n", r3_mod(B));
+        zeeman_shift = 1e3 * (mu_B / h) * r3_mod(B) * (g_gnd * mj_gnd - g_exc * mj_exc);  // kHz / 2pi
+        //--
+
+        // Saturation parameter considering sidebands
+        s = beam.pol_amp[i] * s_0 / (2*sidebands.num + 1);
+        //printf("s = %f\n", s);
+
+        // Main beam
+        delta = beam.delta*gamma; // kHz / 2pi
+        delta += zeeman_shift + doppler_shift;
+        //r3_print(beam.k_dir, "k");
+        //r3_print(beam.pol_amp, "eps");
+        //printf("Laser detuning [kHz / 2pi] = %f\n", beam.delta*gamma);
+        //printf("Doppler shift [kHz / 2pi] = %f\n", doppler_shift);
+        //printf("Zeeman shift [kHz / 2pi] = %f\n\n", zeeman_shift);
+        R[k] = ((2*PI*gamma * 1e3)/2) * s / (1 + s + 4*(delta*delta)/(gamma*gamma)); // Hz
+        printf("R = %f\n\n", R[k]);
+        k += 1;
+
+        // Get all scattering rates due to the sidebands
+        for(j = 0; j < sidebands.num; j++){
+            // Right sideband
+            delta = beam.delta + (j+1)*sidebands.freq; // kHz / 2pi
+            delta += zeeman_shift + doppler_shift;
+            R[k] = ((2*PI*gamma * 1e3)/2) * s / (1 + s + 4*(delta*delta)/(gamma*gamma)); // Hz
+            printf("R = %f\n\n", R[k]);
+            k += 1;
+
+             // Left sideband
+            delta = beam.delta - (j+1)*sidebands.freq; // kHz / 2pi
+            delta += zeeman_shift + doppler_shift;
+            R[k] = ((2*PI*gamma * 1e3)/2) * s / (1 + s + 4*(delta*delta)/(gamma*gamma)); // Hz
+            printf("R = %f\n\n", R[k]);
+            k += 1;
+        }
+    }
+
+    // Release memory  
+    for(i = 0; i < 3; i++) free(C[i]); 
+    free(C);
+
+    // Return
+    return R;
+}
+
 double get_total_scatt_rate(beam_t beam, sidebands_t sidebands, double *B, atom_t atom){
     //
     // Variables
@@ -1132,7 +1432,7 @@ double get_total_scatt_rate(beam_t beam, sidebands_t sidebands, double *B, atom_
         //printf("Doppler shift [kHz / 2pi] = %f\n", doppler_shift);
         //printf("Zeeman shift [kHz / 2pi] = %f\n\n", zeeman_shift);
         R += ((2*PI*gamma * 1e3)/2) * s / (1 + s + 4*(delta*delta)/(gamma*gamma)); // Hz
-        //printf("R = %f\n\n", R);
+        printf("R = %f\n\n", R);
 
         // Get all scattering rates due to the sidebands
         for(j = 1; j < (sidebands.num + 1); j++){
@@ -1155,56 +1455,7 @@ double get_total_scatt_rate(beam_t beam, sidebands_t sidebands, double *B, atom_
     return R;
 }
 
-double *magnetic_acceleration(atom_t atom, magnetic_field_t B_params){
-    // Variables
-    int i;
-    double *a_B, *del_B, norm;  // Magnetic field
-    double g_lande;             // Transition
-    double *r_prime;
-
-    // Magnetic field gradient
-    if(r3_mod(atom.pos) > 0){
-        del_B = (double*) calloc(3, sizeof(double)); // G / cm
-        r_prime = (double*) calloc(3, sizeof(double)); // cm
-
-        for(i = 0; i < 3; i++)
-            r_prime[i] = r3_inner_product(atom.pos, B_params.B_basis[i]);
-
-        norm = sqrt(pow(r_prime[0], 2) * pow(r_prime[1], 2) + 4 * pow(r_prime[2], 2));
-
-        // Anti-helmholtz coils
-        for(i = 0; i < 3; i++){
-            del_B[i] = 0;
-            del_B[i] += B_params.B_basis[0][i] * r_prime[0] / (2 * norm);
-            del_B[i] += B_params.B_basis[1][i] * r_prime[1] / (2 * norm);
-            del_B[i] += - B_params.B_basis[2][i] * 2  * r_prime[2] / norm;
-            del_B[i] = B_params.B_0 * del_B[i];
-        }
-
-        // Magnetic field Bias
-        del_B = r3_sum(del_B, B_params.B_bias);
-
-        // Magnetic acceleration
-        a_B = (double*) calloc(3, sizeof(double)); // cm / s^2
-
-        // Atom state
-        if(atom.J == atom.transition.J_gnd)
-            g_lande = atom.transition.g_gnd;
-        else g_lande = atom.transition.g_exc;
-
-        for(i = 0; i < 3; i++)
-            a_B[i] = - mu_B * g_lande * atom.mJ * del_B[i] / (atom.mass * u) * 1e3; // cm / s^2
-
-        // Release memory
-        free(del_B);
-        free(r_prime);
-    } else {
-        a_B = (double*) calloc(3, sizeof(double)); // cm / s^2
-        for(i = 0; i < 3; i++) a_B[i] = 0;
-    }
-
-    return a_B;
-}
+*/
 
 //
 // Utility functions

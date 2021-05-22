@@ -23,8 +23,8 @@
 
 # Transition (transition.csv)
  
-- gamma     ->  (float)     Transition rate [kHz / (2 pi)]
-- lambda    ->  (float)     Resonant wave length [nm]
+- gamma     ->  (float)     Linewidth [kHz / (2 pi)]
+- lambda    ->  (float)     Resonant wavelength [nm]
 - J_gnd     ->  (int)       Total angular momentum of the ground state
 - J_exc     ->  (int)       Total angular momentum of the excited state
 - g_gnd     ->  (float)     Landè factor of the ground state

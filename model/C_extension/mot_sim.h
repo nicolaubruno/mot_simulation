@@ -18,7 +18,7 @@
 #define MAX_LINES 124
 #define DELIM ","
 #define MAX_BEAMS 16
-#define Py_MODULE 0
+#define Py_MODULE 1
 
 #define h 6.62607004        // Planck constant [10^{-34} J s]
 #define e 1.60217662        // Elementary charge [10^{-19} C]s
@@ -69,9 +69,10 @@ typedef struct{
 
 // Magnetic field
 typedef struct{
-    double B_0;         /* Magnetic Field gradient */
-    double **B_basis;   /* Reference basis of the magnetic field */
-    double *B_bias;     /* Bias of magnetic field */
+    double B_0;             /* Magnetic Field gradient */
+    double **B_basis;       /* Reference basis of the magnetic field */
+    double *B_bias;         /* Bias of magnetic field */
+    double *B_lin_grad;  /* Linear gradient of magnetic field */
 } magnetic_field_t;
 
 // Beam
@@ -166,13 +167,16 @@ int set_polarizations_amplitudes(beam_t *beam, double *eB);
 // Get a list of scattering rate for each beam considering all transitions and sidebands
 double *get_all_scatt_rate(beams_setup_t beams_setup, magnetic_field_t B_params, atom_t atom);
 
-// Get the sum of scattering rates over all possibilities
-double get_total_scatt_rate(beam_t beam, sidebands_t sidebands, double *B, atom_t atom);
-
 // Get magnetic acceleration
 double *magnetic_acceleration(atom_t atom, magnetic_field_t B_params);
 
-/**
+/*
+
+// Get the sum of scattering rates over all possibilities
+double get_total_scatt_rate(beam_t beam, sidebands_t sidebands, double *B, atom_t atom);
+
+// Get all scattering rates for a beam
+double *get_scatt_rates(beam_t beam, sidebands_t sidebands, double *B, atom_t atom);
 
 // Get environment
 environment_t get_environment(char *params_path);
@@ -189,7 +193,7 @@ double scattering_rate(atom_t atom, polarized_beam_t beam, performance_t conds, 
 // Get components of a vector v on the basis B given the components on basis A
 double *change_basis(double *v, double **A, double **B_basis);
 
-**/
+*/
 
 //
 // Utility functions

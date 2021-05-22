@@ -44,11 +44,17 @@ class Results:
         return self._B_params
 
     #
-    # (Dataframe)
+    # (Dictionary)
     @property
     def beams(self):
         return self._beams
 
+    #
+    # (Dataframe) Information about the parameters
+    @property
+    def info(self):
+        return self._info
+    
     #
     # Identification code
     @property
@@ -60,6 +66,7 @@ class Results:
     @property
     def name(self):
         return self._name
+
 
     #
     # 3D-Histogram of positions
@@ -302,6 +309,13 @@ class Results:
         path = params_dir + "magnetic_field.csv"
         self._B_params = pd.read_csv(path, header=0, index_col=0, squeeze=True).astype(object)
 
+        #
+        # Information about the parameters
+        path = "model/parameters/informations.csv"
+        self._info = pd.read_csv(path, header=0)
+        self._info.set_index("parameter", inplace=True)
+        self._info.fillna("", inplace=True)
+
     #
     # Get distributions
     def __get_dists(self):
@@ -512,7 +526,7 @@ class Results:
 
             #
             # Magnetic field
-            prohibited_variables = ["B_axial", "B_bias"]
+            prohibited_variables = ["B_axial", "B_bias", "B_lin_grad"]
 
             if self.loop["var"] in prohibited_variables:
                 self._loop["var"] = ''
@@ -775,7 +789,7 @@ class Results:
     def __set_loop(self):
         #
         # Magnetic field
-        prohibited_variables = ["B_axial, B_bias"]
+        prohibited_variables = ["B_axial", "B_bias", "B_lin_grad"]
 
         for idx in self.B_params.index:
             if not (idx in prohibited_variables):
@@ -1016,12 +1030,6 @@ class Results:
 
                 temp = (np.sum(v_square) * float(self.atom['mass']) * self.ctes['u']) / (3*self.ctes['k_B'])
 
-            elif method == 2:
-                x = self.speed_hist['bins']*1e-2
-                p = self.speed_hist['dens']
-
-                temp = (np.sum(x*p)**2 * np.pi * float(self.atom['mass']) * self.ctes['u']) / (8*self.ctes['k_B'])
-
         #--
 
         #
@@ -1040,16 +1048,6 @@ class Results:
 
                 temp = (np.sum(v_square, axis=0) * float(self.atom['mass']) * self.ctes['u']) / (3*self.ctes['k_B'])
 
-            elif method == 2:
-                temp = np.zeros(len(self.loop['values']))
-                
-                for i in range(len(self.loop['values'])):
-                    self.loop_idx(i)
-                    x = self.speed_hist['bins']*1e-2
-                    p = self.speed_hist['dens']
-
-                    temp[i] = (np.sum(x*p)**2 * np.pi * float(self.atom['mass']) * self.ctes['u']) / (8*self.ctes['k_B'])
-
         return temp   
 
     #
@@ -1060,10 +1058,10 @@ class Results:
         if self.loop["var"] == "gamma" and fixed_loop_idx:
             temp = np.zeros(len(self.loop["values"]))
             for i, gamma in enumerate(self.loop["values"]):
-                temp[i] = 1e9*(self.ctes['hbar'] * gamma * np.sqrt(1 + self.results.beams['main']['s_0'])) / (2 * self.ctes['k_B']) # uK
+                temp[i] = 1e9*(self.ctes['hbar'] * gamma * np.sqrt(1 + self.beams['main']['s_0'])) / (2 * self.ctes['k_B']) # uK
 
         else:
-            temp = 1e9*(self.ctes['h'] * self.transition['gamma'] * np.sqrt(1 + self.results.beams['main']['s_0'])) / (2 * self.ctes['k_B']) # uK
+            temp = 1e9*(self.ctes['h'] * self.transition['gamma'] * np.sqrt(1 + self.beams['main']['s_0'])) / (2 * self.ctes['k_B']) # uK
 
         return temp
 
