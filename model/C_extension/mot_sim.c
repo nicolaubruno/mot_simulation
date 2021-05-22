@@ -808,34 +808,31 @@ double move(atom_t *atom, beams_setup_t beams_setup, performance_t perform, magn
                     chosen_beam = i+1;
                     dt = aux_dt;
                 }
-
-                //r3_print(beams_setup.beams[i].k_dir, "k");
-                //printf("R[%d] = %f\n", k+1,  R[k+1]);
-                //printf("probs[%d] = %f\n", k+1,  probs[k+1]);
-                //printf("dt = %f\n", aux_dt);
-                //printf("\n");
             }
 
             // Method 2 - Fixed time interval
             probs[k+1] = R[k] * fixed_dt;
             probs[0] += probs[k+1];
             opt_beams[k] = i;
+            
+            //r3_print(beams_setup.beams[i].k_dir, "k");
+            //printf("R[%d] = %f\n", k+1,  R[k]);
+            //printf("probs[%d] = %f\n", k+1,  probs[k+1]);
+            //printf("dt [1/Gamma] = %f\n", aux_dt*(2*PI*atom->transition.gamma*1e3));
+            //printf("\n");
 
             k++;
         }
     }
 
+    probs[0] = 1 - probs[0];
+
     if(chosen_beam > 0){
         //r3_print(beams_setup.beams[chosen_beam - 1].k_dir, "k");
-        //printf("dt = %f (max_dt = %f)\n", dt, max_dt);
+        //printf("dt [1/Gamma] = %f\n", dt*(2*PI*atom->transition.gamma*1e3));
         //printf("chosen_beam = %d\n\n", chosen_beam);
     } //else printf("Any beam was chosen by the method 1\n\n");
     //--
-
-    //printf("fixed_dt = %f\n", fixed_dt*(2 * PI * atom->transition.gamma*1e3));
-    //printf("dt = %f\n", dt*(2 * PI * atom->transition.gamma*1e3));
-    //printf("chosen_beam = %d\n\n", chosen_beam);
-    //exit(0);
 
 
     // Check if method 1 wasn't successful
@@ -849,19 +846,12 @@ double move(atom_t *atom, beams_setup_t beams_setup, performance_t perform, magn
 
         if(chosen_beam > 0){
             chosen_beam = opt_beams[chosen_beam - 1] + 1;
+            //printf("chosen_beam = %d\n", chosen_beam);
             //r3_print(beams_setup.beams[opt_beams[chosen_beam - 1]].k_dir, "k");
-            //printf("dt = %f\n", dt);
+            //printf("dt [1/Gamma] = %f\n", dt*(2*PI*atom->transition.gamma*1e3));
         } //else printf("Any beam was chosen by the method 2\n");
         //--
     } //else printf("Any beam was chosen by the method 2\n");
-
-
-    //printf("gamma [kHz/2pi] = %f\n", atom->transition.gamma);
-    //printf("max_dt = %f\n", max_dt*(2 * PI * atom->transition.gamma*1e3));
-    //printf("fixed_dt = %f\n", fixed_dt*(2 * PI * atom->transition.gamma*1e3));
-    //printf("dt = %f\n", dt*(2 * PI * atom->transition.gamma*1e3));
-    //printf("g * dt [m/s] = %f\n", g*dt);
-    //printf("chosen_beam = %d\n\n", chosen_beam);
 
     //
     // Movement

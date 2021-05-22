@@ -7,5 +7,5 @@ max_v,20
 num_sim,2e3
 num_bins,128
 wait_time,3e4
-dt,2.0
+dt,5.0
 parallel_tasks,4
