@@ -789,7 +789,8 @@ double move(atom_t *atom, beams_setup_t beams_setup, performance_t perform, magn
 
     // Time interval
     max_dt = perform.dt / (2 * PI * atom->transition.gamma*1e3);
-    fixed_dt = 0.5 / (2 * PI * atom->transition.gamma*1e3);
+    fixed_dt = 1.0 / (2 * PI * atom->transition.gamma*1e3);
+    dt = max_dt;
 
     // Get all scattering rates
     R = get_all_scatt_rate(beams_setup, B_params, *atom);
@@ -803,7 +804,7 @@ double move(atom_t *atom, beams_setup_t beams_setup, performance_t perform, magn
             if(R[k] > 0){
                 // Method 1 - Exponential distribution sample
                 aux_dt = random_exp(1 / R[k]);
-                if(dt == 0 || aux_dt < dt){
+                if(aux_dt < max_dt && aux_dt < dt && chosen_beam == 0){
                     chosen_beam = i+1;
                     dt = aux_dt;
                 }
@@ -824,13 +825,11 @@ double move(atom_t *atom, beams_setup_t beams_setup, performance_t perform, magn
         }
     }
 
-    if(chosen_beam > 0 && dt <= max_dt){
+    if(chosen_beam > 0){
         //r3_print(beams_setup.beams[chosen_beam - 1].k_dir, "k");
         //printf("dt = %f (max_dt = %f)\n", dt, max_dt);
         //printf("chosen_beam = %d\n\n", chosen_beam);
     } //else printf("Any beam was chosen by the method 1\n\n");
-    
-    if(chosen_beam == 0) dt = fixed_dt;
     //--
 
     //printf("fixed_dt = %f\n", fixed_dt*(2 * PI * atom->transition.gamma*1e3));
@@ -840,7 +839,7 @@ double move(atom_t *atom, beams_setup_t beams_setup, performance_t perform, magn
 
 
     // Check if method 1 wasn't successful
-    if(dt > max_dt && chosen_beam > 0){
+    if(chosen_beam == 0){
         //
         // Apply method 2
         //--
@@ -919,7 +918,7 @@ double move(atom_t *atom, beams_setup_t beams_setup, performance_t perform, magn
         // Add velocity
         vel_mod = 1e4 * h / (atom->transition.lambda * atom->mass * u); // cm / s
         //r3_print(r3_scalar_product(vel_mod, beams_setup.beams[chosen_beam-1].k_dir), "Photon momentum");
-        atom->vel = r3_sum(atom->vel, r3_scalar_product(vel_mod, beams_setup.beams[chosen_beam-1].k_dir)); // cm / s
+        atom->vel = r3_sum(atom->vel, r3_scalar_product(vel_mod, beams_setup.beams[opt_beams[chosen_beam-1]].k_dir)); // cm / s
         atom->vel = r3_sum(atom->vel, r3_scalar_product(vel_mod, rd_v)); // cm / s
     }
     //--

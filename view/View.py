@@ -419,10 +419,10 @@ class View:
                 })
 
             # Looping info
-            info = self.info.loc[res.loop["var"]]
+            info = res.info.loc[res.loop["var"]]
 
             plt.title("Temperature as a function\nof the " + info['name'].lower())
-            plt.xlabel(r"$ " + info['symbol'] + r" (" + info['unit'] + ") $")
+            plt.xlabel(r"$ " + info['symbol'] + r" [" + info['unit'] + "] $")
             x = np.array(res.loop["values"]).astype(float)
 
             plt.ylabel(r"T [$\mu K$]")
