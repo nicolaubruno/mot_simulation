@@ -667,6 +667,8 @@ atom_t get_atom(performance_t perform, magnetic_field_t B_params, char *params_p
         atom.vel[i] = random_norm(0, std_dev); // cm / s
         //atom.vel[i] = 0;
     }
+    //atom.pos[1] = -0.5;
+    //atom.vel[1] = -2.0;
     //--
 
     // Optical transition
@@ -804,7 +806,7 @@ double move(atom_t *atom, beams_setup_t beams_setup, performance_t perform, magn
             if(R[k] > 0){
                 // Method 1 - Exponential distribution sample
                 aux_dt = random_exp(1 / R[k]);
-                if(aux_dt < max_dt && aux_dt < dt && chosen_beam == 0){
+                if(aux_dt < max_dt && aux_dt < dt){
                     chosen_beam = i+1;
                     dt = aux_dt;
                 }
@@ -826,6 +828,8 @@ double move(atom_t *atom, beams_setup_t beams_setup, performance_t perform, magn
     }
 
     probs[0] = 1 - probs[0];
+    //printf("probs[0] = %f\n", probs[0]);
+    //printf("\n");
 
     if(chosen_beam > 0){
         //r3_print(beams_setup.beams[chosen_beam - 1].k_dir, "k");
@@ -847,7 +851,7 @@ double move(atom_t *atom, beams_setup_t beams_setup, performance_t perform, magn
         if(chosen_beam > 0){
             chosen_beam = opt_beams[chosen_beam - 1] + 1;
             //printf("chosen_beam = %d\n", chosen_beam);
-            //r3_print(beams_setup.beams[opt_beams[chosen_beam - 1]].k_dir, "k");
+            //r3_print(beams_setup.beams[chosen_beam - 1].k_dir, "k");
             //printf("dt [1/Gamma] = %f\n", dt*(2*PI*atom->transition.gamma*1e3));
         } //else printf("Any beam was chosen by the method 2\n");
         //--
@@ -908,7 +912,7 @@ double move(atom_t *atom, beams_setup_t beams_setup, performance_t perform, magn
         // Add velocity
         vel_mod = 1e4 * h / (atom->transition.lambda * atom->mass * u); // cm / s
         //r3_print(r3_scalar_product(vel_mod, beams_setup.beams[chosen_beam-1].k_dir), "Photon momentum");
-        atom->vel = r3_sum(atom->vel, r3_scalar_product(vel_mod, beams_setup.beams[opt_beams[chosen_beam-1]].k_dir)); // cm / s
+        atom->vel = r3_sum(atom->vel, r3_scalar_product(vel_mod, beams_setup.beams[chosen_beam-1].k_dir)); // cm / s
         atom->vel = r3_sum(atom->vel, r3_scalar_product(vel_mod, rd_v)); // cm / s
     }
     //--
