@@ -781,7 +781,7 @@ double move(atom_t *atom, beams_setup_t beams_setup, performance_t perform, magn
     double *probs, *R;                          // Absorption variables
     int chosen_beam = 0, num_transitions;       // Absorption variables
     int *opt_beams;                             // Absorption variables
-    //double *a_B;                              // Magnetic acceleration
+    double *a_B;                              // Magnetic acceleration
     double *rd_v, vel_mod;                      // Photonic recoil
 
     // Allocate variables
@@ -862,7 +862,7 @@ double move(atom_t *atom, beams_setup_t beams_setup, performance_t perform, magn
     //--
 
     // Magnetic acceleration
-    //a_B = magnetic_acceleration(*atom, B_params);
+    a_B = magnetic_acceleration(*atom, B_params);
     //a_B = (double*) calloc(3, sizeof(3));
 
     //
@@ -873,7 +873,7 @@ double move(atom_t *atom, beams_setup_t beams_setup, performance_t perform, magn
         atom->pos[i] += atom->vel[i] * dt;
 
         // Magnetic acceleration
-        //atom->pos[i] += (a_B[i] * dt*dt) / 2;
+        atom->pos[i] += (a_B[i] * dt*dt) / 2;
     }
 
     // Gravity
@@ -889,8 +889,8 @@ double move(atom_t *atom, beams_setup_t beams_setup, performance_t perform, magn
         atom->vel[2] += - g * dt;
 
     // Magnetic acceleration
-    //for(i = 0; i < 3; i++)
-    //    atom->vel[i] += a_B[i] * dt;
+    for(i = 0; i < 3; i++)
+        atom->vel[i] += a_B[i] * dt;
 
     //
     // Photonic recoil
@@ -990,6 +990,9 @@ double *magnetic_acceleration(atom_t atom, magnetic_field_t B_params){
             del_B[i] += B_params.B_basis[1][i] * r_prime[1] / (2 * norm);
             del_B[i] += - B_params.B_basis[2][i] * 2  * r_prime[2] / norm;
             del_B[i] = B_params.B_0 * del_B[i];
+
+            // Linear magnetic field gradient
+            del_B[i] += B_params.B_lin_grad[i];
         }
 
         // Magnetic field Bias
