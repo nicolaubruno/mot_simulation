@@ -667,7 +667,7 @@ atom_t get_atom(performance_t perform, magnetic_field_t B_params, char *params_p
         atom.vel[i] = random_norm(0, std_dev); // cm / s
         //atom.vel[i] = 0;
     }
-    //atom.pos[1] = -0.5;
+    //atom.pos[1] = 0.5;
     //atom.vel[1] = -2.0;
     //--
 
@@ -785,13 +785,13 @@ double move(atom_t *atom, beams_setup_t beams_setup, performance_t perform, magn
     double *rd_v, vel_mod;                      // Photonic recoil
 
     // Allocate variables
-    num_transitions = beams_setup.num*3*(2*beams_setup.sidebands.num +1);
+    num_transitions = beams_setup.num*3*(2*beams_setup.sidebands.num + 1);
     probs = (double*) calloc(num_transitions + 1, sizeof(double));
-    opt_beams = (int*) calloc(num_transitions + 1, sizeof(int));
+    opt_beams = (int*) calloc(num_transitions, sizeof(int));
 
     // Time interval
     max_dt = perform.dt / (2 * PI * atom->transition.gamma*1e3);
-    fixed_dt = 1.0 / (2 * PI * atom->transition.gamma*1e3);
+    fixed_dt = 0.5 / (2 * PI * atom->transition.gamma*1e3);
     dt = max_dt;
 
     // Get all scattering rates
@@ -803,9 +803,14 @@ double move(atom_t *atom, beams_setup_t beams_setup, performance_t perform, magn
     // Get time interval
     for(i = 0; i < beams_setup.num; i++){
         for(j = 0; j < 3*(2*beams_setup.sidebands.num + 1); j++){
+            //printf("beam %d\n", i+1);
+            //r3_print(beams_setup.beams[i].k_dir, "k");
+            //printf("R[%d] = %f\n", k+1,  R[k]);
+
             if(R[k] > 0){
                 // Method 1 - Exponential distribution sample
                 aux_dt = random_exp(1 / R[k]);
+                //printf("dt [1/Gamma] = %f\n", aux_dt*(2*PI*atom->transition.gamma*1e3));
                 if(aux_dt < max_dt && aux_dt < dt){
                     chosen_beam = i+1;
                     dt = aux_dt;
@@ -815,12 +820,9 @@ double move(atom_t *atom, beams_setup_t beams_setup, performance_t perform, magn
             // Method 2 - Fixed time interval
             probs[k+1] = R[k] * fixed_dt;
             probs[0] += probs[k+1];
-            opt_beams[k] = i;
-            
-            //r3_print(beams_setup.beams[i].k_dir, "k");
-            //printf("R[%d] = %f\n", k+1,  R[k]);
+            opt_beams[k] = i+1;
+
             //printf("probs[%d] = %f\n", k+1,  probs[k+1]);
-            //printf("dt [1/Gamma] = %f\n", aux_dt*(2*PI*atom->transition.gamma*1e3));
             //printf("\n");
 
             k++;
@@ -849,7 +851,7 @@ double move(atom_t *atom, beams_setup_t beams_setup, performance_t perform, magn
         dt = fixed_dt;
 
         if(chosen_beam > 0){
-            chosen_beam = opt_beams[chosen_beam - 1] + 1;
+            chosen_beam = opt_beams[chosen_beam - 1];
             //printf("chosen_beam = %d\n", chosen_beam);
             //r3_print(beams_setup.beams[chosen_beam - 1].k_dir, "k");
             //printf("dt [1/Gamma] = %f\n", dt*(2*PI*atom->transition.gamma*1e3));
@@ -864,6 +866,7 @@ double move(atom_t *atom, beams_setup_t beams_setup, performance_t perform, magn
     // Magnetic acceleration
     a_B = magnetic_acceleration(*atom, B_params);
     //a_B = (double*) calloc(3, sizeof(3));
+    //r3_print(a_B, "a_B");
 
     //
     // Update position

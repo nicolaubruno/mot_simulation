@@ -1018,7 +1018,7 @@ class Results:
         # Without looping
         #--
         if len(self.loop["var"]) == 0 or fixed_loop_idx:
-            v_av, v_dev = self.average_velocity(fixed_loop_idx=fixed_loop_idx)
+            v_av, v_dev = self.average_velocity(axis=[0, 1], fixed_loop_idx=fixed_loop_idx)
             
             if method == 0:
                 temp = ((np.sum(v_dev*1e-2)/3)**2 * float(self.atom['mass']) * self.ctes['u']) / self.ctes['k_B']
@@ -1036,7 +1036,7 @@ class Results:
         # With looping
         #--
         else:
-            v_av, v_dev = self.average_velocity()
+            v_av, v_dev = self.average_velocity(axis=[0, 1])
 
             if method == 0:
                 temp = ((np.sum(v_dev*1e-2, axis=0)/3)**2 * float(self.atom['mass']) * self.ctes['u']) / self.ctes['k_B']
