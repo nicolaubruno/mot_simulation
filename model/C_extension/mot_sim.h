@@ -65,6 +65,7 @@ typedef struct{
     int num_bins;       /* Number of bins in each histogram */
     double wait_time;   /* Time to reach the equilibrium [1/gamma] */
     double dt;          /* Time interval [1/gamma] */
+    double max_dt;      /* Maximum time interval [1/gamma] */
 } performance_t;
 
 // Magnetic field

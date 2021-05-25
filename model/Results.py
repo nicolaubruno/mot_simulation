@@ -210,6 +210,7 @@ class Results:
         self._perform['max_time'] = float(self.perform['max_time'])
         self._perform['wait_time'] = float(self.perform['wait_time'])
         self._perform['dt'] = float(self.perform['dt'])
+        self._perform['max_dt'] = float(self.perform['dt'])
         self._perform['max_r'] = float(self.perform['max_r'])
         self._perform['max_v'] = float(self.perform['max_v'])
         self._perform['num_sim'] = int(self.perform['num_sim'])

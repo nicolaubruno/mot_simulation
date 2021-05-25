@@ -235,6 +235,20 @@ performance_t get_performance(char *params_path){
     else perform.dt = atof(token);
     //--
 
+    //
+    // Max Time interval
+    //--
+    i += 1;
+    token = strtok_r(rows[i], DELIM, &saveptr); // Variable name
+    token = strtok_r(NULL, DELIM, &saveptr); // Value
+
+    // Python module
+    if(Py_MODULE) perform.max_dt = atof(str_replace(token, ".", ","));
+
+    // C Program
+    else perform.max_dt = atof(token);
+    //--
+
     // Release memory
     free(path);
 
@@ -790,8 +804,8 @@ double move(atom_t *atom, beams_setup_t beams_setup, performance_t perform, magn
     opt_beams = (int*) calloc(num_transitions, sizeof(int));
 
     // Time interval
-    max_dt = perform.dt / (2 * PI * atom->transition.gamma*1e3);
-    fixed_dt = 0.5 / (2 * PI * atom->transition.gamma*1e3);
+    max_dt = perform.max_dt / (2 * PI * atom->transition.gamma*1e3);
+    fixed_dt = perform.dt / (2 * PI * atom->transition.gamma*1e3);
     dt = max_dt;
 
     // Get all scattering rates
