@@ -18,7 +18,7 @@
 #define MAX_LINES 124
 #define DELIM ","
 #define MAX_BEAMS 16
-#define Py_MODULE 1
+#define Py_MODULE 0
 
 #define h 6.62607004        // Planck constant [10^{-34} J s]
 #define e 1.60217662        // Elementary charge [10^{-19} C]s
@@ -87,8 +87,8 @@ typedef struct {
 
 // Sidebands
 typedef struct {
-    int num;      /* Number of sidebands */
-    int freq;     /* Resonant frequency of the sidebands */
+    int num;        /* Number of sidebands */
+    double freq;    /* Resonant frequency of the sidebands */
 } sidebands_t;
 
 // Beams setup

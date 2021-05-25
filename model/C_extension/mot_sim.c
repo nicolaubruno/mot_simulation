@@ -33,6 +33,7 @@ results_t simulate_atom(char *params_path, int only_marginals, long seed_time){
     //print_magnetic_field(B_params);
     //print_beams(beams_setup);
     //print_atom(atom);
+    //exit(0);
 
     // Set initial values
     res.time = 0;
@@ -807,6 +808,10 @@ double move(atom_t *atom, beams_setup_t beams_setup, performance_t perform, magn
     max_dt = perform.max_dt / (2 * PI * atom->transition.gamma*1e3);
     fixed_dt = perform.dt / (2 * PI * atom->transition.gamma*1e3);
     dt = max_dt;
+
+    //printf("fixed_dt = %f\n", fixed_dt*(2 * PI * atom->transition.gamma*1e3));
+    //printf("max_dt = %f\n", max_dt*(2 * PI * atom->transition.gamma*1e3));
+    //exit(0);
 
     // Get all scattering rates
     R = get_all_scatt_rate(beams_setup, B_params, *atom);
@@ -1840,6 +1845,7 @@ int print_performance(performance_t perform){
     printf("num_bins = %d\n", perform.num_bins);
     printf("wait_time [1/Gamma] = %f\n", perform.wait_time);
     printf("time interval [1/Gamma] = %f\n", perform.dt);
+    printf("maximum time interval [1/Gamma] = %f\n", perform.max_dt);
     printf("\n");
 
     return 1;
@@ -1875,7 +1881,7 @@ int print_beams(beams_setup_t beams_setup){
 
     printf("\nSidebands\n");
     printf("num = %d\n", beams_setup.sidebands.num);
-    printf("freq = %d\n", beams_setup.sidebands.freq);
+    printf("freq = %f\n", beams_setup.sidebands.freq);
     printf("\n");
     printf("All Beams\n--\n");
     for(i = 0; i < beams_setup.num; i++){
