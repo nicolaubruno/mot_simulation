@@ -73,7 +73,7 @@ results_t simulate_atom(char *params_path, int only_marginals, long seed_time){
 
         //
         // Update results
-        if(get_values == 1 && r < perform.max_r && j > 10){
+        if(get_values == 1 && r < perform.max_r && j > 9){
             //
             // Update position and velocity
             //--
@@ -99,6 +99,7 @@ results_t simulate_atom(char *params_path, int only_marginals, long seed_time){
         if((((int) progress) % 5) == 0 && last_progress < ((int) progress)){
             //print_status(atom, res);
             //printf("passed_time [1/Gamma] = %f\n", passed_time);
+            //printf("passed_time [ms] = %f\n", passed_time / (2 * PI * atom.transition.gamma));
             //printf("progress = %f\n\n", progress);
             last_progress = (int) progress;
         }
@@ -107,6 +108,10 @@ results_t simulate_atom(char *params_path, int only_marginals, long seed_time){
     }
     //--
 
+    //print_status(atom, res);
+    //printf("passed_time [1/Gamma] = %f\n", passed_time);
+    //printf("passed_time [ms] = %f\n", passed_time / (2 * PI * atom.transition.gamma));
+    //printf("progress = %f\n\n", progress);
     //print_results(res, atom, only_marginals);
 
     return res;
@@ -665,15 +670,15 @@ atom_t get_atom(performance_t perform, magnetic_field_t B_params, char *params_p
     atom.vel = (double *) calloc(3, sizeof(double));
     for(i = 0; i < 3; i++){
         // Position
-        atom.pos[i] = 0;
+        //atom.pos[i] = 0;
 
         // Velocity
         std_dev = sqrt(k_B * perform.T_0 / (atom.mass * u)) * 10; // cm / s
         atom.vel[i] = random_norm(0, std_dev); // cm / s
-        atom.vel[i] = 0;
+        //atom.vel[i] = 0;
     }
-    atom.pos[1] = 0.5;
-    atom.vel[1] = 2.0;
+    //atom.pos[1] = 0.5;
+    //atom.vel[1] = 2.0;
     //--
 
     // Optical transition
