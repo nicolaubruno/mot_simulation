@@ -65,7 +65,6 @@ typedef struct{
     int num_bins;       /* Number of bins in each histogram */
     double wait_time;   /* Time to reach the equilibrium [1/gamma] */
     double dt;          /* Time interval [1/gamma] */
-    double max_dt;      /* Maximum time interval [1/gamma] */
 } performance_t;
 
 // Magnetic field
@@ -165,13 +164,16 @@ double *magnetic_field(magnetic_field_t B_params, double *r);
 // Get polarizations amplitudes
 int set_polarizations_amplitudes(beam_t *beam, double *eB);
 
-// Get a list of scattering rate for each beam considering all transitions and sidebands
-double *get_all_scatt_rate(beams_setup_t beams_setup, magnetic_field_t B_params, atom_t atom);
+// Get the probability to absorb each beam
+double *get_probs(beams_setup_t beams_setup, magnetic_field_t B_params, atom_t atom, double dt);
 
 // Get magnetic acceleration
 double *magnetic_acceleration(atom_t atom, magnetic_field_t B_params);
 
 /*
+
+// Get a list of scattering rate for each beam considering all transitions and sidebands
+double *get_all_scatt_rate(beams_setup_t beams_setup, magnetic_field_t B_params, atom_t atom);
 
 // Get the sum of scattering rates over all possibilities
 double get_total_scatt_rate(beam_t beam, sidebands_t sidebands, double *B, atom_t atom);
