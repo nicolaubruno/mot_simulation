@@ -2,7 +2,7 @@
 # Libraries and modules
 import os, sys, time
 import pandas as pd
-import matplotlib.pyplot as plt
+from matplotlib import pyplot as plt, ticker
 import seaborn as sns
 import numpy as np
 
@@ -398,7 +398,7 @@ class View:
 
     #
     # Plot temperature
-    def temperature(self, res, method=1):
+    def temperature(self, res, log_scale=1, doppler_temperature=False, method=0):
         #
         # Check looping
         if len(res.loop["var"]) > 0:
@@ -417,12 +417,19 @@ class View:
                     "font.size":14,\
                     "axes.titlepad":14
                 })
+            #plt.tight_layout()
+            ax = plt.gca()
 
             # Looping info
             info = res.info.loc[res.loop["var"]]
 
             plt.title("Temperature as a function\nof the " + info['name'].lower())
-            plt.xlabel(r"$ " + info['symbol'] + r" [" + info['unit'] + "] $")
+            if info["unit"]:
+                label = r"$ " + info['symbol'] + r" [" + info['unit'] + r"] $"
+            else:
+                label = r"$ " + info['symbol'] + r"$"
+
+            plt.xlabel(label)
             x = np.array(res.loop["values"]).astype(float)
 
             plt.ylabel(r"T [$\mu K$]")
@@ -431,11 +438,26 @@ class View:
             plt.plot(x, temp, label="Simulation", marker='o', linestyle='--')
 
             # Plot Doppler temperature
-            plt.plot(x, res.doppler_temperature()*np.ones(len(x)), label="Doppler temperature", linestyle='--', marker='', color='black')
+            if doppler_temperature:
+                plt.plot(x, res.doppler_temperature()*np.ones(len(x)), label="Doppler temperature", linestyle='--', marker='', color='black')
+
+            if log_scale == 0:
+                plt.xscale('log')
+
+            elif log_scale == 1:
+                plt.yscale('log')
+
+            elif log_scale == 2:
+                plt.xscale('log')
+                plt.yscale('log')
 
             # Set plot
-            plt.grid(linestyle="--")
-            plt.legend(frameon=True)
+            plt.grid(True, linestyle="--", which="both")
+            ax.yaxis.set_major_formatter(ticker.ScalarFormatter())
+            ax.yaxis.set_minor_formatter(ticker.ScalarFormatter())
+
+            if doppler_temperature:
+                plt.legend(frameon=True)
 
             plt.close(1)
 

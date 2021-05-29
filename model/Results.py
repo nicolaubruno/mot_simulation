@@ -940,9 +940,13 @@ class Results:
         #
         # Returns the best parameters to fit a Gaussian function
         def fit_gaussian(x, y):
+            # Convert to numpy array
+            x = np.array(x)
+            y = np.array(y)
+
             #
             # Gaussian function
-            def gaussian(x, mean, std_dev): \
+            def gaussian(x, mean, std_dev):
                 return np.max(y) * np.exp(-((x - mean)/std_dev)**2 / 2)
 
             #
@@ -1018,7 +1022,7 @@ class Results:
         # Without looping
         #--
         if len(self.loop["var"]) == 0 or fixed_loop_idx:
-            v_av, v_dev = self.average_velocity(axis=[0, 1], fixed_loop_idx=fixed_loop_idx)
+            v_av, v_dev = self.average_velocity(axis=[0, 1, 2], fixed_loop_idx=fixed_loop_idx)
             
             if method == 0:
                 temp = ((np.sum(v_dev*1e-2)/3)**2 * float(self.atom['mass']) * self.ctes['u']) / self.ctes['k_B']
@@ -1029,6 +1033,9 @@ class Results:
                 v_square = v_var + v_av**2
 
                 temp = (np.sum(v_square) * float(self.atom['mass']) * self.ctes['u']) / (3*self.ctes['k_B'])
+            
+            else:
+                raise ValueError("Invalid method")
 
         #--
 
@@ -1036,7 +1043,7 @@ class Results:
         # With looping
         #--
         else:
-            v_av, v_dev = self.average_velocity(axis=[0, 1])
+            v_av, v_dev = self.average_velocity(axis=[0, 1, 2])
 
             if method == 0:
                 temp = ((np.sum(v_dev*1e-2, axis=0)/3)**2 * float(self.atom['mass']) * self.ctes['u']) / self.ctes['k_B']
@@ -1052,16 +1059,21 @@ class Results:
 
     #
     # Doppler temperature
-    def doppler_temperature(self, fixed_loop_idx = False):
+    def doppler_temperature(self, power_broadening=False, fixed_loop_idx = False):
+        if power_broadening:
+            alpha = np.sqrt(1 + self.beams['main']['s_0'])
+        else:
+            alpha = 0;
+
         #
         # Check looping
         if self.loop["var"] == "gamma" and fixed_loop_idx:
             temp = np.zeros(len(self.loop["values"]))
             for i, gamma in enumerate(self.loop["values"]):
-                temp[i] = 1e9*(self.ctes['hbar'] * gamma * np.sqrt(1 + self.beams['main']['s_0'])) / (2 * self.ctes['k_B']) # uK
+                temp[i] = 1e9*(self.ctes['hbar'] * gamma * alpha) / (2 * self.ctes['k_B']) # uK
 
         else:
-            temp = 1e9*(self.ctes['h'] * self.transition['gamma'] * np.sqrt(1 + self.beams['main']['s_0'])) / (2 * self.ctes['k_B']) # uK
+            temp = 1e9*(self.ctes['h'] * self.transition['gamma'] * alpha) / (2 * self.ctes['k_B']) # uK
 
         return temp
 
