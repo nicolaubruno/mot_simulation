@@ -340,7 +340,7 @@ class View:
 
         #
         # Mass centre as a function of laser detuning
-        if res.loop["var"] == "delta":
+        if res.loop["var"]:
             #
             # Clear stored plots
             plt.clf()
@@ -357,25 +357,30 @@ class View:
                     "axes.titlepad":14
                 })
 
-            style={
-                "linestyle":'--'
-            }
 
-            markers = ['o', '^', 's']
+            # Looping info
+            info = res.info.loc[res.loop["var"]]
+            x = np.array(res.loop["values"]).astype(float)
+
+            plt.title("Centre of mass as a\nfunction of the " + info['name'].lower())
+            if info["unit"]:
+                label = r"$ " + info['symbol'] + r"\ [" + info['unit'] + r"] $"
+            else:
+                label = r"$ " + info['symbol'] + r"$"
 
             #
             # Set labels
+            markers = ['o', '^', 's']
             labels = ['x', 'y', 'z']
             plt.title("Centre of mass as a\nfunction of the laser detuning")
-            plt.xlabel(r"$ \Delta (2\pi \times MHz) $")
             plt.ylabel("position (cm)")
+            plt.xlabel(label)
             delta = np.array(res.loop["values"])*(res.transition["gamma"]*1e-3)
 
             #
             # Plot simulated date
             for i in range(3):
-                plt.errorbar(delta, r_c[i], yerr=std_r_c[i], label=labels[i], marker=markers[i], **style)
-
+                plt.errorbar(x, r_c[i], yerr=std_r_c[i], linestyle="--", label=labels[i], marker=markers[i])
 
             #
             # Set plot
@@ -385,6 +390,7 @@ class View:
             #
             # Show
             plt.close(1)
+            plt.tight_layout()
             plt.show()
 
         #
@@ -422,17 +428,21 @@ class View:
 
             # Looping info
             info = res.info.loc[res.loop["var"]]
+            x = np.array(res.loop["values"]).astype(float)
 
+            #
+            # Set label
+            #--
             plt.title("Temperature as a function\nof the " + info['name'].lower())
+            
             if info["unit"]:
-                label = r"$ " + info['symbol'] + r" [" + info['unit'] + r"] $"
+                label = r"$ " + info['symbol'] + r"\ [" + info['unit'] + r"] $"
             else:
                 label = r"$ " + info['symbol'] + r"$"
 
             plt.xlabel(label)
-            x = np.array(res.loop["values"]).astype(float)
-
             plt.ylabel(r"T [$\mu K$]")
+            #--
 
             # Plot temperature
             plt.plot(x, temp, label="Simulation", marker='o', linestyle='--')
@@ -460,7 +470,7 @@ class View:
                 plt.legend(frameon=True)
 
             plt.close(1)
-
+            plt.tight_layout()
             plt.show()
 
         #
@@ -475,7 +485,7 @@ class View:
     #
     # Plot r.m.s. cloud size
     def cloud_size(self, res):
-        if res.loop["var"] == 'delta':
+        if res.loop["var"]:
             #
             # Get data
             r_c, std_r_c = res.mass_centre()
@@ -495,22 +505,29 @@ class View:
                     "axes.titlepad":14
                 })
 
-            style={
-                "linestyle":'--'
-            }
+            # Looping info
+            info = res.info.loc[res.loop["var"]]
+            x = np.array(res.loop["values"]).astype(float)
 
-            markers = ['o', '^', 's']
-
+            #
             # Set labels
+            #--
+            markers = ['o', '^', 's']
             labels = [r'$\sigma_x$', r'$\sigma_y$', r'$\sigma_z$']
-            plt.title("R.M.S. cloud size as a\nfunction of the laser detuning")
-            plt.xlabel(r"$ \Delta (2\pi \times MHz) $")
-            plt.ylabel("Size (mm)")
-            delta = np.array(res.loop["values"])*(res.transition["gamma"]*1e-3)
+
+            plt.title("R.M.S. cloud size as a function of\n " + info['name'].lower())
+            if info["unit"]:
+                label = r"$ " + info['symbol'] + r"\ [" + info['unit'] + r"] $"
+            else:
+                label = r"$ " + info['symbol'] + r"$"
+
+            plt.ylabel("Size [cm]")
+            plt.xlabel(label)
+            #--
 
             # Plot simulated date
             for i in range(3):
-                plt.plot(delta, std_r_c[i], label=labels[i], marker=markers[i], **style)
+                plt.plot(x, std_r_c[i], label=labels[i], linestyle="--", marker=markers[i])
 
             # Set plot
             plt.grid(linestyle="--")

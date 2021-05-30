@@ -337,7 +337,7 @@ class Controller:
                         # Set menu level
                         self._menu_level += 1
                         while self.menu_level == 4:
-                            if res.loop["var"] == "delta":
+                            if res.loop["var"]:
                                 self.__view.mass_centre(res)
                                 self._menu_level -= 1
 
@@ -359,7 +359,7 @@ class Controller:
                         #
                         # Menu level 3
                         while self.menu_level == 4:
-                            if res.loop["var"] == "delta":
+                            if res.loop["var"]:
                                 self.__view.cloud_size(res)
                                 self._menu_level -= 1
 
