@@ -275,6 +275,8 @@ class Controller:
                     if res.pos_3Dhist["dens"] is not None:
                         options[6] = "Heat map"
 
+                    options[7] = "Trapped atoms ratio"
+
                     
                     opt = self.__call_menu(options, header)
 
@@ -468,6 +470,28 @@ class Controller:
                                 self.__view.heatmap(res, axis, 0)
 
                             else: self._menu_level -= 1
+
+                    #
+                    # Trapped atoms ratio
+                    elif opt == 7:
+                        #
+                        # Set menu level
+                        self._menu_level += 1
+
+                        #
+                        # Menu level 3
+                        while self.menu_level == 4:
+                            if len(res.loop["var"]) > 0:
+                                self.__view.trapped_atoms_ratio(res)
+                                self._menu_level -= 1
+
+                            elif not res.loop["var"]:
+                                self.__view.trapped_atoms_ratio(res)
+                                opt = self.__call_input("Enter with any key to continue", header = False, clear_screen=False)
+                                if opt != "-1": self._menu_level -= 1
+
+                            else:
+                                self._menu_level -= 1
                 #--
 
     #

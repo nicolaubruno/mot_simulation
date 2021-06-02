@@ -67,7 +67,11 @@ class View:
         #
         # Show options
         for key, val in options.items():
-            print('%d -> %s;' % (key, val))
+            if val:
+                print('%d -> %s;' % (key, val))
+
+            else:
+                print('%d;' % (key))
 
         print('')
 
@@ -480,6 +484,62 @@ class View:
             print("T [uK] = %f" % (temp))
             print("T_{doppler} [uK] = %f" % (res.doppler_temperature()))
             print()
+
+    #
+    # Plot temperature
+    def trapped_atoms_ratio(self, res):
+        #
+        # With looping
+        if len(res.loop["var"]) > 0:
+            # Data
+            ratio = res.trapped_atoms_ratio()
+
+            # Clear stored plots
+            plt.clf()
+
+            #
+            # Set figure
+            plt.figure(figsize=(5,4))
+            plt.style.use('seaborn-whitegrid')
+            plt.subplots_adjust(top=0.80, bottom=0.15)
+            plt.rcParams.update({
+                    "font.size":14,\
+                    "axes.titlepad":14
+                })
+            #plt.tight_layout()
+            ax = plt.gca()
+
+            # Looping info
+            info = res.info.loc[res.loop["var"]]
+            x = np.array(res.loop["values"]).astype(float)
+
+            #
+            # Set label
+            #--            
+            if info["unit"]:
+                label = r"$ " + info['symbol'] + r"\ [" + info['unit'] + r"] $"
+            else:
+                label = r"$ " + info['symbol'] + r"$"
+
+            plt.xlabel(label)
+            plt.ylabel(r"T [$\mu K$]")
+            #--
+
+            # Plot trapped atoms ratio
+            plt.plot(x, temp, label="Simulation", marker='o', linestyle='--')
+
+            # Set plot
+            plt.grid(True, linestyle="--")
+
+            plt.close(1)
+            plt.tight_layout()
+            plt.show()
+
+        #
+        # Without loop
+        else:
+            ratio = res.trapped_atoms_ratio()
+            print("\nN_trapped / N_total%f\n" % (ratio))
 
     #
     # Plot r.m.s. cloud size

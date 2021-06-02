@@ -98,10 +98,10 @@ class Results:
         return self._vel_hist
     
     #
-    # Speed histogram
+    # Trapped atoms
     @property
-    def speed_hist(self):
-        return self._speed_hist
+    def trapped_atoms(self):
+        return self._trapped_atoms
 
     #
     # Looping status
@@ -184,6 +184,7 @@ class Results:
 
             # Get distributions
             self.__get_dists()
+            self.__get_log()
 
         # Create a new results
         else: self.__new(code, name)
@@ -492,6 +493,13 @@ class Results:
         #--
 
     #
+    def __get_log(self):
+        path = self.directory + 'log.csv'
+        if os.path.exists(path):
+            log = pd.read_csv(path, header=0, index_col=0, squeeze=True).astype(object)
+            self._trapped_atoms = log['trapped_atoms']
+
+    #
     def __get_name(self):
         #
         # Get short name
@@ -620,6 +628,7 @@ class Results:
                 
                 if ((end - val) < 0 and step < 0) or ((end - val) > 0 and step > 0):
                     values = []
+
                     while val <= end:
                         values.append(val)
                         val += step
@@ -693,7 +702,7 @@ class Results:
                 #--
                 prohibited_variables = ["v_0_dir"]
                 if (self.loop["var"] in self.ini_conds.index) and not (self.loop["var"] in prohibited_variables):
-                    self.perform[self.loop["var"]] = self.loop["values"][i]
+                    self.ini_conds[self.loop["var"]] = self.loop["values"][i]
 
                 #
                 # Performance
@@ -1125,6 +1134,28 @@ class Results:
         return temp
 
     #
+    # Trapped atoms ratio
+    def trapped_atoms_ratio(self, fixed_loop_idx = False):
+        #
+        # Without looping
+        #--
+        if len(self.loop["var"]) == 0 or fixed_loop_idx:
+            ratio = (self.trapped_atoms / self.perform['num_sim'])
+
+        #
+        # With looping
+        #--
+        else:
+            ratio = np.zeros(len(self.loop["values"]))
+
+            for i in range(len(self.loop["values"])):
+                self.loop_idx(i)
+                ratio[i] = (self.trapped_atoms / self.perform['num_sim'])
+        #--
+
+        return ratio
+
+    #
     # Get 2D-histogram of positions removing an axis
     def pos_2Dhist(self, axis = 0, val = 0):
         #
@@ -1234,6 +1265,7 @@ class Results:
         self._loop["active"] = idx
         self.__get_attr()
         self.__get_dists()
+        self.__get_log()
         self.__cast_params_values()
 
     #
@@ -1264,6 +1296,7 @@ class Results:
         #
         # Update distributions
         self.__get_dists()
+        self.__get_log()
 
         #
         # Add marginal distribution files
@@ -1306,6 +1339,7 @@ class Results:
         #
         # Update distributions
         self.__get_dists()
+        self.__get_log()
 
         #
         # Add marginal distribution files

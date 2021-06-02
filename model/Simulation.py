@@ -224,7 +224,8 @@ class Simulation:
         # --
         available_opts = {
             0 : "3D distribution",\
-            1 : "Marginal distributions"
+            1 : "Marginal distributions",\
+            2 : "Analysis of trapped atoms"
         }
 
         if opt in available_opts.keys():
@@ -357,7 +358,7 @@ class Simulation:
                         check  = False
 
                         for res_loop_item in res_loop:
-                            if res_loop_item.name == "marginals.csv":
+                            if res_loop_item.name == "marginals.csv" or res_loop_item.name == "log.csv":
                                 check = True
                                 break
 
