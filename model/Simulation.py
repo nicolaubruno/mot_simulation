@@ -22,8 +22,20 @@ class Simulation:
     ''' Attributes '''
 
     __slots__ = [
-        "_pos_freqs_arr", "_vel_freqs_arr", "_atoms_simulated", "_option", "_results", "_transitions", "_parallel_tasks"
+        "_simulated_time", "_trapped_atoms", "_pos_freqs_arr", "_vel_freqs_arr", "_atoms_simulated", "_option", "_results", "_transitions", "_parallel_tasks"
     ]
+
+    #
+    # Simulated
+    @property
+    def simulated_time(self):
+        return self._simulated_time
+
+    #
+    # Trapped atoms
+    @property
+    def trapped_atoms(self):
+        return self._trapped_atoms
 
     #
     # (Array) Position histogram array
@@ -89,11 +101,12 @@ class Simulation:
         #--
         available_opts = {
             0 : "3D distribution",\
-            1 : "Marginal distributions"
+            1 : "Marginal distributions",\
+            2 : "Analysis of trapped atoms"
         }
 
-        if opt in available_opts.keys():
-            self._option = opt
+        if (opt-1) in available_opts.keys():
+            self._option = opt-1 
 
         # Release memory
         del available_opts
@@ -119,8 +132,13 @@ class Simulation:
             self._vel_freqs_arr = np.zeros((3, self.results.perform["num_bins"]))
         #--
 
-        # Setup relevant variables
+        #
+        # Other informations
+        #--
+        self._trapped_atoms = 0
+        self._simulated_time = 0
         self._atoms_simulated = 0
+        #--
 
         # Parallel tasks
         self._parallel_tasks = int(self.results.perform["parallel_tasks"])
@@ -159,6 +177,7 @@ class Simulation:
                     pos_freqs = res[k][0]
                     vel_freqs = res[k][1]
                     time = res[k][2]
+                    self._trapped_atoms += res[k][3]
 
                     #
                     # Add position and velocity frequencies
@@ -241,7 +260,9 @@ class Simulation:
             self._vel_freqs_arr = np.zeros((3, self.results.perform["num_bins"]))
         #--
 
-        # Setup relevant variables
+        # Other informations
+        self._trapped_atoms = 0
+        self._simulated_time = 0
         self._atoms_simulated = 0
 
         # Parallel tasks
@@ -260,6 +281,10 @@ class Simulation:
 
         elif self.option == 1:
             self.results.add_marginals(self.pos_freqs_arr, self.vel_freqs_arr)
+
+        #
+        # Add informations
+        self.results.add_infos({'trapped_atoms': self.trapped_atoms})
 
         #
         # Release memory

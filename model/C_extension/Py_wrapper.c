@@ -9,7 +9,7 @@ static PyObject* C_simulate_atom(PyObject *self, PyObject *args){
     //
     // Variables
     int i, j;
-    int only_marginals;
+    int opt;
     long time;
     PyObject *ret;
     results_t res;
@@ -18,34 +18,19 @@ static PyObject* C_simulate_atom(PyObject *self, PyObject *args){
 
     //
     // Get parameters path
-    if(!PyArg_ParseTuple(args, "sil", &params_path, &only_marginals, &time)){
+    if(!PyArg_ParseTuple(args, "sil", &params_path, &opt, &time)){
         return NULL;
     }
-    
+
     //
     // Results
-    res = simulate_atom(params_path, only_marginals, time);
+    res = simulate_atom(params_path, opt, time);
     //
     // Position and velocity frequencies
     //--
 
-    // Only marginal distributions
-    if(only_marginals){
-        // Build values
-        pos_freqs = build_freqs(res.pos_hist);
-        vel_freqs = build_freqs(res.vel_hist);
-
-        //
-        // Release memory
-        for(i = 0; i < 3; i++){
-            free(res.pos_hist[i].freqs);
-            free(res.vel_hist[i].freqs);
-        }
-
-        free(res.pos_hist);
-        free(res.vel_hist);
     // 3D-Distributions
-    } else {
+    if(opt == 0){
         // Build values
         pos_freqs = build_3Dfreqs(res.pos_3Dhist);
         vel_freqs = build_3Dfreqs(res.vel_3Dhist);
@@ -80,11 +65,27 @@ static PyObject* C_simulate_atom(PyObject *self, PyObject *args){
         free(res.vel_3Dhist.bins_size);
         free(res.vel_3Dhist.coord0);
         //--
+    
+    // Only marginal distributions
+    } else {
+        // Build values
+        pos_freqs = build_freqs(res.pos_hist);
+        vel_freqs = build_freqs(res.vel_hist);
+
+        //
+        // Release memory
+        for(i = 0; i < 3; i++){
+            free(res.pos_hist[i].freqs);
+            free(res.vel_hist[i].freqs);
+        }
+
+        free(res.pos_hist);
+        free(res.vel_hist);
     }
     //--
 
     // Return
-    ret = Py_BuildValue("OOi", pos_freqs, vel_freqs, time);
+    ret = Py_BuildValue("OOdi", pos_freqs, vel_freqs, res.time, res.trapped_atom);
 
     return ret;
 }

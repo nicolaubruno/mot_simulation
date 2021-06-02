@@ -362,7 +362,7 @@ class View:
             info = res.info.loc[res.loop["var"]]
             x = np.array(res.loop["values"]).astype(float)
 
-            plt.title("Centre of mass as a\nfunction of the " + info['name'].lower())
+            #plt.title("Centre of mass as a\nfunction of the " + info['name'].lower())
             if info["unit"]:
                 label = r"$ " + info['symbol'] + r"\ [" + info['unit'] + r"] $"
             else:
@@ -372,15 +372,14 @@ class View:
             # Set labels
             markers = ['o', '^', 's']
             labels = ['x', 'y', 'z']
-            plt.title("Centre of mass as a\nfunction of the laser detuning")
-            plt.ylabel("position (cm)")
+            plt.ylabel("centre of mass [mm]")
             plt.xlabel(label)
             delta = np.array(res.loop["values"])*(res.transition["gamma"]*1e-3)
 
             #
             # Plot simulated date
             for i in range(3):
-                plt.errorbar(x, r_c[i], yerr=std_r_c[i], linestyle="--", label=labels[i], marker=markers[i])
+                plt.plot(x, r_c[i]*10, linestyle="--", label=labels[i], marker=markers[i])
 
             #
             # Set plot
@@ -433,7 +432,7 @@ class View:
             #
             # Set label
             #--
-            plt.title("Temperature as a function\nof the " + info['name'].lower())
+            #plt.title("Temperature as a function\nof the " + info['name'].lower())
             
             if info["unit"]:
                 label = r"$ " + info['symbol'] + r"\ [" + info['unit'] + r"] $"
@@ -515,7 +514,7 @@ class View:
             markers = ['o', '^', 's']
             labels = [r'$\sigma_x$', r'$\sigma_y$', r'$\sigma_z$']
 
-            plt.title("R.M.S. cloud size as a function of\n " + info['name'].lower())
+            #plt.title("R.M.S. cloud size as a function of\n " + info['name'].lower())
             if info["unit"]:
                 label = r"$ " + info['symbol'] + r"\ [" + info['unit'] + r"] $"
             else:

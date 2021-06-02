@@ -103,7 +103,8 @@ class Controller:
                 # Chose a parameter
                 opts = {
                     1: "Marginal distributions",\
-                    2: "Complete 3D distribution"
+                    2: "Complete 3D distribution",\
+                    3: "Analysis of trapped atoms"
                 }
 
                 opt = self.__call_menu(opts, "Choose a simulation option:")
@@ -112,9 +113,6 @@ class Controller:
                 # Back option
                 if self.menu_level < 2:
                     break
-
-                # Check option
-                if opt == 2: opt = 0
 
                 # Create a new simulation
                 self.__simulation.new(shortname, opt, results_group)

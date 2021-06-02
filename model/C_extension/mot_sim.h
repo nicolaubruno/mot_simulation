@@ -67,6 +67,14 @@ typedef struct{
     double dt;          /* Time interval [1/gamma] */
 } performance_t;
 
+// Initial conditions
+typedef struct{
+    double T_0;         /* Initial temperature [uK] */
+    double v_0;         /* Module of the initial velocity of the atoms */
+    double *v_0_dir;    /* Direction of the initial velocity of the atoms */
+    int g_bool;         /* Gravity (1 - Considered, 0 - Do not consider) */
+} initial_conditions_t;
+
 // Magnetic field
 typedef struct{
     double B_0;             /* Magnetic Field gradient */
@@ -120,7 +128,7 @@ typedef struct{
     histogram_3d_t vel_3Dhist;      /* 3D-Histogram of velocity */
     histogram_t *vel_hist;          /* Marginal velocities histograms */
     double time;                    /* Total time [s] */
-    int atom_trapped;               /* 1 - Atom was trapped, 0 - Atom was not trapped */
+    int trapped_atom;               /* 1 - Atom was trapped, 0 - Atom was not trapped */
 } results_t;
 
 /*
@@ -140,6 +148,9 @@ results_t simulate_atom(char *params_path, int marginals, long seed_time);
 // Get parameters of performance
 performance_t get_performance(char *params_path);
 
+// Get initial conditions
+initial_conditions_t get_initial_conditions(char *params_path);
+
 // Get parameters of the magnetic field
 magnetic_field_t get_magnetic_field(char *params_path);
 
@@ -150,7 +161,7 @@ beams_setup_t get_beams(char *params_path);
 transition_t get_transition(char *params_path);
 
 // Get atom
-atom_t get_atom(performance_t perform, magnetic_field_t B_params, char *params_path);
+atom_t get_atom(initial_conditions_t ini_conds, performance_t perform, beams_setup_t beams_setup, int opt, char *params_path);
 
 // Set histograms
 int set_hist(int only_marginals, results_t *res, performance_t conds);
@@ -238,6 +249,9 @@ int update_hist_3d(histogram_3d_t *hist, double *vals);
 // Print parameters of performance
 int print_performance(performance_t perform);
 
+// Print parameters of initial conditions
+int print_initial_conditions(initial_conditions_t ini_conds);
+
 // Print parameters of the magnetic field
 int print_magnetic_field(magnetic_field_t B_params);
 
@@ -248,7 +262,7 @@ int print_atom(atom_t atom);
 int print_beams(beams_setup_t beams_setup);
 
 // Print results
-int print_results(results_t res, atom_t atom, int only_marginals);
+int print_results(results_t res, atom_t atom, int opt);
 
 // Print simulation status
 int print_status(atom_t atom, results_t res);

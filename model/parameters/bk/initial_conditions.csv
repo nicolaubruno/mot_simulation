@@ -1,8 +1,0 @@
-# 
-# id        -> [integer] Identification code
-# T_0       -> [float (uK)] Initial temperature 
-# g_bool    -> [0 or 1] 1 - use gravity, 0 - do not use gravity
-#
-#
-id,T_0,g_bool
-1,50.0,1

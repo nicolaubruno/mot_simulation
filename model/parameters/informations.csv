@@ -13,6 +13,8 @@ parameter,symbol,unit,name
 "B_bias","B_{0}","G","Bias magnetic field"
 "B_lin_grad","\nabla B_0 \cdot \hat{\mathbf{B}_0}","G","Linear magnetic field gradient"
 "T_0","T_0","uK","Initial temperature of the atomic cloud"
+"v_0","v_0","cm/s","Module of the initial velocity of the atoms"
+"v_0_dir","\hat{\mathbf{v}}_0","cm/s","Direction of the initial velocity of the atoms"
 "g_bool","","","Gravity activation"
 "max_time","t_{max}","1/\Gamma","Maximum simulated time"
 "max_r","r_{max}","cm","Maximum distance (threshold)"

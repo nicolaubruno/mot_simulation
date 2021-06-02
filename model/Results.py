@@ -32,6 +32,12 @@ class Results:
         return self._transition
 
     #
+    # (Series) Initial conditions
+    @property
+    def ini_conds(self):
+        return self._ini_conds
+
+    #
     # (Series) Performance
     @property
     def perform(self):
@@ -66,7 +72,6 @@ class Results:
     @property
     def name(self):
         return self._name
-
 
     #
     # 3D-Histogram of positions
@@ -142,7 +147,8 @@ class Results:
 
         #
         # Root dir
-        self._root_dir = "model/results/"
+        self._model_dir = "model/"
+        self._root_dir = self._model_dir + "results/"
         if results_group is not None and results_group != 1: 
             self._root_dir += "group_" + results_group + "/"
 
@@ -205,8 +211,12 @@ class Results:
         # Magnetic field
         self._B_params['B_0'] = float(self.B_params['B_0'])
 
+        # Initial conditions
+        self._ini_conds['T_0'] = float(self.ini_conds['T_0'])
+        self._ini_conds['v_0'] = float(self.ini_conds['v_0'])
+        self._ini_conds['g_bool'] = int(self.ini_conds['g_bool'])
+
         # Performance
-        self._perform['T_0'] = float(self.perform['T_0'])
         self._perform['max_time'] = float(self.perform['max_time'])
         self._perform['wait_time'] = float(self.perform['wait_time'])
         self._perform['dt'] = float(self.perform['dt'])
@@ -300,6 +310,11 @@ class Results:
         #--
 
         #
+        # Initial conditions
+        path = params_dir + "initial_conditions.csv"
+        self._ini_conds = pd.read_csv(path, header=0, index_col=0, squeeze=True).astype(object)
+
+        #
         # Performance
         path = params_dir + "performance.csv"
         self._perform = pd.read_csv(path, header=0, index_col=0, squeeze=True).astype(object)
@@ -311,7 +326,7 @@ class Results:
 
         #
         # Information about the parameters
-        path = "model/parameters/informations.csv"
+        path = self._model_dir + "parameters/informations.csv"
         self._info = pd.read_csv(path, header=0)
         self._info.set_index("parameter", inplace=True)
         self._info.fillna("", inplace=True)
@@ -536,6 +551,13 @@ class Results:
                 self._loop["values"].append(param[self.loop["var"]])
 
             #
+            # Initial conditions
+            prohibited_variables = ["v_0_dir"]
+            if self.loop["var"] in self.ini_conds.index:
+                param = pd.read_csv(obj_dir.path + "/parameters/initial_conditions.csv", header=0, index_col=0, squeeze=True).astype(object) 
+                self._loop["values"].append(param[self.loop["var"]])
+
+            #
             # Performance
             if self.loop["var"] in self.perform.index:
                 param = pd.read_csv(obj_dir.path + "/parameters/performance.csv", header=0, index_col=0, squeeze=True).astype(object) 
@@ -667,6 +689,13 @@ class Results:
                 #--
 
                 #
+                # Initial conditions
+                #--
+                prohibited_variables = ["v_0_dir"]
+                if (self.loop["var"] in self.ini_conds.index) and not (self.loop["var"] in prohibited_variables):
+                    self.perform[self.loop["var"]] = self.loop["values"][i]
+
+                #
                 # Performance
                 #--
                 prohibited_variables = []
@@ -708,6 +737,7 @@ class Results:
 
             self.atom.to_csv(params_dir + "atom.csv", header="atom")
             self.transition.to_csv(params_dir + "transition.csv", header="transition")
+            self.ini_conds.to_csv(params_dir + "initial_conditions.csv", header="initial_conditions")
             self.perform.to_csv(params_dir + "performance.csv", header="performance")
             self.B_params.to_csv(params_dir + "magnetic_field.csv", header="magnetic_field")
 
@@ -737,7 +767,7 @@ class Results:
     # Create attributes
     def __create_attr(self):
         # Parameters directory
-        params_dir = "model/parameters/"
+        params_dir = self._model_dir + "parameters/"
 
         #
         # Atom
@@ -770,7 +800,12 @@ class Results:
         #--
 
         #
-        # Conditions
+        # Initial conditions
+        path = params_dir + "initial_conditions.csv"
+        self._ini_conds = pd.read_csv(path, header=0, index_col=0, squeeze=True).astype(object)
+
+        #
+        # Performance
         path = params_dir + "performance.csv"
         self._perform = pd.read_csv(path, header=0, index_col=0, squeeze=True).astype(object)
         self._perform['num_sim'] = int(float(self._perform['num_sim']))
@@ -798,6 +833,18 @@ class Results:
                     self._loop["var"] = idx
                     self._loop["values"] = values
                     self._B_params[idx] = self.loop["values"][self.loop["active"]]
+        
+        #
+        # Initial conditions
+        prohibited_variables = ["v_0_dir"]
+
+        for idx in self.ini_conds.index:
+            if not (idx in prohibited_variables):
+                values = self.__get_loop_values(str(self.ini_conds[idx]))
+                if len(values) > 0:
+                    self._loop["var"] = idx
+                    self._loop["values"] = values
+                    self._ini_conds[idx] = self.loop["values"][self.loop["active"]]
 
         #
         # Performance
@@ -1299,3 +1346,9 @@ class Results:
         del path
 
         gc.collect()
+
+    #
+    # Add trapped atoms
+    def add_infos(self, data):
+        path = self.directory + "log.csv"
+        pd.Series(data, name="log").to_csv(path, header="log")

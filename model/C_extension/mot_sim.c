@@ -10,11 +10,10 @@
 
 // --
 
-results_t simulate_atom(char *params_path, int only_marginals, long seed_time){
+results_t simulate_atom(char *params_path, int opt, long seed_time){
     // Variables
     int i, j = 0;
-    double r, v, dt = 0, passed_time = 0;
-    int get_values = 0;
+    double r, v, dt = 0;
     double progress;
     int last_progress = 0;
     results_t res;
@@ -23,12 +22,15 @@ results_t simulate_atom(char *params_path, int only_marginals, long seed_time){
     srand(time(0) + seed_time);
 
     // Parameters of the simulation
+    initial_conditions_t ini_conds = get_initial_conditions(params_path);
     performance_t perform = get_performance(params_path);
     magnetic_field_t B_params = get_magnetic_field(params_path);
     beams_setup_t beams_setup = get_beams(params_path);
-    atom_t atom = get_atom(perform, B_params, params_path);
+    atom_t atom = get_atom(ini_conds, perform, beams_setup, opt, params_path);
 
     // Print parameters
+    //printf("opt = %d\n", opt);
+    //print_initial_conditions(ini_conds);
     //print_performance(perform);
     //print_magnetic_field(B_params);
     //print_beams(beams_setup);
@@ -37,8 +39,8 @@ results_t simulate_atom(char *params_path, int only_marginals, long seed_time){
 
     // Set initial values
     res.time = 0;
-    res.atom_trapped = 0;
-    set_hist(only_marginals, &res, perform);
+    res.trapped_atom = 0;
+    set_hist(opt, &res, perform);
 
     // Distance from origin
     r = r3_mod(atom.pos);
@@ -49,14 +51,14 @@ results_t simulate_atom(char *params_path, int only_marginals, long seed_time){
     //
     // Iterations
     //--
-    while((passed_time < perform.max_time) && (r < perform.max_r) && (v < perform.max_v)){
+    while((res.time < perform.max_time) && (r <= perform.max_r) && (v <= perform.max_v)){
         //print_status(atom, res);
 
         // Move atom
         dt = move(&atom, beams_setup, perform, B_params);
 
         // Iterations numbers
-        passed_time += dt; // 1 / gamma
+        res.time += dt; // 1 / gamma
 
         // Distance from origin
         r = r3_mod(atom.pos);
@@ -66,19 +68,19 @@ results_t simulate_atom(char *params_path, int only_marginals, long seed_time){
 
         //
         // Waiting the equilibrium
-        if(passed_time > perform.wait_time){
-            get_values = 1;
-            res.time += dt; // 1 / gamma
+        if(res.time > perform.wait_time){
+            res.trapped_atom = 1;
+            if(opt == 2) break;
         }
 
         //
         // Update results
-        if(get_values == 1 && r < perform.max_r && j > 9){
+        if(res.trapped_atom == 1 && r < perform.max_r && j > 9){
             //
             // Update position and velocity
             //--
             // Marginal histogram
-            if(only_marginals){
+            if(opt == 1){
                 for(i = 0; i < 3; i++) {
                     update_hist(&res.pos_hist[i], atom.pos[i]);
                     if(v < perform.max_v) update_hist(&res.vel_hist[i], atom.vel[i]);
@@ -95,11 +97,11 @@ results_t simulate_atom(char *params_path, int only_marginals, long seed_time){
             j = 0;
         }
 
-        progress = (100*passed_time / perform.max_time);
+        progress = (100*res.time / perform.max_time);
         if((((int) progress) % 5) == 0 && last_progress < ((int) progress)){
             //print_status(atom, res);
-            //printf("passed_time [1/Gamma] = %f\n", passed_time);
-            //printf("passed_time [ms] = %f\n", passed_time / (2 * PI * atom.transition.gamma));
+            //printf("res.time [1/Gamma] = %f\n", res.time);
+            //printf("res.time [ms] = %f\n", res.time / (2 * PI * atom.transition.gamma));
             //printf("progress = %f\n\n", progress);
             last_progress = (int) progress;
         }
@@ -109,10 +111,11 @@ results_t simulate_atom(char *params_path, int only_marginals, long seed_time){
     //--
 
     //print_status(atom, res);
-    //printf("passed_time [1/Gamma] = %f\n", passed_time);
-    //printf("passed_time [ms] = %f\n", passed_time / (2 * PI * atom.transition.gamma));
+    //printf("res.time [1/Gamma] = %f\n", res.time);
+    //printf("res.time [ms] = %f\n", res.time / (2 * PI * atom.transition.gamma));
     //printf("progress = %f\n\n", progress);
-    //print_results(res, atom, only_marginals);
+    //printf("trapped_atom = %d\n\n", res.trapped_atom);
+    //print_results(res, atom, opt);
 
     return res;
 }
@@ -129,34 +132,6 @@ performance_t get_performance(char *params_path){
     // Read lines from the CSV file
     path = str_concatenate(params_path, "performance.csv");
     rows = read_lines(path);
-
-    //
-    // Initial temperature 
-    //--
-    i += 1;
-    token = strtok_r(rows[i], DELIM, &saveptr); // Variable name
-    token = strtok_r(NULL, DELIM, &saveptr); // Value
-
-    // Python module
-    if(Py_MODULE) perform.T_0 = atof(str_replace(token, ".", ","));
-
-    // C program
-    else perform.T_0 = atof(token);
-    //--
-
-    //
-    // Gravity
-    //--
-    i += 1;
-    token = strtok_r(rows[i], DELIM, &saveptr); // Variable name
-    token = strtok_r(NULL, DELIM, &saveptr); // Value
-
-    // Python module
-    if(Py_MODULE) perform.g_bool = atoi(str_replace(token, ".", ","));
-
-    // C program
-    else perform.g_bool = atoi(token);
-    //--
 
     //
     // Maximum time of simulation
@@ -249,6 +224,81 @@ performance_t get_performance(char *params_path){
     free(path);
 
     return perform;
+}
+
+initial_conditions_t get_initial_conditions(char *params_path){
+    //
+    // Variables
+    //
+
+    int i = 0, n;
+    char *token, *saveptr, *path, **rows;
+    initial_conditions_t ini_conds;
+
+    // Read lines from the CSV file
+    path = str_concatenate(params_path, "initial_conditions.csv");
+    rows = read_lines(path);
+
+    //
+    // Initial temperature 
+    //--
+    i += 1;
+    token = strtok_r(rows[i], DELIM, &saveptr); // Variable name
+    token = strtok_r(NULL, DELIM, &saveptr); // Value
+
+    // Python module
+    if(Py_MODULE) ini_conds.T_0 = atof(str_replace(token, ".", ","));
+
+    // C program
+    else ini_conds.T_0 = atof(token);
+    //--
+
+    //
+    // Module of the initial velocity of the atoms
+    //--
+    i += 1;
+    token = strtok_r(rows[i], DELIM, &saveptr); // Variable name
+    token = strtok_r(NULL, DELIM, &saveptr); // Value
+
+    // Python module
+    if(Py_MODULE) ini_conds.v_0 = atof(str_replace(token, ".", ","));
+
+    // C program
+    else ini_conds.v_0 = atof(token);
+    //--
+
+    //
+    // Direction of the initial velocity of the atoms
+    //--
+    i += 1;
+    token = strtok_r(rows[i], DELIM, &saveptr); // Variable name
+    token = strtok_r(NULL, DELIM, &saveptr); // Value
+
+    // Python module
+    if(Py_MODULE) ini_conds.v_0_dir = get_double_array(token, &n);
+
+    // C program
+    else ini_conds.v_0_dir = get_double_array(token, &n);
+    //--
+
+    //
+    // Gravity
+    //--
+    i += 1;
+    token = strtok_r(rows[i], DELIM, &saveptr); // Variable name
+    token = strtok_r(NULL, DELIM, &saveptr); // Value
+
+    // Python module
+    if(Py_MODULE) ini_conds.g_bool = atoi(str_replace(token, ".", ","));
+
+    // C program
+    else ini_conds.g_bool = atoi(token);
+    //--
+
+    // Release memory
+    free(path);
+
+    return ini_conds;
 }
 
 magnetic_field_t get_magnetic_field(char *params_path){
@@ -587,7 +637,7 @@ transition_t get_transition(char *params_path){
     return transition;
 }
 
-atom_t get_atom(performance_t perform, magnetic_field_t B_params, char *params_path){
+atom_t get_atom(initial_conditions_t ini_conds, performance_t perform, beams_setup_t beams_setup, int opt, char *params_path){
     //
     // Variables
     // --
@@ -644,41 +694,43 @@ atom_t get_atom(performance_t perform, magnetic_field_t B_params, char *params_p
     //
     // Initial position
     //--
-    atom.pos = (double *) calloc(3, sizeof(double));
+    if(opt < 2){
+        //
+        // Random vector
+        //--
+        rd_v = (double*) calloc(3, sizeof(double));
 
-    //
-    // Random vector
-    //--
-    rd_v = (double*) calloc(3, sizeof(double));
+        for(i = 0; i < 3; i++) {
+            rd_v[i] = ((double) rand()) / ((double) RAND_MAX);
+            if((((double) rand()) / ((double) RAND_MAX)) < 0.5) rd_v[i] = -rd_v[i];
+        }
+
+        rd_v = r3_normalize(rd_v); // Normalization
+        //--
+
+        if(perform.max_r < beams_setup.beams[0].w) std_dev = (perform.max_r / 2);
+        else std_dev = (beams_setup.beams[0].w / 2);
+        
+        atom.pos = r3_scalar_product(random_norm(0, std_dev), rd_v); // cm
     
-    // Generate a random value for each direction
-    for(i = 0; i < 3; i++) {
-        rd_v[i] = ((double) rand()) / ((double) RAND_MAX);
-        if((((double) rand()) / ((double) RAND_MAX)) < 0.5) rd_v[i] = -rd_v[i];
-    }
+    } else if(opt == 2)
+        atom.pos = r3_scalar_product(-beams_setup.beams[0].w, r3_normalize(ini_conds.v_0_dir));
 
-    // Normalization
-    rd_v = r3_normalize(rd_v); // Normalization
-    //--
-
-    atom.pos = r3_scalar_product(random_norm(0, perform.max_r/2), rd_v); // cm
     //--
 
     //
     // Initial velocity of the atom
     //--
-    atom.vel = (double *) calloc(3, sizeof(double));
-    for(i = 0; i < 3; i++){
-        // Position
-        //atom.pos[i] = 0;
+    if(opt < 2){
+        atom.vel = (double *) calloc(3, sizeof(double));
+        for(i = 0; i < 3; i++){
+            std_dev = sqrt(k_B * ini_conds.T_0 / (atom.mass * u)) * 10; // cm / s
+            atom.vel[i] = random_norm(0, std_dev); // cm / s
+        }  
 
-        // Velocity
-        std_dev = sqrt(k_B * perform.T_0 / (atom.mass * u)) * 10; // cm / s
-        atom.vel[i] = random_norm(0, std_dev); // cm / s
-        //atom.vel[i] = 0;
-    }
-    //atom.pos[1] = 0.5;
-    //atom.vel[1] = 2.0;
+    } else if(opt == 2)
+        atom.vel = r3_scalar_product(ini_conds.v_0, r3_normalize(ini_conds.v_0_dir));
+    
     //--
 
     // Optical transition
@@ -1891,14 +1943,23 @@ int update_hist_3d(histogram_3d_t *hist, double *vals){
 
 int print_performance(performance_t perform){
     printf("Performance\n--\n");
-    printf("T_0 [uK] = %f\n", perform.T_0);
-    printf("g_bool = %d\n", perform.g_bool);
     printf("max_time [1/Gamma] = %f\n", perform.max_time);
     printf("max_r [cm] = %f\n", perform.max_r);
     printf("max_v [cm/s] = %f\n", perform.max_v);
     printf("num_bins = %d\n", perform.num_bins);
     printf("wait_time [1/Gamma] = %f\n", perform.wait_time);
     printf("time interval [1/Gamma] = %f\n", perform.dt);
+    printf("\n");
+
+    return 1;
+}
+
+int print_initial_conditions(initial_conditions_t ini_conds){
+    printf("Initial Conditions\n--\n");
+    printf("T_0 [uK] = %f\n", ini_conds.T_0);
+    printf("v_0 [m/s] = %f\n", ini_conds.v_0);
+    r3_print(ini_conds.v_0_dir, "v_0_dir");
+    printf("g_bool = %d\n", ini_conds.g_bool);
     printf("\n");
 
     return 1;
@@ -1920,7 +1981,9 @@ int print_atom(atom_t atom){
     printf("Z = %d\n", atom.Z);
     printf("mass [u] = %f\n", atom.mass);
     r3_print(atom.pos, "pos [cm/s]");
+    printf("r [cm] = %f\n", r3_mod(atom.pos));
     r3_print(atom.vel, "vel [cm/s]");
+    printf("v [cm/s] = %f\n", r3_mod(atom.vel));
     printf("J = %d\n", atom.J);
     printf("mJ = %d\n", atom.mJ);
     printf("\n");
@@ -1951,16 +2014,17 @@ int print_beams(beams_setup_t beams_setup){
     return 1;
 }
 
-int print_results(results_t res, atom_t atom, int only_marginals){
+int print_results(results_t res, atom_t atom, int opt){
     // Variables
     int i, j;
 
     printf("Simulation status\n--\n");
     printf("total time [ms] = %f\n", res.time / (atom.transition.gamma));
-    printf("Atom trapped [ms] = %d\n", res.atom_trapped);
+    printf("total time [1/Gamma] = %f\n", res.time);
+    printf("Atom trapped [ms] = %d\n", res.trapped_atom);
     printf("\n");
 
-    if(only_marginals){
+    if(opt == 1){
         //
         // Position frequencies
         //-
