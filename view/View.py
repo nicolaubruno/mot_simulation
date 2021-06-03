@@ -161,15 +161,15 @@ class View:
             print(self.__simulation.results.loop["var"] + " = ", end="")
             print(self.__simulation.results.loop['values'])
 
-        if last_loop == -1:
-            print("[0/" + str(len(self.__simulation.results.loop['values'])) + "]", end="")
+            if last_loop == -1:
+                print("[0/" + str(len(self.__simulation.results.loop['values'])) + "]", end="")
 
-        else:
-            print("["+ str(last_loop) +"/" + str(len(self.__simulation.results.loop['values'])) + "] ", end="")
-            for i in range(last_loop):
-                print(str(self.__simulation.results.loop["values"][i]) + ", ", end="")
+            else:
+                print("["+ str(last_loop) +"/" + str(len(self.__simulation.results.loop['values'])) + "] ", end="")
+                for i in range(last_loop):
+                    print(str(self.__simulation.results.loop["values"][i]) + ", ", end="")
 
-        print(self.separator)
+            print(self.separator)
 
     #
     # Print the results
