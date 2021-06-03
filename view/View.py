@@ -226,7 +226,8 @@ class View:
             print()
 
     #
-    # View position marginal histo    def pos_marg_hist(self, res, axis=0):
+    # View position marginal histogram
+    def pos_marg_hist(self, res, axis=0):
         #
         # Gaussian function
         gaussian = lambda x, mean, std_dev, amp: \
@@ -549,7 +550,7 @@ class View:
         # Without loop
         else:
             ratio = res.trapped_atoms_ratio()
-            print("\nN_trapped / N_total%f\n" % (ratio))
+            print("\nN_trapped / N_total = %f\n" % (ratio))
 
     #
     # Plot r.m.s. cloud size
