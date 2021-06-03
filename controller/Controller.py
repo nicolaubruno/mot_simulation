@@ -103,8 +103,8 @@ class Controller:
                 #
                 # Chose a parameter
                 opts = {
-                    1: "Marginal distributions",\
-                    2: "Complete 3D distribution",\
+                    1: "Complete 3D distribution",\
+                    2: "Marginal distributions",\
                     3: "Analysis of trapped atoms"
                 }
 

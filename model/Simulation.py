@@ -100,9 +100,9 @@ class Simulation:
         # Check simulation option
         #--
         available_opts = {
-            0 : "3D distribution",\
-            1 : "Marginal distributions",\
-            2 : "Analysis of trapped atoms"
+            0: "Complete 3D distribution",\
+            1: "Marginal distributions",\
+            2: "Analysis of trapped atoms"
         }
 
         if (opt-1) in available_opts.keys():

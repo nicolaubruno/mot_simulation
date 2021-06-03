@@ -746,36 +746,13 @@ atom_t get_atom(initial_conditions_t ini_conds, performance_t perform, beams_set
     return atom;
 }
 
-int set_hist(int only_marginals, results_t *res, performance_t perform){
+int set_hist(int opt, results_t *res, performance_t perform){
     // Variables
     int i, j, k;
 
-    //
-    // Only marginals
-    //--
-    if(only_marginals){
-        res->pos_hist = (histogram_t*) calloc(3, sizeof(histogram_t));
-        res->vel_hist = (histogram_t*) calloc(3, sizeof(histogram_t));
-
-        for(i = 0; i < 3; i++){
-            // Position
-            res->pos_hist[i].num_bins = perform.num_bins;
-            res->pos_hist[i].bin_size = 2 * perform.max_r / res->pos_hist[i].num_bins;
-            res->pos_hist[i].coord0 = - perform.max_r;
-            res->pos_hist[i].freqs = (int*) calloc(res->pos_hist[i].num_bins, sizeof(int));
-
-            // Velocity
-            res->vel_hist[i].num_bins = perform.num_bins;
-            res->vel_hist[i].bin_size = 2 * perform.max_v / res->vel_hist[i].num_bins;
-            res->vel_hist[i].coord0 = - perform.max_v;
-            res->vel_hist[i].freqs = (int*) calloc(res->vel_hist[i].num_bins, sizeof(int));
-        }
-    //--
-
-    //
     // Complete histograms
     //--
-    } else{
+     if(opt == 0){
         // Position
         res->pos_3Dhist.num_bins = (int*) calloc(3, sizeof(int));
         res->pos_3Dhist.bins_size = (double*) calloc(3, sizeof(double));
@@ -798,7 +775,6 @@ int set_hist(int only_marginals, results_t *res, performance_t perform){
             res->vel_3Dhist.coord0[i] = - perform.max_v;
         }
 
-        //
         // Position
         //--
         res->pos_3Dhist.freqs = (int***) calloc(res->pos_3Dhist.num_bins[0], sizeof(int**));
@@ -814,7 +790,6 @@ int set_hist(int only_marginals, results_t *res, performance_t perform){
         }
         //--
 
-        //
         // Velocity
         //--
         res->vel_3Dhist.freqs = (int***) calloc(res->vel_3Dhist.num_bins[0], sizeof(int**));
@@ -829,6 +804,27 @@ int set_hist(int only_marginals, results_t *res, performance_t perform){
             }
         }
         //--
+
+    //--
+    // Only marginals
+    //--
+    } else if(opt == 1 || opt == 2) {
+        res->pos_hist = (histogram_t*) calloc(3, sizeof(histogram_t));
+        res->vel_hist = (histogram_t*) calloc(3, sizeof(histogram_t));
+
+        for(i = 0; i < 3; i++){
+            // Position
+            res->pos_hist[i].num_bins = perform.num_bins;
+            res->pos_hist[i].bin_size = 2 * perform.max_r / res->pos_hist[i].num_bins;
+            res->pos_hist[i].coord0 = - perform.max_r;
+            res->pos_hist[i].freqs = (int*) calloc(res->pos_hist[i].num_bins, sizeof(int));
+
+            // Velocity
+            res->vel_hist[i].num_bins = perform.num_bins;
+            res->vel_hist[i].bin_size = 2 * perform.max_v / res->vel_hist[i].num_bins;
+            res->vel_hist[i].coord0 = - perform.max_v;
+            res->vel_hist[i].freqs = (int*) calloc(res->vel_hist[i].num_bins, sizeof(int));
+        }
     }
     //--
 
