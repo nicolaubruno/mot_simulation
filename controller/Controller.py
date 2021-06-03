@@ -54,20 +54,20 @@ class Controller:
             #
             # Run Simulation
             if opt == 1:
-                self.run_simulation()
+                self.run_simulation(last_header=True)
 
             #
             # Show parameters of the simulation
             elif opt == 2:
-                self.view_parameters()
+                self.view_parameters(last_header=True)
 
             #
             # Show results
             elif opt == 3:
-                self.view_results()
+                self.view_results(last_header=True)
 
     #
-    def run_simulation(self):
+    def run_simulation(self, last_header=False):
         #
         # Menu level
         self._menu_level = 1
@@ -76,7 +76,8 @@ class Controller:
         # Select a result group
         while self.menu_level == 1:
             # Get result group
-            header = "Select a results group"
+            if last_header: header = " .. / Run Simulation / Select a results group:"
+            else: header = "Run Simulation / Select a results group:"
             results_group = self.__call_menu(self.__simulation.available_results_groups(), header)
 
             # Check back option
@@ -91,7 +92,7 @@ class Controller:
             while self.menu_level == 2:
                 #
                 # Get shortname
-                shortname = self.__call_input("Insert a short name for the simulation")
+                shortname = self.__call_input(".. / Group " + self.__simulation.available_results_groups()[results_group] + " / Short name")
                 if shortname == -1: self._menu_level -= 1
 
                 #
@@ -107,7 +108,10 @@ class Controller:
                     3: "Analysis of trapped atoms"
                 }
 
-                opt = self.__call_menu(opts, "Choose a simulation option:")
+                if shortname: show_shortname = " (" + shortname + ") "
+                else: show_shortname = ""
+
+                opt = self.__call_menu(opts, ".. / Group " + self.__simulation.available_results_groups()[results_group] + show_shortname + " / Choose a simulation option:")
 
                 #
                 # Back option
@@ -125,18 +129,16 @@ class Controller:
                 check_time = dt.now().timestamp()
 
                 # Print simulation status
-                self.__view.simulation_header(header=False)
-
-                # Set progress bars
-                pbars = []
-                for i in range(loop_num):
-                    desc = "Atoms simulated" if loop_num == 1 else self.__simulation.results.loop["var"] + " = " + ("%.2f" % self.__simulation.results.loop["values"][i])
-                    pbars.append(tqdm(total=self.__simulation.results.perform["num_sim"], desc=desc, position=i))
+                self.__view.simulation_header(sim_opt=opts[opt], group=self.__simulation.available_results_groups()[results_group])
 
                 #
                 # Run simulation
                 #--
                 for i in range(loop_num):
+                    # Set progress bar
+                    desc = "Atoms simulated" if loop_num == 1 else self.__simulation.results.loop["var"] + " = " + ("%.2f" % self.__simulation.results.loop["values"][i])
+                    pbar = tqdm(total=self.__simulation.results.perform["num_sim"], desc=desc)
+
                     # Open new simulation for each looping value
                     if i > 0: self.__simulation.open(self.__simulation.results.code, i, opt)
 
@@ -146,30 +148,32 @@ class Controller:
                     while self.__simulation.atoms_simulated < self.__simulation.results.perform["num_sim"]:
                         # Simulate atoms
                         times = self.__simulation.run()
-                        
-                        pbars[i].update(times)
+
+                        self.__view.simulation_header(sim_opt=opts[opt], group=self.__simulation.available_results_groups()[results_group], last_loop=i)
+                        pbar.update(times)
                     #--
 
                     # Save simulation
                     self.__simulation.save()
-                #--
 
-                # Close progress bars
-                for i in range(loop_num): pbars[i].close()
+                    # Close bar
+                    pbar.close()
+                #--
 
                 #
                 # Release memory
                 gc.collect()
 
                 # Information about the simulation
-                self.__view.simulation_header(clear_screen=True)
+                self.__view.simulation_header(sim_opt=opts[opt], group=self.__simulation.available_results_groups()[results_group], last_loop=(i+1))
+                input("Enter with any key to continue ... ")
 
                 #
                 # Set menu level
                 self._menu_level = 0
 
     #
-    def view_parameters(self):
+    def view_parameters(self, last_header=''):
         #
         # Set menu level
         self._menu_level = 1
@@ -212,7 +216,7 @@ class Controller:
                 self._menu_level = 0
 
     #
-    def view_results(self):
+    def view_results(self, last_header=''):
         #
         # Set menu level
         self._menu_level = 1
@@ -221,7 +225,8 @@ class Controller:
         # Check results group
         while self.menu_level == 1:
             # Get result group
-            header = "Select a results group"
+            if last_header: header = ".. / Results / Select a results group:"
+            else: header = " Results / Select a results group:"
             results_group = self.__call_menu(self.__simulation.available_results_groups(), header)
 
             # Check back option
@@ -235,7 +240,7 @@ class Controller:
             # Get result code
             while self.menu_level == 2:
                 # Get code
-                header = "Select a simulation code"
+                header = " .. / Group " + self.__simulation.available_results_groups()[results_group] + " / Select a simulation code"
                 code = self.__call_menu(self.__simulation.available_results(results_group), header, order_command=True)
 
                 # Check back option
@@ -255,7 +260,7 @@ class Controller:
 
                     #
                     # Header
-                    header = "Simulation " + str(res.code) + " " + res.name
+                    header = "../ " + str(res.code) + " (" + res.name + ") / Select visualization"
 
                     #
                     # Options

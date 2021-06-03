@@ -1,5 +1,5 @@
 ,initial_conditions
 T_0,30.0
-v_0,loop[1000 2000 100]
+v_0,1300.0
 v_0_dir,[1 -1 0]
 g_bool,1

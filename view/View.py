@@ -42,14 +42,11 @@ class View:
         #
         # Terminal separator line
         self._separator = '\n'
-        for i in range(50): self._separator += '-'
+        for i in range(70): self._separator += '-'
 
-        self._header = self.separator + '\n'
-        self._header += "Monte Carlo simulation of ultracold atoms in a Magneto-Optical Trap\n"
+        self._header = "\nMonte Carlo simulation of narrow-line magneto-optical traps\n"
         self._header += "Version 2.0, Author: Bruno N. Santos;" + self._separator
-        self._header += "\n\nGlobal options:" + self.separator + '\n'
-        self._header += "-1 -> Back\n"
-        self._header += " 0 -> Exit\n"
+        self._header += "\nGlobal options: -1 -> Back | 0 -> Exit" + self.separator + '\n'
 
     #
     def terminal_menu(self, options, header = None, footer = None, clear_screen = True, show_main_header = True):
@@ -66,14 +63,18 @@ class View:
 
         #
         # Show options
+        cter = 0
+        max_cter = len(options)
+
         for key, val in options.items():
-            if val:
-                print('%d -> %s;' % (key, val))
+            cter += 1
+            if cter < max_cter: end_delim = '\n'
+            else: end_delim = ''
 
-            else:
-                print('%d;' % (key))
+            if val:  print('%d -> %s' % (key, val), end=end_delim)
+            else: print('%d' % (key), end=end_delim)
 
-        print('')
+        print(self.separator)
 
         #
         # Show footer
@@ -104,7 +105,7 @@ class View:
         if description is not None: description += ": "
         else: description = ''
 
-        input_str = input('\n' + description)
+        input_str = input(description)
 
         return input_str
 
@@ -137,7 +138,7 @@ class View:
 
     #
     # Print general information of a simulation
-    def simulation_header(self, header = True, clear_screen = False):
+    def simulation_header(self, header = True, clear_screen = True, sim_opt=None, group='', last_loop=-1):
         #
         # Clear screen
         if clear_screen:
@@ -148,28 +149,27 @@ class View:
         # Show header 
         if header: print(self.header)
 
-        print()
-        print("Results " + str(self.__simulation.results.code) + " " + self.__simulation.results.name + self._separator)
+        if sim_opt: str_opt = ".. / " + sim_opt + " / "
+        else: str_opt = ".. / "
 
-        if not self.__simulation.results.loop["var"]:
-            print("Atoms simulated = %d / %d" % (self.__simulation.atoms_simulated, self.__simulation.results.perform['num_sim']))
-            print()
+        str_opt += "Group " + group + " / "
+        str_opt += str(self.__simulation.results.code) + " (" + self.__simulation.results.name + ")"
+        str_opt += self._separator
+        print(str_opt)
+
+        if self.__simulation.results.loop["var"]:
+            print(self.__simulation.results.loop["var"] + " = ", end="")
+            print(self.__simulation.results.loop['values'])
+
+        if last_loop == -1:
+            print("[0/" + str(len(self.__simulation.results.loop['values'])) + "]", end="")
 
         else:
-            print()
-            print("Number of atoms simulated in each looping: " + str(self.__simulation.results.perform["num_sim"]))
-            
-            #
-            # Looping
-            if len(self.__simulation.results.loop["var"]) > 0:
-                print("Number of loopings: " + str(len(self.__simulation.results.loop["values"])))
-                print(self.__simulation.results.loop["var"] + " = [ ", end='')
-                
-                for val in self.__simulation.results.loop["values"]:
-                    print("%.2f " % val, end='')
+            print("["+ str(last_loop) +"/" + str(len(self.__simulation.results.loop['values'])) + "] ", end="")
+            for i in range(last_loop):
+                print(str(self.__simulation.results.loop["values"][i]) + ", ", end="")
 
-                print(']')
-            print()
+        print(self.separator)
 
     #
     # Print the results
@@ -226,8 +226,7 @@ class View:
             print()
 
     #
-    # View position marginal histogram
-    def pos_marg_hist(self, res, axis=0):
+    # View position marginal histo    def pos_marg_hist(self, res, axis=0):
         #
         # Gaussian function
         gaussian = lambda x, mean, std_dev, amp: \
@@ -279,6 +278,7 @@ class View:
 
         #
         # Show
+
         plt.show()
 
     #
@@ -335,6 +335,7 @@ class View:
 
         #
         # Show
+        print('Showing graph ...')
         plt.show()
 
     #
@@ -389,11 +390,12 @@ class View:
             # Set plot
             plt.grid(linestyle="--")
             plt.legend(frameon=True)
+            plt.close(1)
+            plt.tight_layout()
 
             #
             # Show
-            plt.close(1)
-            plt.tight_layout()
+            print('Showing graph ...')
             plt.show()
 
         #
@@ -474,6 +476,10 @@ class View:
 
             plt.close(1)
             plt.tight_layout()
+            
+            #
+            # Show
+            print('Showing graph ...')
             plt.show()
 
         #
@@ -522,17 +528,21 @@ class View:
                 label = r"$ " + info['symbol'] + r"$"
 
             plt.xlabel(label)
-            plt.ylabel(r"T [$\mu K$]")
+            plt.ylabel(r"$N / N_{total}$")
             #--
 
             # Plot trapped atoms ratio
-            plt.plot(x, temp, label="Simulation", marker='o', linestyle='--')
+            plt.plot(x, ratio, label="Simulation", marker='o', linestyle='--')
 
             # Set plot
             plt.grid(True, linestyle="--")
 
             plt.close(1)
             plt.tight_layout()
+            
+            #
+            # Show
+            print('Showing graph ...')
             plt.show()
 
         #
@@ -591,9 +601,11 @@ class View:
             # Set plot
             plt.grid(linestyle="--")
             plt.legend(frameon=True)
-
-            # Show
             plt.close(1)
+            
+            #
+            # Show
+            print('Showing graph ...')
             plt.show()
 
         else:
@@ -636,5 +648,6 @@ class View:
 
         #
         # Show
+        print('Showing graph ...')
         plt.show()
 
