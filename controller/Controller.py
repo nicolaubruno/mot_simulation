@@ -67,7 +67,7 @@ class Controller:
                 self.view_results()
 
     #
-    def run_simulation(self):
+    def run_simulation(self, last_header = None):
         #
         # Menu level
         self._menu_level = 1
@@ -76,8 +76,11 @@ class Controller:
         # Select a result group
         while self.menu_level == 1:
             # Get result group
-            header = "Select a results group"
-            results_group = self.__call_menu(self.__simulation.available_results_groups(), header)
+            if last_header: header = " .. / Run Simulation / Select a results group:"
+            else: header = "Run Simulation / Select a results group:"
+
+            available_groups = self.__simulation.available_results_groups()
+            results_group = self.__call_menu(available_groups, header)
 
             # Check back option
             if self.menu_level < 1:
@@ -91,7 +94,7 @@ class Controller:
             while self.menu_level == 2:
                 #
                 # Get shortname
-                shortname = self.__call_input("Insert a short name for the simulation")
+                shortname = self.__call_input(".. / Group " + available_groups[results_group] + " / Short name")
                 if shortname == -1: self._menu_level -= 1
 
                 #
@@ -107,7 +110,10 @@ class Controller:
                     3: "Analysis of trapped atoms"
                 }
 
-                opt = self.__call_menu(opts, "Choose a simulation option:")
+                if shortname: show_shortname = " (" + shortname + ") "
+                else: show_shortname = ""
+
+                opt = self.__call_menu(opts, ".. / Group " + available_groups[results_group] + show_shortname + " / Choose a simulation option:")
 
                 #
                 # Back option
@@ -125,7 +131,7 @@ class Controller:
                 check_time = dt.now().timestamp()
 
                 # Print simulation status
-                self.__view.simulation_header(header=False)
+                self.__view.simulation_header(group=available_groups[results_group], sim_opt=opts[opt], clear_screen=True)
 
                 # Set progress bars
                 pbars = []
@@ -162,7 +168,8 @@ class Controller:
                 gc.collect()
 
                 # Information about the simulation
-                self.__view.simulation_header(clear_screen=True)
+                #self.__view.simulation_header(group=available_groups[results_group], sim_opt=opts[opt], clear_screen=True)
+                input("Enter any key to continue ... ")
 
                 #
                 # Set menu level

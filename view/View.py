@@ -35,21 +35,18 @@ class View:
 
     #
     def __init__(self, simulation):
-        #
         # Model objects
         self.__simulation = simulation
 
-        #
         # Terminal separator line
+        #--
         self._separator = '\n'
-        for i in range(50): self._separator += '-'
+        for i in range(70): self._separator += '-'
 
-        self._header = self.separator + '\n'
-        self._header += "Monte Carlo simulation of ultracold atoms in a Magneto-Optical Trap\n"
+        self._header = "\nMonte Carlo simulation of narrow-line magneto-optical traps\n"
         self._header += "Version 2.0, Author: Bruno N. Santos;" + self._separator
-        self._header += "\n\nGlobal options:" + self.separator + '\n'
-        self._header += "-1 -> Back\n"
-        self._header += " 0 -> Exit\n"
+        self._header += "\nGlobal options: -1 -> Back | 0 -> Exit" + self.separator + '\n'
+        #--
 
     #
     def terminal_menu(self, options, header = None, footer = None, clear_screen = True, show_main_header = True):
@@ -108,7 +105,6 @@ class View:
 
         return input_str
 
-    #
     # Print the status of the simulation
     def simulation_status(self, clear_screen=True):
         #
@@ -135,43 +131,32 @@ class View:
             print(str(self.__simulation.loop["values"][self.__simulation.results.loop["active"]]) + ")")
             print()
 
-    #
     # Print general information of a simulation
-    def simulation_header(self, header = True, clear_screen = False):
-        #
+    def simulation_header(self, group, header = True, clear_screen = False, sim_opt = None):
         # Clear screen
         if clear_screen:
             if os.name == 'nt': os.system('cls')
             else: os.system('clear')
 
-        #
         # Show header 
         if header: print(self.header)
+
+        # Simulation option
+        if sim_opt: str_opt = ".. / " + sim_opt + " / "
+        else: str_opt = ".. / "
+
+        str_opt += "Group " + group + " / " + str(self.__simulation.results.code)
+        if self.__simulation.results.name: str_opt += " (" + self.__simulation.results.name + ")"
+        str_opt += self._separator
+        print(str_opt)
+
+        if self.__simulation.results.loop["var"]:
+            print(self.__simulation.results.loop["var"] + " = ", end="")
+            print(self.__simulation.results.loop['values'])
 
         print()
         print("Results " + str(self.__simulation.results.code) + " " + self.__simulation.results.name + self._separator)
 
-        if not self.__simulation.results.loop["var"]:
-            print("Atoms simulated = %d / %d" % (self.__simulation.atoms_simulated, self.__simulation.results.perform['num_sim']))
-            print()
-
-        else:
-            print()
-            print("Number of atoms simulated in each looping: " + str(self.__simulation.results.perform["num_sim"]))
-            
-            #
-            # Looping
-            if len(self.__simulation.results.loop["var"]) > 0:
-                print("Number of loopings: " + str(len(self.__simulation.results.loop["values"])))
-                print(self.__simulation.results.loop["var"] + " = [ ", end='')
-                
-                for val in self.__simulation.results.loop["values"]:
-                    print("%.2f " % val, end='')
-
-                print(']')
-            print()
-
-    #
     # Print the results
     def results_history(self, num = 5, clear_screen = True):
         #
@@ -198,7 +183,6 @@ class View:
             print(' ' + val[1], end='')
             print()
     
-    #
     # Print the results groups
     def results_groups(self):
         #
@@ -225,7 +209,6 @@ class View:
             print(' ' + val[1], end='')
             print()
 
-    #
     # View position marginal histogram
     def pos_marg_hist(self, res, axis=0):
         #
@@ -281,7 +264,6 @@ class View:
         # Show
         plt.show()
 
-    #
     # View velocity marginal histogram
     def vel_marg_hist(self, res, axis=0):
         #
@@ -337,7 +319,6 @@ class View:
         # Show
         plt.show()
 
-    #
     # Plot mass centre
     def mass_centre(self, res):
         r_c, std_r_c = res.mass_centre()
@@ -405,7 +386,6 @@ class View:
             print("z = %f +- %f" % (r_c[2], std_r_c[2]))
             print()
 
-    #
     # Plot temperature
     def temperature(self, res, log_scale=1, doppler_temperature=False, method=0):
         #
@@ -485,8 +465,7 @@ class View:
             print("T_{doppler} [uK] = %f" % (res.doppler_temperature()))
             print()
 
-    #
-    # Plot temperature
+    # Plot trapped atoms ratio
     def trapped_atoms_ratio(self, res):
         #
         # With looping
@@ -522,26 +501,29 @@ class View:
                 label = r"$ " + info['symbol'] + r"$"
 
             plt.xlabel(label)
-            plt.ylabel(r"T [$\mu K$]")
+            plt.ylabel(r"$N / N_{total}$")
             #--
 
             # Plot trapped atoms ratio
-            plt.plot(x, temp, label="Simulation", marker='o', linestyle='--')
+            plt.plot(x, ratio, label="Simulation", marker='o', linestyle='--')
 
             # Set plot
             plt.grid(True, linestyle="--")
 
             plt.close(1)
             plt.tight_layout()
+            
+            #
+            # Show
+            print('Showing graph ...')
             plt.show()
 
         #
         # Without loop
         else:
             ratio = res.trapped_atoms_ratio()
-            print("\nN_trapped / N_total%f\n" % (ratio))
+            print("\nN_trapped / N_total = %f\n" % (ratio))
 
-    #
     # Plot r.m.s. cloud size
     def cloud_size(self, res):
         if res.loop["var"]:
@@ -599,7 +581,6 @@ class View:
         else:
             print('Visualization not implemented')
     
-    #
     # Heat map
     def heatmap(self, res, axis, val):
         #
@@ -637,4 +618,3 @@ class View:
         #
         # Show
         plt.show()
-
