@@ -1156,6 +1156,10 @@ class Results:
 
         return v_mean, v_std_dev
 
+    # General complementary error function
+    def general_erfc(self, t, mean, std_dev):
+        return 1 - (erf((t - mean) / np.sqrt(2 * std_dev**2)) - erf((- mean) / np.sqrt(2 * std_dev**2))) / 2
+
     # Get 2D-histogram of positions removing an axis
     def pos_2Dhist(self, axis = 0, val = 0):
         #
