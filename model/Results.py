@@ -4,8 +4,10 @@
 import sys, os, gc
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
 
 from scipy.optimize import curve_fit
+from scipy.special import erf
 #--
 
 #
@@ -13,109 +15,91 @@ class Results:
 
     ''' Attributes '''
 
-    #
     # Constants in the international system
     @property
     def ctes(self):
         return self._ctes
  
-    #
     # (Series)
     @property
     def atom(self):
         return self._atom
 
-    #
     # (Series)
     @property
     def transition(self):
         return self._transition
 
-    #
     # (Series) Initial conditions
     @property
     def ini_conds(self):
         return self._ini_conds
 
-    #
     # (Series) Performance
     @property
     def perform(self):
         return self._perform
 
-    #
     # (Series) Magnetic field
     @property
     def B_params(self):
         return self._B_params
 
-    #
     # (Dictionary)
     @property
     def beams(self):
         return self._beams
 
-    #
     # (Dataframe) Information about the parameters
     @property
     def info(self):
         return self._info
     
-    #
     # Identification code
     @property
     def code(self):
         return self._code
 
-    #
     # Identification short name
     @property
     def name(self):
         return self._name
 
-    #
     # 3D-Histogram of positions
     @property
     def pos_3Dhist(self):
         return self._pos_3Dhist
     
-    #
     # Marginal histograms of positions
     @property
     def pos_hist(self):
         return self._pos_hist
 
-    #
     # 3D-Histogram of velocities
     @property
     def vel_3Dhist(self):
         return self._vel_3Dhist
     
-    #
     # Marginal histograms of velocities
     @property
     def vel_hist(self):
         return self._vel_hist
     
-    #
     # Trapped atoms
     @property
     def trapped_atoms(self):
         return self._trapped_atoms
 
-    #
     # Looping status
     @property
     def loop(self):
         return self._loop
 
-    #
     # Results directory
     @property
     def directory(self):
         return self._directory
 
-    #
     # Root directory
     @property
     def root_dir(self):
@@ -126,7 +110,6 @@ class Results:
 
     #
     def __init__(self, code, name = '', loop_idx = 0, results_group = None):
-        #
         # Constants in the international system
         #--
         self._ctes = {
@@ -137,7 +120,6 @@ class Results:
         }
         #--
 
-        #
         # Set loop variable
         self._loop = {
             "var": '',\
@@ -145,19 +127,19 @@ class Results:
             "active": int(loop_idx)
         }
 
-        #
         # Root dir
         self._model_dir = "model/"
         self._root_dir = self._model_dir + "results/"
         if results_group is not None and results_group != 1: 
             self._root_dir += "group_" + results_group + "/"
 
-        #
         # Identification
         self._code = None
         self._name = name.strip()
 
-        #
+        # Null trapped atoms
+        self._trapped_atoms = -1
+
         # Get existent results
         #--
         if self.__check_code(code):
@@ -194,7 +176,6 @@ class Results:
         # Cast values of the parameters
         self.__cast_params_values()
 
-    #
     # Cast values of the parameters
     def __cast_params_values(self):
         # Atom
@@ -252,10 +233,8 @@ class Results:
                     self.loop["values"][i] = float(val)
         #--
 
-    #
     # Get attributes
     def __get_attr(self):
-        #
         # Change directory
         #--
         self._directory = self.root_dir + str(self.code)
@@ -277,21 +256,17 @@ class Results:
             params_dir = self._directory + "parameters/"
         #--
 
-        #
         # Read parameters
-        #
+        #--
 
-        #
         # Atom
         path = params_dir + "atom.csv"
         self._atom = pd.read_csv(path, header=0, index_col=0, squeeze=True).astype(object)
 
-        #
         # Transition
         path = params_dir + "transition.csv"
         self._transition = pd.read_csv(path, header=0, index_col=0, squeeze=True).astype(object)
 
-        #
         # Beams
         #--
         self._beams = {'main': None, 'setup': None, 'sidebands': None}
@@ -310,27 +285,24 @@ class Results:
         self._beams['sidebands'] = pd.read_csv(path, header=0, index_col=0, squeeze=True).astype(object)
         #--
 
-        #
         # Initial conditions
         path = params_dir + "initial_conditions.csv"
         self._ini_conds = pd.read_csv(path, header=0, index_col=0, squeeze=True).astype(object)
 
-        #
         # Performance
         path = params_dir + "performance.csv"
         self._perform = pd.read_csv(path, header=0, index_col=0, squeeze=True).astype(object)
 
-        #
         # Magnetic field
         path = params_dir + "magnetic_field.csv"
         self._B_params = pd.read_csv(path, header=0, index_col=0, squeeze=True).astype(object)
 
-        #
         # Information about the parameters
         path = self._model_dir + "parameters/informations.csv"
         self._info = pd.read_csv(path, header=0)
         self._info.set_index("parameter", inplace=True)
         self._info.fillna("", inplace=True)
+        #--
 
     #
     # Get distributions
@@ -772,7 +744,6 @@ class Results:
         # Release memory
         del num_res
 
-    #
     # Create attributes
     def __create_attr(self):
         # Parameters directory
@@ -828,7 +799,6 @@ class Results:
         # Check looping values
         self.__set_loop()
         
-    #
     # Set looping values
     def __set_loop(self):
         #
@@ -1071,7 +1041,6 @@ class Results:
 
         return vel_c, std_vel_c      
 
-    #
     # Get temperatures in uK
     def temperature(self, fixed_loop_idx = False, method=0):
         #
@@ -1113,7 +1082,6 @@ class Results:
 
         return temp   
 
-    #
     # Doppler temperature
     def doppler_temperature(self, power_broadening=False, fixed_loop_idx = False):
         if power_broadening:
@@ -1133,7 +1101,6 @@ class Results:
 
         return temp
 
-    #
     # Trapped atoms ratio
     def trapped_atoms_ratio(self, fixed_loop_idx = False):
         #
@@ -1155,7 +1122,40 @@ class Results:
 
         return ratio
 
-    #
+    # Capture velocity
+    def capture_velocity(self):
+        v_mean, v_std_dev = (0,0)
+
+        if self.loop["var"] == 'v_0' and len(self.loop["values"]) > 1:
+            v_c = self.loop['values']
+            ratio = np.zeros(len(self.loop['values']))
+
+            for i, val in enumerate(self.loop["values"]):
+                self.loop_idx(i)
+                ratio[i] = self.trapped_atoms / (self.perform['num_sim'])
+
+            # General complementary error function
+            def general_erfc(t, mean, std_dev):
+                return 1 - (erf((t - mean) / np.sqrt(2 * std_dev**2)) - erf((- mean) / np.sqrt(2 * std_dev**2))) / 2
+
+            # Get data
+            params, covs = curve_fit(general_erfc, v_c, ratio, bounds=([min(v_c), 0], [max(v_c), (max(v_c) - min(v_c))]))
+            v_mean = params[0]
+            v_std_dev = params[1]
+
+            '''
+            x = np.linspace(v_mean - 5*v_std_dev, v_mean + 5*v_std_dev, 1000)
+            y = np.array([general_erfc(xi, v_mean, v_std_dev) for xi in x])
+
+            plt.clf()
+            plt.plot(v_c, ratio, marker="o", linestyle="")
+            plt.plot(x, y)
+            plt.grid(linestyle="--")
+            plt.show()
+            '''
+
+        return v_mean, v_std_dev
+
     # Get 2D-histogram of positions removing an axis
     def pos_2Dhist(self, axis = 0, val = 0):
         #
@@ -1195,7 +1195,6 @@ class Results:
 
         return hist
 
-    #
     # Check if code exists
     def __check_code(self, code):
         #
@@ -1236,7 +1235,6 @@ class Results:
 
         return ret  
 
-    #
     # Check if name exists
     def __check_name(self, name):
         #
@@ -1268,7 +1266,6 @@ class Results:
         self.__get_log()
         self.__cast_params_values()
 
-    #
     # Add frequencies in the 3D histogram of positions
     def add_positions(self, pos_freqs_arr):
         #
@@ -1313,7 +1310,6 @@ class Results:
 
         gc.collect()
 
-    #
     # Add frequencies in the 3D histogram of velocities
     def add_velocities(self, vel_freqs_arr):
         #
@@ -1356,7 +1352,6 @@ class Results:
 
         gc.collect()
 
-    #
     # Add frequencies in the marginal histograms of positions
     def add_marginals(self, pos_freqs_arr, vel_freqs_arr):
         data = {
@@ -1381,7 +1376,6 @@ class Results:
 
         gc.collect()
 
-    #
     # Add trapped atoms
     def add_infos(self, data):
         path = self.directory + "log.csv"

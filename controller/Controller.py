@@ -54,17 +54,17 @@ class Controller:
             #
             # Run Simulation
             if opt == 1:
-                self.run_simulation()
+                self.run_simulation(last_header = "Main Menu")
 
             #
             # Show parameters of the simulation
             elif opt == 2:
-                self.view_parameters()
+                self.view_parameters(last_header = "Main Menu")
 
             #
             # Show results
             elif opt == 3:
-                self.view_results()
+                self.view_results(last_header = "Main Menu")
 
     #
     def run_simulation(self, last_header = None):
@@ -176,12 +176,10 @@ class Controller:
                 self._menu_level = 0
 
     #
-    def view_parameters(self):
-        #
+    def view_parameters(self, last_header = None):
         # Set menu level
         self._menu_level = 1
 
-        #
         # Header
         header = 'Parameters of the simulation'
 
@@ -219,40 +217,169 @@ class Controller:
                 self._menu_level = 0
 
     #
-    def view_results(self):
-        #
+    def view_results(self, last_header = None):
+        # Available groups
+        available_groups = self.__simulation.available_results_groups()
+
         # Set menu level
         self._menu_level = 1
 
-        #
+        # Looping menu
+        while True:
+            # Get result group
+            #--
+            if self.menu_level == 1:
+                # Header
+                if last_header: header = last_header + " / Results / Select a results group:"
+                else: header = "Results / Select a results group:"
+                
+                # Get group
+                results_group = self.__call_menu(available_groups, header, add_menu_level=True)
+            #--
+
+            # Collective or individual results set
+            #--
+            if self.menu_level == 2:
+                # Header
+                header = ".. / Group " + available_groups[results_group] + " / Collective or Individual Results Sets"
+
+                # Options
+                opts = {
+                    1: "Individual",\
+                    2: "Collective"
+                }
+
+                # Check option
+                opt = self.__call_menu(opts, header, add_menu_level=True)
+                if opt == 1: collective = False
+                elif opt == 2: collective = True
+            #--
+
+            # Visualization of collective results and
+            # get simulation code for individual results
+            #--
+            if self.menu_level == 3:
+                # Collective results set
+                #--
+                if collective:
+                    # Header
+                    header = ".. / (Collective) Group " + available_groups[results_group] + " / Visualization"
+
+                    # Options
+                    opts = {
+                        1: "Trap depth vs detuning"
+                    }
+
+                    # Get visualization option
+                    opt = self.__call_menu(opts, header, add_menu_level=True)
+                
+                    # Trap depth vs detuning
+                    if opt == 1:
+                        results = self.__simulation.available_results(results_group)
+                        self.__view.trap_depth_vs_detuning(results)
+                #--
+
+                # Individual results set
+                #--
+                elif not collective:
+                    # Get code
+                    header = ".. / (Individual) Group " + available_groups[results_group] + " / Simulation Code"
+                    code = self.__call_menu(self.__simulation.available_results(results_group), header, order_command=True, add_menu_level=True)
+                #--
+            #--
+
+            # Visualization option of collective results set and
+            # Visualization of individual results
+            #--
+            if self.menu_level == 4:
+                # Collective results set
+                #--
+                if collective:
+                    pass
+                #--
+
+                # Individual results set
+                if not collective:
+                    #
+                    # Result
+                    res = Results(code)
+
+                    # Header
+                    header = ".. / Group " + available_groups[results_group] + " / " + str(res.code)
+                    if res.name: header += " (" + str(res.name) + ")"
+                    header += " / Visualizations"
+
+                    # Options
+                    options = {}
+
+                    # Add options
+                    #--
+                    if len(res.pos_hist[0]["freqs"]) > 0:
+                        options[1] = "Histogram of positions"
+                        options[2] = "Centre of mass"
+                        options[3] = "R.M.S Clouds sizes"
+
+                    if len(res.vel_hist[0]["freqs"]) > 0:
+                        options[4] = "Histogram of velocities"
+                        options[5] = "Temperature"
+
+                    if res.pos_3Dhist["dens"] is not None:
+                        options[6] = "Heat map"
+
+                    if res.trapped_atoms >= 0:
+                        options[7] = "Trapped atoms ratio"
+                    #--
+
+                    # Get visualization option
+                    opt = self.__call_menu(options, header)
+
+                    # Trapped atoms ratio
+                    if opt == 7:
+                        self.__view.trapped_atoms_ratio(res)
+
+                        if not res.loop["var"]:
+                            opt = self.__call_input("Enter with any key to continue", header = False, clear_screen=False)
+
+                #--
+            #--
+
+            # Visualization option of individual results
+            #--
+            if self.menu_level == 5:
+                break
+            #--
+
+            # Leave menu
+            else: break
+
         # Check results group
+        #--
         while self.menu_level == 1:
             # Get result group
-            header = "Select a results group"
-            results_group = self.__call_menu(self.__simulation.available_results_groups(), header)
+            if last_header: header = " .. / Results / Select a results group:"
+            else: header = "Results / Select a results group:"
+            available_groups = self.__simulation.available_results_groups()
+            results_group = self.__call_menu(available_groups, header)
 
             # Check back option
-            if self.menu_level < 1:
-                break
+            if self.menu_level < 1: break
 
             # Set menu level
             self._menu_level += 1
 
-            #
-            # Get result code
+            # Collective or individual results set
+            #--
             while self.menu_level == 2:
                 # Get code
-                header = "Select a simulation code"
+                header = ".. / Group " + available_groups[results_group] + " / Collective or Individual visualization"
                 code = self.__call_menu(self.__simulation.available_results(results_group), header, order_command=True)
 
                 # Check back option
-                if self.menu_level < 2:
-                    break
+                if self.menu_level < 2: break
 
                 # Set menu level
                 self._menu_level += 1
 
-                #
                 # View option
                 #--
                 while self._menu_level == 3:
@@ -262,7 +389,9 @@ class Controller:
 
                     #
                     # Header
-                    header = "Simulation " + str(res.code) + " " + res.name
+                    header = ".. / Group " + available_groups[results_group] + " / " + str(res.code)
+                    if res.name: header += " (" + str(res.name) + ")"
+                    header += " / Visualizations"
 
                     #
                     # Options
@@ -282,9 +411,9 @@ class Controller:
                     if res.pos_3Dhist["dens"] is not None:
                         options[6] = "Heat map"
 
-                    options[7] = "Trapped atoms ratio"
+                    if res.trapped_atoms >= 0:
+                        options[7] = "Trapped atoms ratio"
 
-                    
                     opt = self.__call_menu(options, header)
 
                     #
@@ -500,26 +629,25 @@ class Controller:
                             else:
                                 self._menu_level -= 1
                 #--
+            #--
+        #--
 
     #
-    def __call_menu(self, options, header = '', clear_screen = True, order_command = False):
+    def __call_menu(self, options, header = '', clear_screen = True, order_command = False, add_menu_level = False):
         #
         # Variables
         call = True
         msg = ''
+        old_menu_level = self.menu_level
 
-        #
         # Call menu
+        #--
         while call:
-            #
             # Get option
             opt = self.__view.terminal_menu(options, header=header, footer=msg, clear_screen=clear_screen)
             msg = "Invalid code! "
             call = False
 
-            #
-            # Check option code
-            #
             # Exit
             if opt == '0':
                 print('\nExiting ...', end='\n\n')
@@ -543,6 +671,10 @@ class Controller:
                     call = True
 
             else: call = True
+        #--
+
+        if old_menu_level == self.menu_level and add_menu_level:
+            self._menu_level += 1
 
         return opt
 

@@ -25,49 +25,41 @@ class Simulation:
         "_simulated_time", "_trapped_atoms", "_pos_freqs_arr", "_vel_freqs_arr", "_atoms_simulated", "_option", "_results", "_transitions", "_parallel_tasks"
     ]
 
-    #
     # Simulated
     @property
     def simulated_time(self):
         return self._simulated_time
 
-    #
     # Trapped atoms
     @property
     def trapped_atoms(self):
         return self._trapped_atoms
 
-    #
     # (Array) Position histogram array
     @property
     def pos_freqs_arr(self):
         return self._pos_freqs_arr
 
-    #
     # (Array) Velocity histogram array
     @property
     def vel_freqs_arr(self):
         return self._vel_freqs_arr
     
-    #
     # Atoms simulated
     @property
     def atoms_simulated(self):
         return self._atoms_simulated
 
-    #
     # Simulation option
     @property
     def option(self):
         return self._option
     
-    #
     # Parallel tasks
     @property
     def parallel_tasks(self):
         return self._parallel_tasks
 
-    #
     # (Object) Results to be built in the simulation
     @property
     def results(self):
@@ -291,7 +283,6 @@ class Simulation:
         # Release memory
         gc.collect()
 
-    #
     # Get available result groups
     def available_results_groups(self):
         #
@@ -320,7 +311,6 @@ class Simulation:
 
         return res
 
-    #
     # Get available results
     def available_results(self, results_group):
         #
@@ -332,11 +322,8 @@ class Simulation:
         #
         # Get results dir
         #--
-        if results_group == 1:
-            path = "model/results/"
-
-        else:
-            path = "model/results/group_" + available_groups[results_group]
+        if results_group == 1: path = "model/results/"
+        else: path = "model/results/group_" + available_groups[results_group]
         #--
 
         #
@@ -348,7 +335,6 @@ class Simulation:
             # Check if the results is valid
             if res_dir_item.is_dir() and (len(res_dir_item.name) > 6) and not (res_dir_item.name[:5] == "group"):
                 res_dir = os.scandir(res_dir_item.path)
-                print(res_dir_item.name)
 
                 check = True
                 for res_item in res_dir:
@@ -376,7 +362,6 @@ class Simulation:
 
         return {key: value for key, value in sorted(res.items(), key=(lambda x: -x[0]))}
 
-    #
     # Check if results code exists
     def check_results_code(self, code):
         #

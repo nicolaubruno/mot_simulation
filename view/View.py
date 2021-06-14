@@ -524,6 +524,68 @@ class View:
             ratio = res.trapped_atoms_ratio()
             print("\nN_trapped / N_total = %f\n" % (ratio))
 
+    # Plot trap depth vs detuning
+    def trap_depth_vs_detuning(self, results):
+        capture_velocity = [] # Capture velocity which half the atoms were trapped
+        err_capture_velocity = [] # Capture velocity which half the atoms were trapped
+        delta = []
+
+        for code, name in results.items():
+            res = Results(code)
+
+            if len(res.loop["values"]) > 0:
+                delta.append(float(res.beams['main'].delta))
+                v_mean, v_std_dev = res.capture_velocity()
+                capture_velocity.append(v_mean)
+                err_capture_velocity.append(v_std_dev)
+
+            else:
+                raise ValueError("This visualization option requires looping in each results set")
+
+        # Clear stored plots
+        plt.clf()
+
+        #
+        # Set figure
+        plt.figure(figsize=(5,4))
+        plt.style.use('seaborn-whitegrid')
+        plt.subplots_adjust(top=0.80, bottom=0.15)
+        plt.rcParams.update({
+                "font.size":14,\
+                "axes.titlepad":14
+            })
+        #plt.tight_layout()
+        ax = plt.gca()
+
+        # Looping info
+        info = res.info.loc["delta"]
+
+        #
+        # Set label
+        #--            
+        if info["unit"]:
+            label = r"$ " + info['symbol'] + r"\ [" + info['unit'] + r"] $"
+        else:
+            label = r"$ " + info['symbol'] + r"$"
+
+        plt.xlabel(label)
+        plt.ylabel(r"$\bar{v}$")
+        #--
+
+        # Plot trapped atoms ratio
+        plt.errorbar(delta, capture_velocity, err_capture_velocity, label="Simulation", marker='o', linestyle='')
+
+        # Set plot
+        plt.grid(True, linestyle="--")
+
+        plt.close(1)
+        plt.tight_layout()
+        
+        #
+        # Show
+        print('Showing graph ...')
+        plt.show()
+
     # Plot r.m.s. cloud size
     def cloud_size(self, res):
         if res.loop["var"]:
