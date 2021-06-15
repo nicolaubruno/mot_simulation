@@ -239,7 +239,7 @@ class Controller:
 
             # Collective or individual results set
             #--
-            if self.menu_level == 2:
+            elif self.menu_level == 2:
                 # Header
                 header = ".. / Group " + available_groups[results_group] + " / Collective or Individual Results Sets"
 
@@ -255,10 +255,10 @@ class Controller:
                 elif opt == 2: collective = True
             #--
 
-            # Visualization of collective results and
+            # Visualization option of collective results and
             # get simulation code for individual results
             #--
-            if self.menu_level == 3:
+            elif self.menu_level == 3:
                 # Collective results set
                 #--
                 if collective:
@@ -272,11 +272,6 @@ class Controller:
 
                     # Get visualization option
                     opt = self.__call_menu(opts, header, add_menu_level=True)
-                
-                    # Trap depth vs detuning
-                    if opt == 1:
-                        results = self.__simulation.available_results(results_group)
-                        self.__view.trap_depth_vs_detuning(results)
                 #--
 
                 # Individual results set
@@ -288,14 +283,18 @@ class Controller:
                 #--
             #--
 
-            # Visualization option of collective results set and
-            # Visualization of individual results
+            # Visualization of collective results set and
+            # Visualization option of individual results
             #--
-            if self.menu_level == 4:
+            elif self.menu_level == 4:
                 # Collective results set
                 #--
                 if collective:
-                    pass
+                    # Trap depth vs detuning
+                    if opt == 1:
+                        results = self.__simulation.available_results(results_group)
+                        self.__view.trap_depth_vs_detuning(results)
+                        self._menu_level -= 1
                 #--
 
                 # Individual results set
@@ -331,8 +330,16 @@ class Controller:
                     #--
 
                     # Get visualization option
-                    opt = self.__call_menu(options, header)
+                    opt = self.__call_menu(options, header, add_menu_level=True)
+                #--
+            #--
 
+            # Visualization of individual results
+            #--
+            elif self.menu_level == 5:
+                #
+                # Individual results
+                if not collective:
                     # Trapped atoms ratio
                     if opt == 7:
                         self.__view.trapped_atoms_ratio(res)
@@ -340,13 +347,11 @@ class Controller:
                         if not res.loop["var"]:
                             opt = self.__call_input("Enter with any key to continue", header = False, clear_screen=False)
 
-                #--
-            #--
-
-            # Visualization option of individual results
-            #--
-            if self.menu_level == 5:
-                break
+                        self._menu_level -= 1
+            
+                # Collective results
+                elif collective:
+                    break
             #--
 
             # Leave menu
