@@ -714,7 +714,7 @@ atom_t get_atom(initial_conditions_t ini_conds, performance_t perform, beams_set
         atom.pos = r3_scalar_product(random_norm(0, std_dev), rd_v); // cm
     
     } else if(opt == 2)
-        atom.pos = r3_scalar_product(-beams_setup.beams[0].w, r3_normalize(ini_conds.v_0_dir));
+        atom.pos = r3_scalar_product(-perform.max_r, r3_normalize(ini_conds.v_0_dir));
 
     //--
 
