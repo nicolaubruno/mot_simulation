@@ -88,12 +88,11 @@ class Simulation:
 
         self._results = Results(int(dt.now().timestamp()), shortname.strip(), results_group=results_group)
         
-        #
         # Check simulation option
         #--
         available_opts = {
-            0 : "3D distribution",\
-            1 : "Marginal distributions",\
+            0 : "Marginal distributions",\
+            1 : "3D distribution",\
             2 : "Analysis of trapped atoms"
         }
 
@@ -104,27 +103,24 @@ class Simulation:
         del available_opts
         #--
 
-        #
-        # Simulate 3D distribution (Heavy option)
+        # Simulate marginal distributions (Lightweight option)
         #--
         if self.option == 0:
             #
-            # Frequencies (1D-array)
-            self._pos_freqs_arr = np.zeros(self.results.perform["num_bins"]**3)
-            self._vel_freqs_arr = np.zeros(self.results.perform["num_bins"]**3)
-        #--
-
-        #
-        # Simulate marginal distributions (Lightweight option)
-        #--
-        elif self.option == 1:
-            #
-            # Frequencies of positions (3D-array)
+            # Frequencies of positions (1D-array)
             self._pos_freqs_arr = np.zeros((3, self.results.perform["num_bins"]))
             self._vel_freqs_arr = np.zeros((3, self.results.perform["num_bins"]))
         #--
 
-        #
+        # Simulate 3D distribution (Heavy option)
+        #--
+        elif self.option == 1:
+            #
+            # Frequencies (3D-array)
+            self._pos_freqs_arr = np.zeros(self.results.perform["num_bins"]**3)
+            self._vel_freqs_arr = np.zeros(self.results.perform["num_bins"]**3)
+        #--
+
         # Other informations
         #--
         self._trapped_atoms = 0
@@ -141,8 +137,8 @@ class Simulation:
 
     #
     def run(self):
-        #
         # Check simulation status
+        #--
         if self.atoms_simulated < self.results.perform["num_sim"]:
             #
             # Check number of executions
@@ -156,7 +152,7 @@ class Simulation:
             args_pool = []
             for i in range(times):
                 seed = int(randint(0, 1e10))
-                args_pool.append((self.results.directory + "parameters/", self.option, seed))
+                args_pool.append((self.results.directory + "parameters/", 1 - self.option, seed))
 
             #
             # Parallel execution
@@ -174,16 +170,16 @@ class Simulation:
                     #
                     # Add position and velocity frequencies
                     #--
-                    if self.option == 0:
-                        for i in range(self.results.perform["num_bins"]**3):
-                            self._pos_freqs_arr[i] += pos_freqs[i]
-                            self._vel_freqs_arr[i] += vel_freqs[i]
-
-                    elif self.option == 1:                
+                    if self.option == 0:                
                         for i in range(3):
                             for j in range(self.results.perform["num_bins"]):
                                 self._pos_freqs_arr[i][j] += pos_freqs[i][j]
                                 self._vel_freqs_arr[i][j] += vel_freqs[i][j]
+
+                    elif self.option == 1:
+                        for i in range(self.results.perform["num_bins"]**3):
+                            self._pos_freqs_arr[i] += pos_freqs[i]
+                            self._vel_freqs_arr[i] += vel_freqs[i]
                     #--
 
                 #
@@ -205,6 +201,7 @@ class Simulation:
             gc.collect()
 
             return times
+        #--
 
     #
     def open(self, code, loop_idx = 0, opt = 0):
@@ -215,35 +212,22 @@ class Simulation:
         # Check simulation option
         # --
         available_opts = {
-            0 : "3D distribution",\
-            1 : "Marginal distributions",\
+            0 : "Marginal distributions",\
+            1 : "3D distribution",\
             2 : "Analysis of trapped atoms"
         }
 
-        if opt in available_opts.keys():
-            self._option = opt
+        if (opt-1) in available_opts.keys():
+            self._option = opt-1
 
         # Release memory
         del available_opts
         #--
 
         #
-        # Simulate 3D distribution (Heavy option)
-        #--
-        if self.option == 0:
-            #
-            # Frequencies (1D-array)
-            del self._pos_freqs_arr
-            del self._vel_freqs_arr
-
-            self._pos_freqs_arr = np.zeros(self.results.perform["num_bins"]**3)
-            self._vel_freqs_arr = np.zeros(self.results.perform["num_bins"]**3)
-        #--
-
-        #
         # Simulate marginal distributions (Lightweight option)
         #--
-        elif self.option == 1:
+        if self.option == 0:
             #
             # Frequencies (3D-array)
             del self._pos_freqs_arr
@@ -251,6 +235,19 @@ class Simulation:
 
             self._pos_freqs_arr = np.zeros((3, self.results.perform["num_bins"]))
             self._vel_freqs_arr = np.zeros((3, self.results.perform["num_bins"]))
+        #--
+
+        #
+        # Simulate 3D distribution (Heavy option)
+        #--
+        elif self.option == 1:
+            #
+            # Frequencies (1D-array)
+            del self._pos_freqs_arr
+            del self._vel_freqs_arr
+
+            self._pos_freqs_arr = np.zeros(self.results.perform["num_bins"]**3)
+            self._vel_freqs_arr = np.zeros(self.results.perform["num_bins"]**3)
         #--
 
         # Other informations
@@ -266,16 +263,14 @@ class Simulation:
 
     #
     def save(self):
-        #
-        # Add position and velocities
+        # Add position and velocities in 3D-histograms
         if self.option == 0:
+            self.results.add_marginals(self.pos_freqs_arr, self.vel_freqs_arr)
+
+        elif self.option == 1:
             self.results.add_positions(self.pos_freqs_arr)
             self.results.add_velocities(self.vel_freqs_arr)
 
-        elif self.option == 1:
-            self.results.add_marginals(self.pos_freqs_arr, self.vel_freqs_arr)
-
-        #
         # Add informations
         self.results.add_infos({'trapped_atoms': self.trapped_atoms})
 

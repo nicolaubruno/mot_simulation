@@ -1272,9 +1272,8 @@ class Results:
 
     # Add frequencies in the 3D histogram of positions
     def add_positions(self, pos_freqs_arr):
-        #
         # Transform the 3D-array in a 1D-array
-
+        #--
         indexes = []
         values = []
 
@@ -1285,28 +1284,19 @@ class Results:
                     values.append(pos_freqs_arr[int(self.perform['num_bins'])**2 * i + int(self.perform['num_bins'])*j + k])
 
         values = np.array(values)
+        #--
 
-        #
         # Save file
-
         path = self.directory + "/positions.csv"
         pos_freqs = pd.Series(values, index=indexes).astype("int32")
         pos_freqs.fillna(0, inplace=True)
         pos_freqs.to_csv(path)
 
-        #
         # Update distributions
         self.__get_dists()
         self.__get_log()
 
-        #
-        # Add marginal distribution files
-        pos_freqs_arr = [self.pos_hist[i]["freqs"] for i in range(3)]
-        self.add_marginals(pos_freqs_arr, self.vel_freqs_arr)
-
-        #
         # Release memory
-
         del values
         del indexes
         del pos_freqs
@@ -1316,8 +1306,8 @@ class Results:
 
     # Add frequencies in the 3D histogram of velocities
     def add_velocities(self, vel_freqs_arr):
-        #
         # Transform the 3D-array in a 1D-array
+        #--
         indexes = []
         values = []
 
@@ -1328,27 +1318,19 @@ class Results:
                     values.append(vel_freqs_arr[int(self.perform['num_bins'])**2 * i + int(self.perform['num_bins'])*j + k])
 
         values = np.array(values)
+        #--
 
-        #
         # Save file
         path = self.directory + "/velocities.csv"
         vel_freqs = pd.Series(values, index=indexes).astype("int32")
         vel_freqs.fillna(0, inplace=True)
         vel_freqs.to_csv(path)
 
-        #
         # Update distributions
         self.__get_dists()
         self.__get_log()
 
-        #
-        # Add marginal distribution files
-        vel_freqs_arr = [self.vel_hist[i]["freqs"] for i in range(3)]
-        self.add_marginals(self.pos_freqs_arr, vel_freqs_arr)
-
-        #
         # Release memory
-
         del values
         del indexes
         del vel_freqs

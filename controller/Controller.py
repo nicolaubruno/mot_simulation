@@ -145,7 +145,7 @@ class Controller:
                 for i in range(loop_num):
                     # Open new simulation for each looping value
                     if i > 0: self.__simulation.open(self.__simulation.results.code, i, opt)
-
+                    
                     #
                     # Simulate atoms
                     #--
