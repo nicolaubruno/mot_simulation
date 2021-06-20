@@ -41,7 +41,7 @@ class View:
         # Terminal separator line
         #--
         self._separator = '\n'
-        for i in range(70): self._separator += '-'
+        for i in range(85): self._separator += '-'
 
         self._header = "\nMonte Carlo simulation of narrow-line magneto-optical traps\n"
         self._header += "Version 2.0, Author: Bruno N. Santos;" + self._separator
@@ -49,7 +49,7 @@ class View:
         #--
 
     #
-    def terminal_menu(self, options, header = None, footer = None, clear_screen = True, show_main_header = True):
+    def terminal_menu(self, options, header = None, footer = None, clear_screen = True, show_main_header = True, enumerated_list = False):
         #
         # Clear screen
         if clear_screen:
@@ -63,7 +63,11 @@ class View:
 
         #
         # Show options
+        i = 0
         for key, val in options.items():
+            i += 1
+            if enumerated_list: print("[%d] " % i, end='')
+
             if val:
                 print('%d -> %s;' % (key, val))
 
@@ -647,13 +651,13 @@ class View:
             else:
                 label = r"$ " + info['symbol'] + r"$"
 
-            plt.ylabel("Size [cm]")
+            plt.ylabel("Size [mm]")
             plt.xlabel(label)
             #--
 
             # Plot simulated date
             for i in range(3):
-                plt.plot(x, std_r_c[i], label=labels[i], linestyle="--", marker=markers[i])
+                plt.plot(x, std_r_c[i]*10, label=labels[i], linestyle="--", marker=markers[i])
 
             # Set plot
             plt.grid(linestyle="--")
@@ -661,6 +665,7 @@ class View:
 
             # Show
             plt.close(1)
+            plt.tight_layout()
             plt.show()
 
         else:

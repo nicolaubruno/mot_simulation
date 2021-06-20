@@ -279,12 +279,12 @@ class Controller:
                 elif not collective:
                     # Get code
                     header = ".. / (Individual) Group " + available_groups[results_group] + " / Simulation Code"
-                    code = self.__call_menu(self.__simulation.available_results(results_group), header, order_command=True, add_menu_level=True)
+                    code = self.__call_menu(self.__simulation.available_results(results_group), header, order_command=True, add_menu_level=True, enumerated_list = True)
                 #--
             #--
 
             # Visualization of collective results set and
-            # Visualization option of individual results
+            # Visualization option level 1 of individual results
             #--
             elif self.menu_level == 4:
                 # Collective results set
@@ -316,7 +316,7 @@ class Controller:
                     if len(res.pos_hist[0]["freqs"]) > 0:
                         options[1] = "Histogram of positions"
                         options[2] = "Centre of mass"
-                        options[3] = "R.M.S Clouds sizes"
+                        options[3] = "Cloud size"
 
                     if len(res.vel_hist[0]["freqs"]) > 0:
                         options[4] = "Histogram of velocities"
@@ -334,14 +334,132 @@ class Controller:
                 #--
             #--
 
-            # Visualization of individual results
+            # Visualization option level 2 of individual results
             #--
             elif self.menu_level == 5:
                 #
                 # Individual results
                 if not collective:
+                    # Histogram of positions (choose axis or looping value)
+                    if opt == 1:
+                        # Choose looping value
+                        #--
+                        if len(res.loop["var"]) > 0:
+                            # Header
+                            header = ".. / " + str(res.code)
+                            if res.name: header += " (" + str(res.name) + ")"
+                            header += " / " + options[opt]
+                            header += " / Choose looping value"
+
+                            # Get looping values
+                            idx = [i+1 for i in range(len(res.loop["values"]))]
+                            loop_idx = [res.loop["var"] + " = " + ("%.2f" % res.loop["values"][i]) for i in range(len(res.loop["values"]))]
+                            opts = dict(zip(idx, loop_idx))
+
+                            opt_view = int(self.__call_menu(opts, header, add_menu_level = True))
+
+                            if opt_view != -1: res.loop_idx(opt_view - 1)
+                        #--
+
+                        # Choose axis
+                        #--
+                        else:
+                            opts = {
+                                1 : 'x-axis',\
+                                2 : 'y-axis',\
+                                3 : 'z-axis'
+                            }
+
+                            # Header
+                            header = ".. / " + str(res.code)
+                            if res.name: header += " (" + str(res.name) + ")"
+                            header += " / Visualizations / " + options[opt]
+                            header += " / " + res.loop["var"] + " = " + str(res.loop["values"][res.loop["active"]])
+                            header += " / Choose axis"
+
+                            opt_view = int(self.__call_menu(opts, header))
+
+                            if opt_view != -1:
+                                self.__view.pos_marg_hist(res, opt_view-1)
+                        #--
+
+                    # Centre of mass
+                    elif opt == 2:
+                        self.__view.mass_centre(res)
+
+                        if not res.loop["var"]:
+                            waiting = self.__call_input("Enter with any key to continue", header = False,clear_screen=False)
+
+                        self._menu_level -= 1
+
+                    # Cloud size
+                    elif opt == 3:
+                        self.__view.cloud_size(res)
+
+                        if not res.loop["var"]:
+                            waiting = self.__call_input("Enter with any key to continue", header = False,clear_screen=False)
+
+                        self._menu_level -= 1
+                            
+                    # Histogram of velocities (choose axis or looping value)
+                    elif opt == 4:
+                        # Choose looping value
+                        #--
+                        if len(res.loop["var"]) > 0:
+                            # Header
+                            header = ".. / " + str(res.code)
+                            if res.name: header += " (" + str(res.name) + ")"
+                            header += " / " + options[opt]
+                            header += " / Choose looping value"
+
+                            # Get looping values
+                            idx = [i+1 for i in range(len(res.loop["values"]))]
+                            loop_idx = [res.loop["var"] + " = " + ("%.2f" % res.loop["values"][i]) for i in range(len(res.loop["values"]))]
+                            opts = dict(zip(idx, loop_idx))
+
+                            opt_view = int(self.__call_menu(opts, header, add_menu_level = True))
+
+                            if opt_view != -1: res.loop_idx(opt_view - 1)
+                        #--
+
+                        # Choose axis
+                        #--
+                        else:              
+                            opts = {
+                                1 : 'x-axis',\
+                                2 : 'y-axis',\
+                                3 : 'z-axis'
+                            }
+
+                            # Header
+                            header = ".. / " + str(res.code)
+                            if res.name: header += " (" + str(res.name) + ")"
+                            header += " / Visualizations / " + options[opt]
+                            header += " / " + res.loop["var"] + " = " + str(res.loop["values"][res.loop["active"]])
+                            header += " / Choose axis"
+
+                            opt_view = int(self.__call_menu(opts, header))
+
+                            if opt_view != -1:
+                                self.__view.vel_marg_hist(res, opt_view-1)
+                        #--
+
+                    # Temperature
+                    elif opt == 5:
+                        self.__view.temperature(res)
+
+                        if not res.loop["var"]:
+                            self.__call_input("Enter with any key to continue", header = False,clear_screen=False)
+
+                        self._menu_level -= 1
+
+                    # Heat map
+                    elif opt == 6:
+                        print("Visualization has not implemented yet!")
+                        self.__call_input("Enter with any key to continue", header = False, clear_screen=False)
+
                     # Trapped atoms ratio
-                    if opt == 7:
+                    elif opt == 7:
                         self.__view.trapped_atoms_ratio(res)
 
                         if not res.loop["var"]:
@@ -352,6 +470,54 @@ class Controller:
                 # Collective results
                 elif collective:
                     break
+            #--
+
+            # Visualization option level 3 of individual results
+            #--
+            elif self.menu_level == 6:
+                if collective:
+                    break
+
+                else:
+                    # Histogram of positions (choose axis)
+                    if opt == 1:
+                        opts = {
+                            1 : 'x-axis',\
+                            2 : 'y-axis',\
+                            3 : 'z-axis'
+                        }
+
+                        # Header
+                        header = ".. / " + str(res.code)
+                        if res.name: header += " (" + str(res.name) + ")"
+                        header += " / " + options[opt]
+                        header += " / " + res.loop["var"] + " = " + str(res.loop["values"][res.loop["active"]])
+                        header += " / Choose axis"
+
+                        opt_view = int(self.__call_menu(opts, header))
+
+                        if opt_view != -1:
+                            self.__view.pos_marg_hist(res, opt_view-1)
+
+                    # Histogram of positions (choose axis)
+                    elif opt == 4:
+                        opts = {
+                            1 : 'x-axis',\
+                            2 : 'y-axis',\
+                            3 : 'z-axis'
+                        }
+
+                        # Header
+                        header = ".. / " + str(res.code)
+                        if res.name: header += " (" + str(res.name) + ")"
+                        header += " / " + options[opt]
+                        header += " / " + res.loop["var"] + " = " + str(res.loop["values"][res.loop["active"]])
+                        header += " / Choose axis"
+
+                        opt_view = int(self.__call_menu(opts, header))
+
+                        if opt_view != -1:
+                            self.__view.vel_marg_hist(res, opt_view-1)
             #--
 
             # Leave menu
@@ -638,7 +804,7 @@ class Controller:
         #--
 
     #
-    def __call_menu(self, options, header = '', clear_screen = True, order_command = False, add_menu_level = False):
+    def __call_menu(self, options, header = '', clear_screen = True, order_command = False, add_menu_level = False, enumerated_list = False):
         #
         # Variables
         call = True
@@ -649,7 +815,7 @@ class Controller:
         #--
         while call:
             # Get option
-            opt = self.__view.terminal_menu(options, header=header, footer=msg, clear_screen=clear_screen)
+            opt = self.__view.terminal_menu(options, header=header, footer=msg, clear_screen=clear_screen, enumerated_list = enumerated_list)
             msg = "Invalid code! "
             call = False
 
