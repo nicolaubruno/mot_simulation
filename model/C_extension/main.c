@@ -10,7 +10,7 @@ int main(){
     results_t res;
 
     for(i = 0; i < 1; i++){
-        res = simulate_atom("../parameters/", 1, time(0));
+        res = simulate_atom("../parameters/", 2, time(0));
         
         //printf("\nSim %d\n", i+1);
 

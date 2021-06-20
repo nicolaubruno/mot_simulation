@@ -18,7 +18,7 @@
 #define MAX_LINES 124
 #define DELIM ","
 #define MAX_BEAMS 16
-#define Py_MODULE 1
+#define Py_MODULE 0
 
 #define h 6.62607004        // Planck constant [10^{-34} J s]
 #define e 1.60217662        // Elementary charge [10^{-19} C]s
@@ -175,13 +175,16 @@ double *magnetic_field(magnetic_field_t B_params, double *r);
 // Get polarizations amplitudes
 int set_polarizations_amplitudes(beam_t *beam, double *eB);
 
-// Get the probability to absorb each beam
-double *get_probs(beams_setup_t beams_setup, magnetic_field_t B_params, atom_t atom, double dt);
+// Get scattering rates of each beam
+double *get_scatt_rate(beams_setup_t beams_setup, magnetic_field_t B_params, atom_t atom);
 
 // Get magnetic acceleration
 double *magnetic_acceleration(atom_t atom, magnetic_field_t B_params);
 
 /*
+
+// Get the probability to absorb each beam
+double *get_probs(beams_setup_t beams_setup, magnetic_field_t B_params, atom_t atom, double dt);
 
 // Get a list of scattering rate for each beam considering all transitions and sidebands
 double *get_all_scatt_rate(beams_setup_t beams_setup, magnetic_field_t B_params, atom_t atom);

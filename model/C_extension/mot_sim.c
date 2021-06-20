@@ -839,8 +839,9 @@ double move(atom_t *atom, beams_setup_t beams_setup, performance_t perform, magn
     //
     // Variables
     int i, j;                                   // Auxiliary variables
-    double dt;                                  // Time interval
-    double *probs;                              // Probability of absorption
+    double dt, aux_dt;                          // Time interval
+    double R_max = -1, *R;                      // Scattering rates
+    double *probs;                              // Probability to absorb a beam
     int chosen_beam = 0;                        // Absorption variables
     double *a_B;                                // Magnetic acceleration
     double *rd_v, vel_mod;                      // Photonic recoil
@@ -848,11 +849,29 @@ double move(atom_t *atom, beams_setup_t beams_setup, performance_t perform, magn
     // Allocate variables
     probs = (double*) calloc(beams_setup.num + 1, sizeof(double));
 
-    // Time interval
-    dt = perform.dt / (2 * PI * atom->transition.gamma*1e3);
+    // Get scattering rates
+    R = get_scatt_rate(beams_setup, B_params, *atom);
 
-    // Get probabilities
-    probs = get_probs(beams_setup, B_params, *atom, dt);
+    // Time interval
+    //--
+    aux_dt = perform.dt / (2 * PI * atom->transition.gamma*1e3);
+    
+    // Get minimum scattering rate
+    for(i = 0; i < beams_setup.num; i++)
+        if(R[i] > R_max || R_max < 0) R_max = R[i];
+
+    if(aux_dt > (1 / (2*R_max))) dt = 1 / (4*R_max);
+    else dt = aux_dt;
+    //--
+
+    // Get probabilities to absorb a beam
+    for(i = 0; i < beams_setup.num; i++){
+        probs[i + 1] = R[i] * dt;
+        probs[0] += probs[i + 1];
+    }
+
+    // Probability of the atom does not absorb a beam
+    probs[0] = 1 - probs[0];
 
     // Pick a beam
     chosen_beam = random_pick(probs, beams_setup.num + 1);
@@ -1022,6 +1041,207 @@ double *magnetic_acceleration(atom_t atom, magnetic_field_t B_params){
     return a_B;
 }
 
+double *get_scatt_rate(beams_setup_t beams_setup, magnetic_field_t B_params, atom_t atom){
+    // Variables          
+    int i, j, l, m;                                             // Auxiliary variables
+    double *B, *eB;                                             // Magnetic field     
+    double *R;                                                  // Scattering rates
+    double s, s_0, r;                                           // Saturation parameter
+    double zeeman_shift, doppler_shift, laser_detuning, delta;  // Detuning
+    double lambda, gamma, g_gnd, g_exc;                         // Transition
+    int mj_gnd, mj_exc;                                         // Transition
+    double **C;                                                 // Basis of the beam frame
+    int pol[] = {+1, -1, 0};                                    // All polarizations
+    beam_t beam;                                                // Beam     
+
+    // Allocate memory
+    R = (double*) calloc(beams_setup.num, sizeof(double));
+
+    //
+    // Magnetic field
+    //--
+    B = magnetic_field(B_params, atom.pos);
+    if(r3_mod(B) == 0){
+        eB = B_params.B_basis[2];
+    } else eB = r3_normalize(B);
+    //--
+
+    //
+    // Check each beam
+    //--
+    for(i = 0; i < beams_setup.num; i++){
+        // Get beam
+        beam = beams_setup.beams[i];
+        //r3_print(beam.k_dir, "k");
+
+        // Polarizations
+        set_polarizations_amplitudes(&beam, eB);
+
+        //
+        // Initial Saturation parameter
+        //--
+        // Basis of the beam frame
+        C = orthonormal_basis(r3_normalize(beam.k_dir));
+
+        // Distance from the propagation axis
+        r = pow(r3_inner_product(C[0], atom.pos), 2);
+        r += pow(r3_inner_product(C[1], atom.pos), 2);
+
+        s_0 = beam.s_0;
+        s_0 = s_0 * exp(-2 * pow((r / beam.w), 2));
+        //--
+
+        // Transition
+        gamma = atom.transition.gamma; // kHz / 2pi
+        lambda = atom.transition.lambda; // nm
+
+        // Doppler shift
+        doppler_shift = - 1e4 * r3_inner_product(atom.vel, C[2]) / lambda; // kHz / 2pi
+
+        //
+        // Check all possible transitions
+        //--
+        // Polarizations
+        for(j = 0; j < 3; j++){
+            //
+            // Zeeman shift
+            //--
+            // Ground state
+            mj_gnd = - atom.transition.J_gnd;
+            
+            // Excited state
+            mj_exc = mj_gnd + pol[j];
+
+            // Landè factors
+            g_gnd = atom.transition.g_gnd;
+            g_exc = atom.transition.g_exc;
+
+            // Compute shift
+            zeeman_shift = 1e3 * (mu_B / h) * r3_mod(B) * (g_gnd * mj_gnd - g_exc * mj_exc);  // kHz / 2pi
+            //--
+
+            // Saturation parameter considering sidebands
+            s = beam.pol_amp[j] * s_0 / (2*beams_setup.sidebands.num + 1);
+
+            // Main beam
+            laser_detuning = beam.delta*gamma; // kHz / 2pi
+            delta = laser_detuning + zeeman_shift + doppler_shift;
+            R[i] += ((2*PI*gamma * 1e3)/2) * s / (1 + s + 4*(delta*delta)/(gamma*gamma)); // Hz
+
+            // Get all scattering rates due to the sidebands
+            for(m = 0; m < beams_setup.sidebands.num; m++){
+                // Right sideband
+                laser_detuning = (beam.delta + (m+1)*beams_setup.sidebands.freq)*gamma; // kHz / 2pi
+                delta = laser_detuning + zeeman_shift + doppler_shift;
+                R[i] += ((2*PI*gamma * 1e3)/2) * s / (1 + s + 4*(delta*delta)/(gamma*gamma)); // Hz
+
+                // Left sideband
+                laser_detuning = (beam.delta - (m+1)*beams_setup.sidebands.freq)*gamma; // kHz / 2pi
+                delta = laser_detuning + zeeman_shift + doppler_shift;
+                R[i] += ((2*PI*gamma * 1e3)/2) * s / (1 + s + 4*(delta*delta)/(gamma*gamma)); // Hz
+            }
+        }
+
+        // Release memory  
+        for(l = 0; l < 3; l++) free(C[l]); 
+        free(C);
+
+        //printf("R[%d] = %f\n\n", i + 1, R[i]);
+    }
+    //--
+
+    return R;    
+}
+
+int set_polarizations_amplitudes(beam_t *beam, double *eB){
+    //
+    // Variables
+    int i, j;
+    double **R1, **R2;
+    double *pol_amp;
+    complex_t **C1, **C2, **A_s_c, **A;
+    complex_t *C1_eps, *C2_eps, *C2_s_eps;
+
+    // Bases of the beam frame
+    R1 = orthonormal_basis(beam->k_dir);
+    C1 = r3_oper_to_c3_oper(R1);
+
+    // Bases of the B frame
+    R2 = orthonormal_basis(eB);
+    C2 = r3_oper_to_c3_oper(R2);
+
+    //
+    // Change-of-Basis matrix of the Spherical basis to the Cartesian basis
+    //--
+    A_s_c = c3_operator_zeros();
+
+    A_s_c[0][0].re = - 1 / sqrt(2);
+    A_s_c[0][1].re = 1 / sqrt(2);
+
+    A_s_c[1][0].im = 1 / sqrt(2);
+    A_s_c[1][1].im = 1 / sqrt(2);
+
+    A_s_c[2][2].re = 1;
+    //--
+
+    //
+    // Change-of-Basis matrix of the Cartesian beam frame to the Cartesian B frame
+    //--
+    A = c3_operator_zeros();
+
+    for(i = 0; i < 3; i++){
+        for(j = 0; j < 3; j++){
+            A[i][j] = c3_inner_product(C2[i], C1[j]);
+        }
+    }
+    //--
+
+    //
+    // Get polarization amplitudes
+    //--
+    // Polarization on the Cartesian beam frame
+    C1_eps = c3_apply_operator(A_s_c, r3_to_c3(beam->pol_amp));
+
+    // Polarization on the Cartesian B frame
+    C2_eps = c3_apply_operator(A, C1_eps);
+
+    // Polarization on the Spherical B frame
+    C2_s_eps = c3_apply_operator(c3_operator_dagger(A_s_c), C2_eps);
+
+    // Set Polarization amplitudes
+    pol_amp = (double*) calloc(3, sizeof(double));
+    for(i = 0; i < 3; i++) pol_amp[i] = pow(c_mod(C2_s_eps[i]), 2);
+    beam->pol_amp = pol_amp;
+    //--
+
+    //
+    // Release memory    
+    //--
+    for(i = 0; i < 3; i++){
+        free(A[i]);
+        free(A_s_c[i]);
+        free(C1[i]);
+        free(C2[i]);
+        free(R1[i]);
+        free(R2[i]);
+    }
+
+    free(A);
+    free(A_s_c);
+    free(C1);
+    free(C1_eps);
+    free(C2);
+    free(C2_eps);
+    free(C2_s_eps);
+    free(R1);
+    free(R2);
+    //--
+
+    return 1;
+}
+
+/*
+
 double *get_probs(beams_setup_t beams_setup, magnetic_field_t B_params, atom_t atom, double dt){
     // Variables          
     int i, j, l, m;                                             // Auxiliary variables
@@ -1141,95 +1361,6 @@ double *get_probs(beams_setup_t beams_setup, magnetic_field_t B_params, atom_t a
 
     return probs;    
 }
-
-int set_polarizations_amplitudes(beam_t *beam, double *eB){
-    //
-    // Variables
-    int i, j;
-    double **R1, **R2;
-    double *pol_amp;
-    complex_t **C1, **C2, **A_s_c, **A;
-    complex_t *C1_eps, *C2_eps, *C2_s_eps;
-
-    // Bases of the beam frame
-    R1 = orthonormal_basis(beam->k_dir);
-    C1 = r3_oper_to_c3_oper(R1);
-
-    // Bases of the B frame
-    R2 = orthonormal_basis(eB);
-    C2 = r3_oper_to_c3_oper(R2);
-
-    //
-    // Change-of-Basis matrix of the Spherical basis to the Cartesian basis
-    //--
-    A_s_c = c3_operator_zeros();
-
-    A_s_c[0][0].re = - 1 / sqrt(2);
-    A_s_c[0][1].re = 1 / sqrt(2);
-
-    A_s_c[1][0].im = 1 / sqrt(2);
-    A_s_c[1][1].im = 1 / sqrt(2);
-
-    A_s_c[2][2].re = 1;
-    //--
-
-    //
-    // Change-of-Basis matrix of the Cartesian beam frame to the Cartesian B frame
-    //--
-    A = c3_operator_zeros();
-
-    for(i = 0; i < 3; i++){
-        for(j = 0; j < 3; j++){
-            A[i][j] = c3_inner_product(C2[i], C1[j]);
-        }
-    }
-    //--
-
-    //
-    // Get polarization amplitudes
-    //--
-    // Polarization on the Cartesian beam frame
-    C1_eps = c3_apply_operator(A_s_c, r3_to_c3(beam->pol_amp));
-
-    // Polarization on the Cartesian B frame
-    C2_eps = c3_apply_operator(A, C1_eps);
-
-    // Polarization on the Spherical B frame
-    C2_s_eps = c3_apply_operator(c3_operator_dagger(A_s_c), C2_eps);
-
-    // Set Polarization amplitudes
-    pol_amp = (double*) calloc(3, sizeof(double));
-    for(i = 0; i < 3; i++) pol_amp[i] = pow(c_mod(C2_s_eps[i]), 2);
-    beam->pol_amp = pol_amp;
-    //--
-
-    //
-    // Release memory    
-    //--
-    for(i = 0; i < 3; i++){
-        free(A[i]);
-        free(A_s_c[i]);
-        free(C1[i]);
-        free(C2[i]);
-        free(R1[i]);
-        free(R2[i]);
-    }
-
-    free(A);
-    free(A_s_c);
-    free(C1);
-    free(C1_eps);
-    free(C2);
-    free(C2_eps);
-    free(C2_s_eps);
-    free(R1);
-    free(R2);
-    //--
-
-    return 1;
-}
-
-/*
 
 double *get_all_scatt_rate(beams_setup_t beams_setup, magnetic_field_t B_params, atom_t atom){
     // Variables          
