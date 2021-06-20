@@ -152,7 +152,12 @@ class Simulation:
             args_pool = []
             for i in range(times):
                 seed = int(randint(0, 1e10))
-                args_pool.append((self.results.directory + "parameters/", 1 - self.option, seed))
+                
+                # Check option
+                if self.option in [0, 1]: opt = 1 - self.option
+                else: opt = self.option
+
+                args_pool.append((self.results.directory + "parameters/", opt, seed))
 
             #
             # Parallel execution
