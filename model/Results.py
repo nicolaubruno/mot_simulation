@@ -1132,7 +1132,9 @@ class Results:
 
             for i, val in enumerate(self.loop["values"]):
                 self.loop_idx(i)
-                ratio[i] = self.trapped_atoms / (self.perform['num_sim'])
+                ratio[i] = self.trapped_atoms
+
+            ratio = ratio / max(ratio)
 
             # General complementary error function
             def general_erfc(t, mean, std_dev):

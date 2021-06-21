@@ -513,29 +513,16 @@ class View:
 
             # Fitting
             if res.loop["var"] == "v_0":
-                
-                # Check if curve looks a error function
-                y0 = ratio[0]
-                looks_erf = False
+                v_mean, v_std_dev = res.capture_velocity()
 
-                for yi in ratio:
-                    if np.sqrt((yi - y0)**2) > 0.1: 
-                        looks_erf = True
-                        break
+                x_fit = np.linspace(min(x), max(x), 1000)
+                y_fit = np.max(ratio) * np.array([res.general_erfc(xi, v_mean, v_std_dev) for xi in x_fit])
 
-                    y0 = yi
-
-                if looks_erf:
-                    v_mean, v_std_dev = res.capture_velocity()
-
-                    x_fit = np.linspace(min(x), max(x), 1000)
-                    y_fit = np.array([res.general_erfc(xi, v_mean, v_std_dev) for xi in x_fit])
-
-                    plt.plot(x_fit, y_fit, label=r"$erfc(" + ("%.2f" % v_mean) + "," + ("%.2f" % v_std_dev) + ")$", marker="", linestyle="--", color="Black")
+                plt.plot(x_fit, y_fit, label="Adapted erfc" r"$(\mu = " + ("%.2f" % v_mean) + ")$", marker="", linestyle="--", color="Black")
 
             # Set plot
             plt.grid(True, linestyle="--")
-            plt.legend(frameon = True, loc="upper right")
+            plt.legend(frameon = True)
 
             plt.close(1)
             plt.tight_layout()

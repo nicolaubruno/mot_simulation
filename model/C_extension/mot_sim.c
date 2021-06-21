@@ -12,7 +12,7 @@
 
 results_t simulate_atom(char *params_path, int opt, long seed_time){
     // Variables
-    int i, j = 0;
+    int i;
     double r, v, dt = 0;
     double progress;
     int last_progress = 0;
@@ -68,14 +68,14 @@ results_t simulate_atom(char *params_path, int opt, long seed_time){
 
         //
         // Waiting the equilibrium
-        if(res.time > perform.wait_time){
+        if(res.time > perform.wait_time && res.trapped_atom == 0){
             res.trapped_atom = 1;
             if(opt == 2) break;
         }
 
         //
         // Update results
-        if(res.trapped_atom == 1 && r < perform.max_r && j > 9){
+        if(res.trapped_atom == 1 && r < perform.max_r){
             //
             // Update position and velocity
             //--
@@ -93,8 +93,6 @@ results_t simulate_atom(char *params_path, int opt, long seed_time){
                 if(v < perform.max_v) update_hist_3d(&res.vel_3Dhist, atom.vel);
             }
             //--
-
-            j = 0;
         }
 
         progress = (100*res.time / perform.max_time);
@@ -105,8 +103,6 @@ results_t simulate_atom(char *params_path, int opt, long seed_time){
             //printf("progress = %f\n\n", progress);
             last_progress = (int) progress;
         }
-
-        j++;
     }
     //--
 
