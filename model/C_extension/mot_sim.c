@@ -26,7 +26,7 @@ results_t simulate_atom(char *params_path, int opt, long seed_time){
     performance_t perform = get_performance(params_path);
     magnetic_field_t B_params = get_magnetic_field(params_path);
     beams_setup_t beams_setup = get_beams(params_path);
-    atom_t atom = get_atom(ini_conds, perform, beams_setup, opt, params_path);
+    atom_t atom = get_atom(ini_conds, perform, beams_setup, B_params, opt, params_path);
 
     // Print parameters
     //printf("opt = %d\n", opt);
@@ -633,14 +633,14 @@ transition_t get_transition(char *params_path){
     return transition;
 }
 
-atom_t get_atom(initial_conditions_t ini_conds, performance_t perform, beams_setup_t beams_setup, int opt, char *params_path){
+atom_t get_atom(initial_conditions_t ini_conds, performance_t perform, beams_setup_t beams_setup, magnetic_field_t B_params, int opt, char *params_path){
     //
     // Variables
     // --
     int i = 0;
     char *path, **rows;
     char *token, *saveptr;
-    double std_dev, *rd_v;
+    double std_dev;
     atom_t atom;
     //--
 
@@ -687,32 +687,12 @@ atom_t get_atom(initial_conditions_t ini_conds, performance_t perform, beams_set
     else atom.mass = atof(token);
     //--
 
-    //
-    // Initial position
-    //--
-    if(opt < 2){
-        //
-        // Random vector
-        //--
-        rd_v = (double*) calloc(3, sizeof(double));
+    // Optical transition
+    atom.transition = get_transition(params_path);
 
-        for(i = 0; i < 3; i++) {
-            rd_v[i] = ((double) rand()) / ((double) RAND_MAX);
-            if((((double) rand()) / ((double) RAND_MAX)) < 0.5) rd_v[i] = -rd_v[i];
-        }
-
-        rd_v = r3_normalize(rd_v); // Normalization
-        //--
-
-        if(perform.max_r < beams_setup.beams[0].w) std_dev = (perform.max_r / 2);
-        else std_dev = (beams_setup.beams[0].w / 2);
-        
-        atom.pos = r3_scalar_product(random_norm(0, std_dev), rd_v); // cm
-    
-    } else if(opt == 2)
-        atom.pos = r3_scalar_product(-perform.max_r, r3_normalize(ini_conds.v_0_dir));
-
-    //--
+    // Initial state
+    atom.J = atom.transition.J_gnd;
+    atom.mJ = -atom.transition.J_gnd;
 
     //
     // Initial velocity of the atom
@@ -726,20 +706,74 @@ atom_t get_atom(initial_conditions_t ini_conds, performance_t perform, beams_set
 
     } else if(opt == 2)
         atom.vel = r3_scalar_product(ini_conds.v_0, r3_normalize(ini_conds.v_0_dir));
-    
     //--
 
-    // Optical transition
-    atom.transition = get_transition(params_path);
-
-    // Initial state
-    atom.J = atom.transition.J_gnd;
-    atom.mJ = -atom.transition.J_gnd;
+    // Initial position
+    set_ini_atom_pos(&atom, beams_setup, B_params, perform, ini_conds, opt);
 
     // Release memory
     free(path);
 
     return atom;
+}
+
+int set_ini_atom_pos(atom_t *atom, beams_setup_t beams_setup, magnetic_field_t B_params, performance_t perform, initial_conditions_t ini_conds, int opt){
+    // Variables
+    int i;
+    double R, z_0 = 0, beta, chi;
+    double *r_0, *B, *rd_v;
+
+    // Theoretical equilibrium position
+    if(beams_setup.beams[0].delta < 0){
+        // Gravity relevance
+        R = 1e7 * (h * 2 * PI * atom->transition.gamma);
+        R = R / (2 * atom->mass * u * atom->transition.lambda * g);
+
+        // Magnetic field
+        r_0 = (double*) calloc(3, sizeof(double));
+        r_0[2] = -1;
+        B = magnetic_field(B_params, r_0);
+        beta = 2 * PI * (mu_B / h) * B[2] * 1e-4 * 1e10;
+
+        // Transition
+        chi = atom->transition.g_exc * (- atom->transition.J_gnd - 1);
+        chi += atom->transition.g_gnd * atom->transition.J_gnd;
+
+        z_0 = sqrt((R - 1)*beams_setup.beams[0].s_0 - 1) / 2;
+        z_0 = z_0 + beams_setup.beams[0].delta;
+        z_0 = ((2 * PI * atom->transition.gamma * 1e3) / (chi * beta)) * z_0; // cm
+    }
+
+    // Check option
+    //--
+    // Marginal and 3D histograms option
+    if(opt < 2){
+        // Check regime and threshold
+        if((fabs(beams_setup.beams[0].delta) < sqrt(1 + beams_setup.beams[0].s_0)) || (fabs(z_0) > perform.max_r) || z_0 > 0){
+            // Random vector
+            //--
+            rd_v = (double*) calloc(3, sizeof(double));
+
+            for(i = 0; i < 3; i++) {
+                rd_v[i] = ((double) rand()) / ((double) RAND_MAX);
+                if((((double) rand()) / ((double) RAND_MAX)) < 0.5) rd_v[i] = -rd_v[i];
+            }
+
+            rd_v = r3_normalize(rd_v); // Normalization
+            //--
+
+            atom->pos = r3_scalar_product(random_norm(0, perform.max_r / 2), rd_v); // cm
+        } else {
+            atom->pos = (double*) calloc(3, sizeof(double));
+            atom->pos[2] = z_0;
+        }
+    // Trapped atoms option
+    } else if(opt == 2){
+        atom->pos = r3_scalar_product(-perform.max_r, r3_normalize(ini_conds.v_0_dir));
+    }
+    //--
+
+    return 1;
 }
 
 int set_hist(int only_marginals, results_t *res, performance_t perform){

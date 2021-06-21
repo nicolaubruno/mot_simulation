@@ -266,6 +266,7 @@ class View:
 
         #
         # Show
+        plt.tight_layout()
         plt.show()
 
     # View velocity marginal histogram
@@ -321,6 +322,7 @@ class View:
 
         #
         # Show
+        plt.tight_layout()
         plt.show()
 
     # Plot mass centre
@@ -694,4 +696,5 @@ class View:
 
         #
         # Show
+        plt.tight_layout()
         plt.show()
