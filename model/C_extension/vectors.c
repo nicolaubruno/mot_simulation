@@ -359,6 +359,42 @@ double *r3_apply_operator(double **A, double *v){
     return a;
 }
 
+double **r3_operator_product(double **A, double **B){
+    int i, j, k;
+    double **C;
+
+    C = (double**) calloc(3, sizeof(double*));
+    for(i = 0; i < 3; i++) C[i] = (double*) calloc(3, sizeof(double));
+
+    for(i = 0; i < 3; i++){
+        for(j = 0; j < 3; j++){
+            for(k = 0; k < 3; k++){
+                C[i][j] += A[i][k]*B[k][j];
+            }
+        }
+    }
+
+    return C;
+}
+
+double **r3_transposed_operator(double **A){
+    // Variables
+    int i, j;
+    double **B;
+
+    B = (double**) calloc(3, sizeof(double*));
+
+    for(i = 0; i < 3; i++){
+        B[i] = (double*) calloc(3, sizeof(double));
+
+        for(j = 0; j < 3; j++){
+            B[i][j] = A[j][i];
+        }
+    }
+
+    return B;
+}
+
 int r3_print(double *z, char *name){
     int i;
 

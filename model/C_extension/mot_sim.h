@@ -249,6 +249,11 @@ int update_hist(histogram_t *hist, double val);
 // Update multidimensional histogram
 int update_hist_3d(histogram_3d_t *hist, double *vals);
 
+// Rotating matrix about
+// axis [1 (x), 2 (y), 3 (z)]
+// theta [Degree]
+double **rotating_matrix(double theta, int axis);
+
 //
 // Debug
 

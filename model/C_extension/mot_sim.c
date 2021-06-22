@@ -300,6 +300,7 @@ initial_conditions_t get_initial_conditions(char *params_path){
 magnetic_field_t get_magnetic_field(char *params_path){
     // Variables
     int i = 0, n;
+    double *angles;
     char *token, *saveptr, *path, **rows;
     magnetic_field_t B_params;
 
@@ -327,8 +328,11 @@ magnetic_field_t get_magnetic_field(char *params_path){
     i += 1;
     token = strtok_r(rows[i], DELIM, &saveptr); // Variable name
     token = strtok_r(NULL, DELIM, &saveptr); // Value
-        
-    B_params.B_basis = orthonormal_basis(r3_normalize(get_double_array(token, &n)));
+    angles = get_double_array(token, &n);
+
+    B_params.B_basis = rotating_matrix(angles[0], 1);
+    B_params.B_basis = r3_operator_product(B_params.B_basis, rotating_matrix(angles[1], 2));
+    B_params.B_basis = r3_operator_product(B_params.B_basis, rotating_matrix(angles[2], 3));
     //--
 
     //
@@ -361,6 +365,7 @@ magnetic_field_t get_magnetic_field(char *params_path){
 
     // Release memory
     free(path);
+    free(angles);
 
     return B_params;
 }
@@ -908,14 +913,11 @@ double move(atom_t *atom, beams_setup_t beams_setup, performance_t perform, magn
     //printf("chosen_beam = %d\n", chosen_beam);
     //if(chosen_beam > 0) r3_print(beams_setup.beams[chosen_beam-1].k_dir, "k");
 
-    //
     // Movement
     //--
-
     // Magnetic acceleration
     a_B = magnetic_acceleration(*atom, B_params);
 
-    //
     // Update position
     // --
     for(i = 0; i < 3; i++) {
@@ -961,7 +963,6 @@ double move(atom_t *atom, beams_setup_t beams_setup, performance_t perform, magn
 
         // Add velocity
         vel_mod = 1e4 * h / (atom->transition.lambda * atom->mass * u); // cm / s
-        //r3_print(r3_scalar_product(vel_mod, beams_setup.beams[chosen_beam-1].k_dir), "Photon momentum");
         atom->vel = r3_sum(atom->vel, r3_scalar_product(vel_mod, beams_setup.beams[chosen_beam-1].k_dir)); // cm / s
         atom->vel = r3_sum(atom->vel, r3_scalar_product(vel_mod, rd_v)); // cm / s
 
@@ -1027,27 +1028,20 @@ double *magnetic_acceleration(atom_t atom, magnetic_field_t B_params){
     // Magnetic field gradient
     if(r3_mod(atom.pos) > 0){
         del_B = (double*) calloc(3, sizeof(double)); // G / cm
-        r_prime = (double*) calloc(3, sizeof(double)); // cm
+        r_prime = r3_apply_operator(B_params.B_basis, atom.pos); // cm
 
-        for(i = 0; i < 3; i++)
-            r_prime[i] = r3_inner_product(atom.pos, B_params.B_basis[i]);
-
+        // Anti-helmholtz coils (Magnetic field frame)
         norm = sqrt(pow(r_prime[0], 2) * pow(r_prime[1], 2) + 4 * pow(r_prime[2], 2));
+        del_B[0] = r_prime[0] / (2 * norm);
+        del_B[1] = r_prime[1] / (2 * norm);
+        del_B[2] = - 2 * r_prime[2] / norm;
+        del_B = r3_scalar_product(B_params.B_0, del_B);
 
-        // Anti-helmholtz coils
-        for(i = 0; i < 3; i++){
-            del_B[i] = 0;
-            del_B[i] += B_params.B_basis[0][i] * r_prime[0] / (2 * norm);
-            del_B[i] += B_params.B_basis[1][i] * r_prime[1] / (2 * norm);
-            del_B[i] += - B_params.B_basis[2][i] * 2  * r_prime[2] / norm;
-            del_B[i] = B_params.B_0 * del_B[i];
+        // Change basis (Lab frame)
+        del_B = r3_apply_operator(r3_transposed_operator(B_params.B_basis), del_B);
 
-            // Linear magnetic field gradient
-            del_B[i] += B_params.B_lin_grad[i];
-        }
-
-        // Magnetic field Bias
-        del_B = r3_sum(del_B, B_params.B_bias);
+        // Add linear magnetic field gradient
+        del_B = r3_sum(B_params.B_lin_grad, del_B);
 
         // Magnetic acceleration
         a_B = (double*) calloc(3, sizeof(double)); // cm / s^2
@@ -1058,7 +1052,7 @@ double *magnetic_acceleration(atom_t atom, magnetic_field_t B_params){
         else g_lande = atom.transition.g_exc;
 
         for(i = 0; i < 3; i++)
-            a_B[i] = - mu_B * g_lande * atom.mJ * del_B[i] / (atom.mass * u) * 1e3; // cm / s^2
+            a_B[i] = - (mu_B * g_lande * atom.mJ * del_B[i] / (atom.mass * u)) * 1e3; // cm / s^2
 
         // Release memory
         free(del_B);
@@ -2097,6 +2091,49 @@ int update_hist_3d(histogram_3d_t *hist, double *vals){
     free(coord);
 
     return 1;
+}
+
+double **rotating_matrix(double theta, int axis){
+    // Variables
+    int i;       // Utility
+    double **R;
+
+    // Allocate memory
+    R = (double**) calloc(3, sizeof(double*));
+    for(i = 0; i < 3; i++) R[i] = (double*) calloc(3, sizeof(double));
+
+    // Convert to radian
+    theta = theta * PI / 180;
+
+    // Rotating about x
+    if(axis == 1){
+        R[0][0] = 1;
+
+        R[1][1] = cos(theta);
+        R[2][2] = cos(theta);
+        R[1][2] = -sin(theta);
+        R[2][1] = sin(theta);
+
+    // Rotating about y
+    } else if(axis == 2){
+        R[1][1] = 1;
+
+        R[0][0] = cos(theta);
+        R[2][2] = cos(theta);
+        R[0][2] = sin(theta);
+        R[2][0] = -sin(theta);
+
+    // Rotating about z
+    } else if(axis == 3){
+        R[2][2] = 1;
+
+        R[0][0] = cos(theta);
+        R[1][1] = cos(theta);
+        R[0][1] = -sin(theta);
+        R[1][0] = sin(theta);
+    }
+
+    return R;
 }
 
 //

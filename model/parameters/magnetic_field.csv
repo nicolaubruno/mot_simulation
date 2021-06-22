@@ -1,5 +1,5 @@
 ,magnetic_field
 B_0,1.71
-B_axial,[-1 0 0]
+B_axial,[0 90 0]
 B_bias,[0 0 0]
 B_lin_grad,[0 0 0.094]

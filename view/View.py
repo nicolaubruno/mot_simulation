@@ -353,24 +353,33 @@ class View:
             info = res.info.loc[res.loop["var"]]
             x = np.array(res.loop["values"]).astype(float)
 
-            #plt.title("Centre of mass as a\nfunction of the " + info['name'].lower())
-            if info["unit"]:
-                label = r"$ " + info['symbol'] + r"\ [" + info['unit'] + r"] $"
+            # x label
+            #--
+            if info["symbol"] == "T_0":
+                x_scale_factor, label = self.__temperature_axis(np.max(x))
+
             else:
-                label = r"$ " + info['symbol'] + r"$"
+                x_scale_factor = 1
+
+                if info["unit"]:
+                    label = r"$ " + info['symbol'] + r"\ [" + info['unit'] + r"] $"
+                else:
+                    label = r"$ " + info['symbol'] + r"$"
+
+            plt.xlabel(label)
+            #--
 
             #
             # Set labels
             markers = ['o', '^', 's']
             labels = ['x', 'y', 'z']
             plt.ylabel("centre of mass [mm]")
-            plt.xlabel(label)
             delta = np.array(res.loop["values"])*(res.transition["gamma"]*1e-3)
 
             #
             # Plot simulated date
             for i in range(3):
-                plt.plot(x, r_c[i]*10, linestyle="--", label=labels[i], marker=markers[i])
+                plt.plot(x_scale_factor * x, r_c[i]*10, linestyle="--", label=labels[i], marker=markers[i])
 
             #
             # Set plot
@@ -419,22 +428,31 @@ class View:
             info = res.info.loc[res.loop["var"]]
             x = np.array(res.loop["values"]).astype(float)
 
-            #
             # Set label
             #--
-            #plt.title("Temperature as a function\nof the " + info['name'].lower())
-            
-            if info["unit"]:
-                label = r"$ " + info['symbol'] + r"\ [" + info['unit'] + r"] $"
+            # x label
+            #--
+            if info["symbol"] == "T_0":
+                x_scale_factor, label = self.__temperature_axis(np.max(x))
+
             else:
-                label = r"$ " + info['symbol'] + r"$"
+                x_scale_factor = 1
+
+                if info["unit"]:
+                    label = r"$ " + info['symbol'] + r"\ [" + info['unit'] + r"] $"
+                else:
+                    label = r"$ " + info['symbol'] + r"$"
 
             plt.xlabel(label)
-            plt.ylabel(r"T [$\mu K$]")
+            #--
+
+            # y label
+            y_scale_factor, label = self.__temperature_axis(np.max(temp))
+            plt.ylabel(label)
             #--
 
             # Plot temperature
-            plt.plot(x, temp, label="Simulation", marker='o', linestyle='--')
+            plt.plot(x_scale_factor*x, y_scale_factor*temp, label="Simulation", marker='o', linestyle='--')
 
             # Plot Doppler temperature
             if doppler_temperature:
@@ -498,20 +516,30 @@ class View:
             info = res.info.loc[res.loop["var"]]
             x = np.array(res.loop["values"]).astype(float)
 
-            #
             # Set label
-            #--            
-            if info["unit"]:
-                label = r"$ " + info['symbol'] + r"\ [" + info['unit'] + r"] $"
+            #--          
+            # x label
+            #--
+            if info["symbol"] == "T_0":
+                x_scale_factor, label = self.__temperature_axis(np.max(x))
+
             else:
-                label = r"$ " + info['symbol'] + r"$"
+                x_scale_factor = 1
+
+                if info["unit"]:
+                    label = r"$ " + info['symbol'] + r"\ [" + info['unit'] + r"] $"
+                else:
+                    label = r"$ " + info['symbol'] + r"$"
 
             plt.xlabel(label)
-            plt.ylabel(r"$N / N_{total}$")
+            #--
+
+            # y label
+            plt.ylabel(r"$N / N_total$")
             #--
 
             # Plot trapped atoms ratio
-            plt.plot(x, ratio, label="Simulation", marker='o', linestyle="")
+            plt.plot(x_scale_factor * x, ratio, label="Simulated points", marker='o', linestyle="")
 
             # Fitting
             if res.loop["var"] == "v_0":
@@ -520,7 +548,7 @@ class View:
                 x_fit = np.linspace(min(x), max(x), 1000)
                 y_fit = np.max(ratio) * np.array([res.general_erfc(xi, v_mean, v_std_dev) for xi in x_fit])
 
-                plt.plot(x_fit, y_fit, label="Adapted erfc" r"$(\mu = " + ("%.2f" % v_mean) + ")$", marker="", linestyle="--", color="Black")
+                plt.plot(x_scale_factor * x_fit, y_fit, label="Adapted erfc" r"$(\mu = " + ("%.2f" % v_mean) + ")$", marker="", linestyle="--", color="Black")
 
             # Set plot
             plt.grid(True, linestyle="--")
@@ -576,7 +604,6 @@ class View:
         # Looping info
         info = res.info.loc["delta"]
 
-        #
         # Set label
         #--            
         if info["unit"]:
@@ -584,8 +611,9 @@ class View:
         else:
             label = r"$ " + info['symbol'] + r"$"
 
+        # x label
         plt.xlabel(label)
-        plt.ylabel(r"$\bar{v}$")
+        plt.ylabel(r"$ \Delta [\Gamma] $")
         #--
 
         # Plot trapped atoms ratio
@@ -634,19 +662,28 @@ class View:
             markers = ['o', '^', 's']
             labels = [r'$\sigma_x$', r'$\sigma_y$', r'$\sigma_z$']
 
-            #plt.title("R.M.S. cloud size as a function of\n " + info['name'].lower())
-            if info["unit"]:
-                label = r"$ " + info['symbol'] + r"\ [" + info['unit'] + r"] $"
+            # x label
+            #--
+            if info["symbol"] == "T_0":
+                x_scale_factor, label = self.__temperature_axis(np.max(x))
+
             else:
-                label = r"$ " + info['symbol'] + r"$"
+                x_scale_factor = 1
+
+                if info["unit"]:
+                    label = r"$ " + info['symbol'] + r"\ [" + info['unit'] + r"] $"
+                else:
+                    label = r"$ " + info['symbol'] + r"$"
+
+            plt.xlabel(label)
+            #--
 
             plt.ylabel("Size [mm]")
-            plt.xlabel(label)
             #--
 
             # Plot simulated date
             for i in range(3):
-                plt.plot(x, std_r_c[i]*10, label=labels[i], linestyle="--", marker=markers[i])
+                plt.plot(x_scale_factor * x, std_r_c[i]*10, label=labels[i], linestyle="--", marker=markers[i])
 
             # Set plot
             plt.grid(linestyle="--")
@@ -698,3 +735,19 @@ class View:
         # Show
         plt.tight_layout()
         plt.show()
+
+    # Temperature axis
+    def __temperature_axis(self, T_max, symbol="T"):
+        if T_max >= 1e6:
+            scale_factor = 1e-6
+            label = r"$" + symbol + r"\ [K]$"
+
+        elif T_max >= 1e3:
+            scale_factor = 1e-3
+            label = r"$" + symbol + r"\ [m K]$"
+
+        else:
+            scale_factor = 1
+            label = r"$" + symbol + r"\ [\mu K]$"
+
+        return scale_factor, label

@@ -106,6 +106,12 @@ double *r3_normalize(double *r);
 // Apply real operator to a R3 vector
 double *r3_apply_operator(double **A, double *v);
 
+// Product between two operators
+double **r3_operator_product(double **A, double **B);
+
+// Transposed operator
+double **r3_transposed_operator(double **A);
+
 // View R3 vector
 int r3_print(double *z, char *name);
 
