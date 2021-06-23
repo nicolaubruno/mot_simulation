@@ -1158,6 +1158,42 @@ class Results:
 
         return v_mean, v_std_dev
 
+    # Capture temperature
+    def capture_temperature(self):
+        T_mean, T_std_dev = (0,0)
+
+        if self.loop["var"] == 'T_0' and len(self.loop["values"]) > 1:
+            T_c = self.loop['values']
+            ratio = np.zeros(len(self.loop['values']))
+
+            for i, val in enumerate(self.loop["values"]):
+                self.loop_idx(i)
+                ratio[i] = self.trapped_atoms
+
+            ratio = ratio / max(ratio)
+
+            # General complementary error function
+            def general_erfc(t, mean, std_dev):
+                return 1 - (erf((t - mean) / np.sqrt(2 * std_dev**2)) - erf((- mean) / np.sqrt(2 * std_dev**2))) / 2
+
+            # Get data
+            params, covs = curve_fit(general_erfc, T_c, ratio, bounds=([min(T_c), 0], [max(T_c), (max(T_c) - min(T_c))]))
+            T_mean = params[0]
+            T_std_dev = params[1]
+
+            '''
+            x = np.linspace(T_mean - 5*T_std_dev, T_mean + 5*T_std_dev, 1000)
+            y = np.array([general_erfc(xi, T_mean, T_std_dev) for xi in x])
+
+            plt.clf()
+            plt.plot(T_c, ratio, marker="o", linestyle="")
+            plt.plot(x, y)
+            plt.grid(linestyle="--")
+            plt.show()
+            '''
+
+        return T_mean, T_std_dev
+
     # General complementary error function
     def general_erfc(self, t, mean, std_dev):
         return 1 - (erf((t - mean) / np.sqrt(2 * std_dev**2)) - erf((- mean) / np.sqrt(2 * std_dev**2))) / 2

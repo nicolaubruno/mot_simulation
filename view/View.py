@@ -570,21 +570,50 @@ class View:
 
     # Plot trap depth vs detuning
     def trap_depth_vs_detuning(self, results):
-        capture_velocity = [] # Capture velocity which half the atoms were trapped
-        err_capture_velocity = [] # Capture velocity which half the atoms were trapped
+        # Capture velocity | temperature which half the atoms were trapped
+        capture = []
+
+        # Capture velocity | temperature which half the atoms were trapped
+        err_capture = []
+
         delta = []
 
+        opt = None
+
+        # Get capture values
         for code, name in results.items():
             res = Results(code)
 
             if len(res.loop["values"]) > 0:
+                opt = res.loop["var"]
                 delta.append(float(res.beams['main'].delta))
-                v_mean, v_std_dev = res.capture_velocity()
-                capture_velocity.append(v_mean)
-                err_capture_velocity.append(v_std_dev)
+
+                if opt == "T_0":
+                    mean, std_dev = res.capture_temperature()
+
+                elif opt == "v_0":
+                    mean, std_dev = res.capture_velocity()
+
+                else:
+                    raise ValueError("This visualization option requires looping in T_0 or v_0 variables")
+
+                capture.append(mean)
+                err_capture.append(std_dev)
 
             else:
                 raise ValueError("This visualization option requires looping in each results set")
+
+        capture = np.array(capture)
+        err_capture = np.array(err_capture)
+
+        # Capture velocity
+        if opt == "v_0":
+            y_label = r"$ v_c\ [cm/s] $"
+            y_scale_factor = 1
+
+        # Initial temperature
+        if opt == "T_0":          
+            y_scale_factor, y_label = self.__temperature_axis(np.max(mean)) 
 
         # Clear stored plots
         plt.clf()
@@ -607,17 +636,17 @@ class View:
         # Set label
         #--            
         if info["unit"]:
-            label = r"$ " + info['symbol'] + r"\ [" + info['unit'] + r"] $"
+            x_label = r"$ " + info['symbol'] + r"\ [" + info['unit'] + r"] $"
         else:
-            label = r"$ " + info['symbol'] + r"$"
+            x_label = r"$ " + info['symbol'] + r"$"
 
         # x label
-        plt.xlabel(label)
-        plt.ylabel(r"$ \Delta [\Gamma] $")
+        plt.ylabel(y_label)
+        plt.xlabel(x_label)
         #--
 
         # Plot trapped atoms ratio
-        plt.errorbar(delta, capture_velocity, err_capture_velocity, label="Simulation", marker='o', linestyle='')
+        plt.errorbar(delta, y_scale_factor * capture, y_scale_factor * err_capture, label="Simulated Points", marker='o', linestyle='')
 
         # Set plot
         plt.grid(True, linestyle="--")
