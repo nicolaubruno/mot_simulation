@@ -1181,17 +1181,6 @@ class Results:
             T_mean = params[0]
             T_std_dev = params[1]
 
-            '''
-            x = np.linspace(T_mean - 5*T_std_dev, T_mean + 5*T_std_dev, 1000)
-            y = np.array([general_erfc(xi, T_mean, T_std_dev) for xi in x])
-
-            plt.clf()
-            plt.plot(T_c, ratio, marker="o", linestyle="")
-            plt.plot(x, y)
-            plt.grid(linestyle="--")
-            plt.show()
-            '''
-
         return T_mean, T_std_dev
 
     # General complementary error function

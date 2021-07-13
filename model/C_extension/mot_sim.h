@@ -18,7 +18,7 @@
 #define MAX_LINES 124
 #define DELIM ","
 #define MAX_BEAMS 16
-#define Py_MODULE 1
+#define Py_MODULE 0
 
 #define h 6.62607004        // Planck constant [10^{-34} J s]
 #define e 1.60217662        // Elementary charge [10^{-19} C]s
@@ -163,8 +163,8 @@ transition_t get_transition(char *params_path);
 // Get atom
 atom_t get_atom(initial_conditions_t ini_conds, performance_t perform, beams_setup_t beams_setup, magnetic_field_t B_params, int opt, char *params_path);
 
-// Set initial position of the atom
-int set_ini_atom_pos(atom_t *atom, beams_setup_t beams_setup, magnetic_field_t B_params, performance_t perform, initial_conditions_t ini_conds, int opt);
+// Set initial atom state
+int set_ini_atom_state(atom_t *atom, beams_setup_t beams_setup, magnetic_field_t B_params, performance_t perform, initial_conditions_t ini_conds, int opt);
 
 // Set histograms
 int set_hist(int only_marginals, results_t *res, performance_t conds);

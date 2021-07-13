@@ -51,8 +51,11 @@ results_t simulate_atom(char *params_path, int opt, long seed_time){
     //
     // Iterations
     //--
-    while((res.time < perform.max_time) && (r <= perform.max_r) && (v <= perform.max_v)){
+    while((res.time < perform.max_time) && (r <= perform.max_r)){
         //print_status(atom, res);
+
+        // Velocity threshold
+        if(opt < 2 && (v <= perform.max_v)) break; 
 
         // Move atom
         dt = move(&atom, beams_setup, perform, B_params);
@@ -645,7 +648,6 @@ atom_t get_atom(initial_conditions_t ini_conds, performance_t perform, beams_set
     int i = 0;
     char *path, **rows;
     char *token, *saveptr;
-    double std_dev;
     atom_t atom;
     //--
 
@@ -699,22 +701,8 @@ atom_t get_atom(initial_conditions_t ini_conds, performance_t perform, beams_set
     atom.J = atom.transition.J_gnd;
     atom.mJ = -atom.transition.J_gnd;
 
-    //
-    // Initial velocity of the atom
-    //--
-    if(opt < 2){
-        atom.vel = (double *) calloc(3, sizeof(double));
-        for(i = 0; i < 3; i++){
-            std_dev = sqrt(k_B * ini_conds.T_0 / (atom.mass * u)) * 10; // cm / s
-            atom.vel[i] = random_norm(0, std_dev); // cm / s
-        }  
-
-    } else if(opt == 2)
-        atom.vel = r3_scalar_product(ini_conds.v_0, r3_normalize(ini_conds.v_0_dir));
-    //--
-
-    // Initial position
-    set_ini_atom_pos(&atom, beams_setup, B_params, perform, ini_conds, opt);
+    // Initial atom state
+    set_ini_atom_state(&atom, beams_setup, B_params, perform, ini_conds, opt);
 
     // Release memory
     free(path);
@@ -722,11 +710,11 @@ atom_t get_atom(initial_conditions_t ini_conds, performance_t perform, beams_set
     return atom;
 }
 
-int set_ini_atom_pos(atom_t *atom, beams_setup_t beams_setup, magnetic_field_t B_params, performance_t perform, initial_conditions_t ini_conds, int opt){
+int set_ini_atom_state(atom_t *atom, beams_setup_t beams_setup, magnetic_field_t B_params, performance_t perform, initial_conditions_t ini_conds, int opt){
     // Variables
     int i;
     double R, z_0 = 0, beta, chi;
-    double *r_0, *B, *rd_v;
+    double *r_0, *B, *rd_v, std_dev;
 
     // Theoretical equilibrium position
     if(beams_setup.beams[0].delta < 0){
@@ -748,11 +736,11 @@ int set_ini_atom_pos(atom_t *atom, beams_setup_t beams_setup, magnetic_field_t B
         z_0 = z_0 + beams_setup.beams[0].delta;
         z_0 = ((2 * PI * atom->transition.gamma * 1e3) / (chi * beta)) * z_0; // cm
     }
-
-    // Check option
+    
+    // Initial position
     //--
     // Marginal and 3D histograms option
-    if(opt < 2){
+    if(opt < 2){ 
         // Check regime and threshold
         if((fabs(beams_setup.beams[0].delta) < sqrt(1 + beams_setup.beams[0].s_0)) || (fabs(z_0) > perform.max_r) || z_0 > 0){
             // Random vector
@@ -771,46 +759,39 @@ int set_ini_atom_pos(atom_t *atom, beams_setup_t beams_setup, magnetic_field_t B
         } else {
             atom->pos = (double*) calloc(3, sizeof(double));
             atom->pos[2] = z_0;
-        }
+        } 
+
     // Trapped atoms option
     } else if(opt == 2){
-        atom->pos = r3_scalar_product(-perform.max_r, r3_normalize(ini_conds.v_0_dir));
+        // Initial position
+        atom->pos = (double*) calloc(3, sizeof(double)); 
+        //atom->pos = r3_scalar_product(-perform.max_r, r3_normalize(ini_conds.v_0_dir));
+
+        // Initial velocity
+        // atom->vel = r3_scalar_product(ini_conds.v_0, r3_normalize(ini_conds.v_0_dir));
     }
+    //-- 
+
+    // Initial velocity
+    //--        
+    atom->vel = (double *) calloc(3, sizeof(double));
+    for(i = 0; i < 3; i++){
+        std_dev = sqrt(k_B * ini_conds.T_0 / (atom->mass * u)) * 10; // cm / s
+        atom->vel[i] = random_norm(0, std_dev); // cm / s
+    }  
     //--
 
     return 1;
 }
 
-int set_hist(int only_marginals, results_t *res, performance_t perform){
+int set_hist(int opt, results_t *res, performance_t perform){
     // Variables
     int i, j, k;
 
     //
-    // Only marginals
-    //--
-    if(only_marginals){
-        res->pos_hist = (histogram_t*) calloc(3, sizeof(histogram_t));
-        res->vel_hist = (histogram_t*) calloc(3, sizeof(histogram_t));
-
-        for(i = 0; i < 3; i++){
-            // Position
-            res->pos_hist[i].num_bins = perform.num_bins;
-            res->pos_hist[i].bin_size = 2 * perform.max_r / res->pos_hist[i].num_bins;
-            res->pos_hist[i].coord0 = - perform.max_r;
-            res->pos_hist[i].freqs = (int*) calloc(res->pos_hist[i].num_bins, sizeof(int));
-
-            // Velocity
-            res->vel_hist[i].num_bins = perform.num_bins;
-            res->vel_hist[i].bin_size = 2 * perform.max_v / res->vel_hist[i].num_bins;
-            res->vel_hist[i].coord0 = - perform.max_v;
-            res->vel_hist[i].freqs = (int*) calloc(res->vel_hist[i].num_bins, sizeof(int));
-        }
-    //--
-
-    //
     // Complete histograms
     //--
-    } else{
+    if(opt == 0){
         // Position
         res->pos_3Dhist.num_bins = (int*) calloc(3, sizeof(int));
         res->pos_3Dhist.bins_size = (double*) calloc(3, sizeof(double));
@@ -864,6 +845,28 @@ int set_hist(int only_marginals, results_t *res, performance_t perform){
             }
         }
         //--
+
+    //
+    // Only marginals
+    //--
+    } else if(opt == 1){
+        res->pos_hist = (histogram_t*) calloc(3, sizeof(histogram_t));
+        res->vel_hist = (histogram_t*) calloc(3, sizeof(histogram_t));
+
+        for(i = 0; i < 3; i++){
+            // Position
+            res->pos_hist[i].num_bins = perform.num_bins;
+            res->pos_hist[i].bin_size = 2 * perform.max_r / res->pos_hist[i].num_bins;
+            res->pos_hist[i].coord0 = - perform.max_r;
+            res->pos_hist[i].freqs = (int*) calloc(res->pos_hist[i].num_bins, sizeof(int));
+
+            // Velocity
+            res->vel_hist[i].num_bins = perform.num_bins;
+            res->vel_hist[i].bin_size = 2 * perform.max_v / res->vel_hist[i].num_bins;
+            res->vel_hist[i].coord0 = - perform.max_v;
+            res->vel_hist[i].freqs = (int*) calloc(res->vel_hist[i].num_bins, sizeof(int));
+        }
+    //--
     }
     //--
 

@@ -22,13 +22,13 @@ class Simulation:
     ''' Attributes '''
 
     __slots__ = [
-        "_simulated_time", "_trapped_atoms", "_pos_freqs_arr", "_vel_freqs_arr", "_atoms_simulated", "_option", "_results", "_transitions", "_parallel_tasks"
+        "_average_escape_time", "_trapped_atoms", "_pos_freqs_arr", "_vel_freqs_arr", "_atoms_simulated", "_option", "_results", "_transitions", "_parallel_tasks"
     ]
 
     # Simulated
     @property
-    def simulated_time(self):
-        return self._simulated_time
+    def average_escape_time(self):
+        return self._average_escape_time
 
     # Trapped atoms
     @property
@@ -70,7 +70,6 @@ class Simulation:
 
     #
     def __init__(self):
-        #
         # Set-up initial values
         self._atoms_simulated = -1
         self._results = None
@@ -78,16 +77,15 @@ class Simulation:
 
     #
     def new(self, shortname = '', opt = 0, results_group = None):
-        #
-        # Create a directory to save the results
-        #
-
+        # Create result object
+        #--
         # Empty results
         if results_group is not None and results_group > 1:
             results_group = self.available_results_groups()[results_group]
 
         self._results = Results(int(dt.now().timestamp()), shortname.strip(), results_group=results_group)
-        
+        #--
+
         # Check simulation option
         #--
         available_opts = {
@@ -124,8 +122,8 @@ class Simulation:
         # Other informations
         #--
         self._trapped_atoms = 0
-        self._simulated_time = 0
         self._atoms_simulated = 0
+        self._average_escape_time = 0
         #--
 
         # Parallel tasks
@@ -169,8 +167,8 @@ class Simulation:
                 for k in range(times):
                     pos_freqs = res[k][0]
                     vel_freqs = res[k][1]
-                    time = res[k][2]
                     self._trapped_atoms += res[k][3]
+                    if res[k][3] == 0: self._average_escape_time += res[k][2]
 
                     #
                     # Add position and velocity frequencies
@@ -256,6 +254,7 @@ class Simulation:
         #--
 
         # Other informations
+        self._average_escape_time = 0
         self._trapped_atoms = 0
         self._simulated_time = 0
         self._atoms_simulated = 0
@@ -268,16 +267,25 @@ class Simulation:
 
     #
     def save(self):
-        # Add position and velocities in 3D-histograms
+        # Add position and velocities in marginal histograms
         if self.option == 0:
             self.results.add_marginals(self.pos_freqs_arr, self.vel_freqs_arr)
 
+        # Add position and velocities in 3D-histograms
         elif self.option == 1:
             self.results.add_positions(self.pos_freqs_arr)
             self.results.add_velocities(self.vel_freqs_arr)
 
+        # Escape flux
+        #--
+        if self.average_escape_time > 0 and self.trapped_atoms < self.perform["num_sim"]:
+            escape_flux = (self.trapped_atoms) / (self.perform["num_sim"] * self.average_escape_time) # number / lifetime
+
+        else: escape_flux = 0
+        #--
+
         # Add informations
-        self.results.add_infos({'trapped_atoms': self.trapped_atoms})
+        self.results.add_infos({'trapped_atoms': self.trapped_atoms, "escape_flux": escape_flux})
 
         #
         # Release memory

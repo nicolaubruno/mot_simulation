@@ -491,47 +491,40 @@ class View:
 
     # Plot trapped atoms ratio
     def trapped_atoms_ratio(self, res):
-        #
         # With looping
+        #--
         if len(res.loop["var"]) > 0:
             # Data
             ratio = res.trapped_atoms_ratio()
 
-            # Clear stored plots
-            plt.clf()
-
-            #
             # Set figure
-            plt.figure(figsize=(5,4))
-            plt.style.use('seaborn-whitegrid')
-            plt.subplots_adjust(top=0.80, bottom=0.15)
+            plt.clf() # Clear plots
+            plt.figure(figsize=(5,4)) # Set figure size
+            plt.style.use('seaborn-whitegrid') # Theme
+            #plt.subplots_adjust(top=0.80, bottom=0.15)
             plt.rcParams.update({
                     "font.size":14,\
                     "axes.titlepad":14
                 })
-            #plt.tight_layout()
             ax = plt.gca()
 
             # Looping info
             info = res.info.loc[res.loop["var"]]
             x = np.array(res.loop["values"]).astype(float)
 
-            # Set label
+            # Set labels
             #--          
             # x label
             #--
             if info["symbol"] == "T_0":
-                x_scale_factor, label = self.__temperature_axis(np.max(x))
+                x_scale_factor, x_label = self.__temperature_axis(np.max(x))
 
             else:
                 x_scale_factor = 1
+                x_label = r"$ " + info['symbol']
+                if info["unit"]: x_label += r"\ [" + info['unit'] + r"] $"
 
-                if info["unit"]:
-                    label = r"$ " + info['symbol'] + r"\ [" + info['unit'] + r"] $"
-                else:
-                    label = r"$ " + info['symbol'] + r"$"
-
-            plt.xlabel(label)
+            plt.xlabel(x_label)
             #--
 
             # y label
@@ -542,13 +535,20 @@ class View:
             plt.plot(x_scale_factor * x, ratio, label="Simulated points", marker='o', linestyle="")
 
             # Fitting
-            if res.loop["var"] == "v_0":
-                v_mean, v_std_dev = res.capture_velocity()
+            #--
+            # Initial Velocity
+            if res.loop["var"] in ["v_0", "T_0"]:
+                if res.loop["var"] == "v_0":
+                    mean, std_dev = res.capture_velocity()
 
-                x_fit = np.linspace(min(x), max(x), 1000)
-                y_fit = np.max(ratio) * np.array([res.general_erfc(xi, v_mean, v_std_dev) for xi in x_fit])
+                elif res.loop["var"] == "T_0":
+                    mean, std_dev = res.capture_temperature()
 
-                plt.plot(x_scale_factor * x_fit, y_fit, label="Adapted erfc" r"$(\mu = " + ("%.2f" % v_mean) + ")$", marker="", linestyle="--", color="Black")
+                x_fit = np.linspace(np.min(x), np.max(x), 1000)
+                y_fit = np.max(ratio) * np.array([res.general_erfc(xi, mean, std_dev) for xi in x_fit])
+
+                plt.plot(x_scale_factor * x_fit, y_fit, label="Fitting" r"$(\mu = " + ("%.2f" % (x_scale_factor * mean)) + ")$", marker="", linestyle="--", color="Black")
+            #--
 
             # Set plot
             plt.grid(True, linestyle="--")
@@ -557,16 +557,17 @@ class View:
             plt.close(1)
             plt.tight_layout()
             
-            #
             # Show
             print('Showing graph ...')
             plt.show()
+        #--
 
-        #
         # Without loop
+        #--
         else:
             ratio = res.trapped_atoms_ratio()
             print("\nN_trapped / N_total = %f\n" % (ratio))
+        #--
 
     # Plot trap depth vs detuning
     def trap_depth_vs_detuning(self, results):
