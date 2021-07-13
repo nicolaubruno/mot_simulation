@@ -276,16 +276,13 @@ class Simulation:
             self.results.add_positions(self.pos_freqs_arr)
             self.results.add_velocities(self.vel_freqs_arr)
 
-        # Escape flux
-        #--
-        if self.average_escape_time > 0 and self.trapped_atoms < self.perform["num_sim"]:
-            escape_flux = (self.trapped_atoms) / (self.perform["num_sim"] * self.average_escape_time) # number / lifetime
-
-        else: escape_flux = 0
-        #--
+        # Average escape time
+        if self.trapped_atoms == self.results.perform["num_sim"]:
+            average_escape_time = -1
+        else: average_escape_time = self.average_escape_time / (self.results.perform["num_sim"] - self.trapped_atoms)
 
         # Add informations
-        self.results.add_infos({'trapped_atoms': self.trapped_atoms, "escape_flux": escape_flux})
+        self.results.add_infos({'trapped_atoms': self.trapped_atoms, "average_escape_time": average_escape_time})
 
         #
         # Release memory

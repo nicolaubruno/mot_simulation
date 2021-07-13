@@ -1,9 +1,9 @@
 ,performance
-max_time,1e5
+max_time,1e4
 max_r,2.0
 max_v,1e4
-num_sim,500
+num_sim,100
 num_bins,64
-wait_time,1e5
-dt,15.0
+wait_time,1e4
+dt,20.0
 parallel_tasks,2
