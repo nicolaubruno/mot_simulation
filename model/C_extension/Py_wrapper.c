@@ -67,7 +67,7 @@ static PyObject* C_simulate_atom(PyObject *self, PyObject *args){
         //--
     
     // Only marginal distributions
-    } else {
+    } else if(opt == 1){
         // Build values
         pos_freqs = build_freqs(res.pos_hist);
         vel_freqs = build_freqs(res.vel_hist);
@@ -81,6 +81,10 @@ static PyObject* C_simulate_atom(PyObject *self, PyObject *args){
 
         free(res.pos_hist);
         free(res.vel_hist);
+    
+    } else{
+        pos_freqs = PyList_New(0);
+        vel_freqs = PyList_New(0);
     }
     //--
 
