@@ -660,6 +660,14 @@ class View:
         print('Showing graph ...')
         plt.show()
 
+    # Plot escape flux of atoms
+    def escape_flux_atoms(self, res):
+        X = res.loop["values"]
+        Y = res.escape_flux_atoms()
+
+        print(X)
+        print(Y)
+
     # Plot r.m.s. cloud size
     def cloud_size(self, res):
         if res.loop["var"]:

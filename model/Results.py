@@ -90,6 +90,11 @@ class Results:
     def trapped_atoms(self):
         return self._trapped_atoms
 
+    # Average escape time
+    @property
+    def average_escape_time(self):
+        return self._average_escape_time
+
     # Looping status
     @property
     def loop(self):
@@ -470,6 +475,7 @@ class Results:
         if os.path.exists(path):
             log = pd.read_csv(path, header=0, index_col=0, squeeze=True).astype(object)
             self._trapped_atoms = log['trapped_atoms']
+            if "average_escape_time" in log: self._average_escape_time = log['average_escape_time']
 
     #
     def __get_name(self):
@@ -1121,6 +1127,26 @@ class Results:
         #--
 
         return ratio
+
+    # Escape flux of atoms
+    def escape_flux_atoms(self):
+        # With looping
+        if len(self.loop["var"]) > 0:
+            escape_flux_atoms = np.zeros(len(self.loop["values"]))
+
+            for i in range(len(self.loop["values"])):
+                self.loop_idx(i)
+
+                # Get escape flux of atoms
+                if self.average_escape_time > 0:
+                    escape_flux_atoms[i] = (self.perform["num_sim"] - self.trapped_atoms) / self.average_escape_time
+
+        # Without looping
+        elif self.average_escape_time > 0: 
+            escape_flux_atoms = (self.perform["num_sim"] - self.trapped_atoms) / self.average_escape_time
+        else: escape_flux_atoms = 0
+
+        return escape_flux_atoms
 
     # Capture velocity
     def capture_velocity(self):

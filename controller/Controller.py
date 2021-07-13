@@ -326,7 +326,8 @@ class Controller:
                         options[6] = "Heat map"
 
                     if res.trapped_atoms >= 0:
-                        options[7] = "Trapped atoms ratio"
+                        options[7] = "Escape flux of atoms"
+                        options[8] = "Trapped atoms"
                     #--
 
                     # Get visualization option
@@ -458,8 +459,17 @@ class Controller:
                         print("Visualization has not implemented yet!")
                         self.__call_input("Enter with any key to continue", header = False, clear_screen=False)
 
-                    # Trapped atoms ratio
+                    # Escape flux of atoms
                     elif opt == 7:
+                        self.__view.escape_flux_atoms(res)
+
+                        if not res.loop["var"]:
+                            opt = self.__call_input("Enter with any key to continue", header = False, clear_screen=False)
+
+                        self._menu_level -= 1
+
+                    # Trapped atoms
+                    elif opt == 8:
                         self.__view.trapped_atoms_ratio(res)
 
                         if not res.loop["var"]:
