@@ -256,7 +256,6 @@ class Simulation:
         # Other informations
         self._average_escape_time = 0
         self._trapped_atoms = 0
-        self._simulated_time = 0
         self._atoms_simulated = 0
 
         # Parallel tasks
