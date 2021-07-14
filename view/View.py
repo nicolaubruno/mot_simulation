@@ -662,11 +662,49 @@ class View:
 
     # Plot escape flux of atoms
     def escape_flux_atoms(self, res):
-        X = res.loop["values"]
-        Y = res.escape_flux_atoms()
+        X = np.array(res.loop["values"])
+        Y = np.array(res.escape_flux_atoms())
 
-        print(X)
-        print(Y)
+        #
+        # Set figure
+        plt.clf() # Clear previously plots
+        plt.figure(figsize=(5,4))
+        plt.style.use('seaborn-whitegrid')
+        plt.rcParams.update({
+                "font.size":14,\
+                "axes.titlepad":14
+            })
+
+        # Looping info
+        info = res.info.loc[res.loop["var"]]
+
+        # Set labels
+        #--
+        # x label        
+        if info["symbol"] == "T_0":
+            x_scale_factor, x_label = self.__temperature_axis(np.max(X))
+        else:
+            x_scale_factor = 1
+            x_label = r"$ " + info['symbol'] + r"$"           
+            if info["unit"]: x_label += r"$\ [" + info['unit'] + r"] $"
+
+        plt.xlabel(x_label)
+
+        # y label
+        plt.ylabel(r"$ \Phi\ [1 / \tau]$")
+        #--
+
+        # Plot trapped atoms ratio
+        plt.errorbar(x_scale_factor*X, Y, label="MOT On", marker='o', linestyle='')
+
+        # Set plot
+        plt.grid(True, linestyle="--")
+        plt.close(1)
+        plt.tight_layout()
+        
+        # Show
+        print('Showing graph ...')
+        plt.show()
 
     # Plot r.m.s. cloud size
     def cloud_size(self, res):
