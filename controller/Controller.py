@@ -107,7 +107,7 @@ class Controller:
                 opts = {
                     1: "Marginal distributions",\
                     2: "Complete 3D distribution",\
-                    3: "Escape flux of atoms"
+                    3: "Analysis of trapped atoms"
                 }
 
                 if shortname: show_shortname = " (" + shortname + ") "

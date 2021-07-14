@@ -240,6 +240,9 @@ double random_norm(double mean, double std_dev);
 // Generate a double random number following a Exponential distribution given a mean
 double random_exp(double mean);
 
+// Generate a double random number following a uniform distribution given by the interval (a, b)
+double random_uniform(double a, double b);
+
 // Pick randomly a element of an integer array given an array of probabilities
 int random_pick(double *probs, int size);
 

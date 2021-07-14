@@ -714,7 +714,7 @@ int set_ini_atom_state(atom_t *atom, beams_setup_t beams_setup, magnetic_field_t
     // Variables
     int i;
     double R, z_0 = 0, beta, chi;
-    double *r_0, *B, *rd_v, std_dev;
+    double *r_0, *B, *rd_v, std_dev, size;
 
     // Theoretical equilibrium position
     if(beams_setup.beams[0].delta < 0){
@@ -737,10 +737,10 @@ int set_ini_atom_state(atom_t *atom, beams_setup_t beams_setup, magnetic_field_t
         z_0 = ((2 * PI * atom->transition.gamma * 1e3) / (chi * beta)) * z_0; // cm
     }
     
-    // Initial position
-    //--
     // Marginal and 3D histograms option
     if(opt < 2){ 
+        // Initial position
+        //--
         // Check regime and threshold
         if((fabs(beams_setup.beams[0].delta) < sqrt(1 + beams_setup.beams[0].s_0)) || (fabs(z_0) > perform.max_r) || z_0 > 0){
             // Random vector
@@ -760,26 +760,47 @@ int set_ini_atom_state(atom_t *atom, beams_setup_t beams_setup, magnetic_field_t
             atom->pos = (double*) calloc(3, sizeof(double));
             atom->pos[2] = z_0;
         } 
+        //--
+
+        // Initial velocity
+        //--        
+        atom->vel = (double *) calloc(3, sizeof(double));
+        for(i = 0; i < 3; i++){
+            std_dev = sqrt(k_B * ini_conds.T_0 / (atom->mass * u)) * 10; // cm / s
+            atom->vel[i] = random_norm(0, std_dev); // cm / s
+        }  
+        //--
 
     // Trapped atoms option
     } else if(opt == 2){
         // Initial position
-        atom->pos = (double*) calloc(3, sizeof(double)); 
-        //atom->pos = r3_scalar_product(-perform.max_r, r3_normalize(ini_conds.v_0_dir));
+        //--
+        //atom->pos = (double*) calloc(3, sizeof(double)); 
+        atom->pos = r3_scalar_product(-1, r3_normalize(ini_conds.v_0_dir));
+
+        // Random vector
+        //--
+        rd_v = (double*) calloc(3, sizeof(double));
+
+        for(i = 0; i < 3; i++) {
+            rd_v[i] = ((double) rand()) / ((double) RAND_MAX);
+            if((((double) rand()) / ((double) RAND_MAX)) < 0.5) rd_v[i] = -rd_v[i];
+        }
+
+        rd_v = r3_normalize(rd_v); // Normalization
+        //--
+
+        // Perpendicular component
+        rd_v = r3_cross_product(rd_v, atom->pos);
+        size = random_uniform(0, beams_setup.beams[0].w);
+        rd_v = r3_scalar_product(size, r3_normalize(rd_v));
+        atom->pos = r3_scalar_product(sqrt(beams_setup.beams[0].w*beams_setup.beams[0].w - size*size), atom->pos);
+        atom->pos = r3_sum(rd_v, atom->pos);
 
         // Initial velocity
-        // atom->vel = r3_scalar_product(ini_conds.v_0, r3_normalize(ini_conds.v_0_dir));
+        atom->vel = r3_scalar_product(ini_conds.v_0, r3_normalize(ini_conds.v_0_dir));
     }
     //-- 
-
-    // Initial velocity
-    //--        
-    atom->vel = (double *) calloc(3, sizeof(double));
-    for(i = 0; i < 3; i++){
-        std_dev = sqrt(k_B * ini_conds.T_0 / (atom->mass * u)) * 10; // cm / s
-        atom->vel[i] = random_norm(0, std_dev); // cm / s
-    }  
-    //--
 
     return 1;
 }
@@ -1995,6 +2016,10 @@ double random_norm(double mean, double std_dev){
     free(v);
 
     return norm;
+}
+
+double random_uniform(double a, double b){
+    return (a + (b - a) * ((double) rand()) / ((double) RAND_MAX));
 }
 
 int random_pick(double *probs, int size){

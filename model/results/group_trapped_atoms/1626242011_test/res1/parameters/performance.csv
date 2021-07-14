@@ -1,0 +1,9 @@
+,performance
+max_time,30000.0
+max_r,2.0
+max_v,10000.0
+num_sim,100
+num_bins,8
+wait_time,30000.0
+dt,15.0
+parallel_tasks,2.0
