@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
-from scipy.optimize import curve_fit
+from scipy.optimize import brentq
 from scipy.special import erf
 #--
 
@@ -1153,24 +1153,35 @@ class Results:
         v_mean, v_std_dev = (0,0)
 
         if self.loop["var"] == 'v_0' and len(self.loop["values"]) > 1:
-            v_c = self.loop['values']
+            # Get velocities and trapped atoms ratio
+            #--
+            vel = self.loop['values']
             ratio = np.zeros(len(self.loop['values']))
 
             for i, val in enumerate(self.loop["values"]):
                 self.loop_idx(i)
                 ratio[i] = self.trapped_atoms
 
-            ratio = ratio / max(ratio)
+            ratio = ratio / self.perform["num_sim"]
+            #--
 
-            # General complementary error function
-            def general_erfc(t, mean, std_dev):
-                return 1 - (erf((t - mean) / np.sqrt(2 * std_dev**2)) - erf((- mean) / np.sqrt(2 * std_dev**2))) / 2
+            # Get capture velocity
+            #--
+            # Fit polynomial
+            c = np.polyfit(vel, ratio, 10, full = False, cov = False)
 
-            # Get data
-            params, covs = curve_fit(general_erfc, v_c, ratio, bounds=([min(v_c), 0], [max(v_c), (max(v_c) - min(v_c))]))
-            v_mean = params[0]
-            v_std_dev = params[1]
+            # Polynomial function
+            def f(x):
+                y = -0.5
 
+                for i in range(11):
+                    y += c[10 - i]*x**i
+
+                return y
+
+            # Get capture velocity
+            vel_c = brentq(f, np.min(vel), np.max(vel), full_output = False)
+            #--
             '''
             x = np.linspace(v_mean - 5*v_std_dev, v_mean + 5*v_std_dev, 1000)
             y = np.array([general_erfc(xi, v_mean, v_std_dev) for xi in x])
@@ -1181,8 +1192,9 @@ class Results:
             plt.grid(linestyle="--")
             plt.show()
             '''
+        else: raise ValueError("The loop variable must be v_0 to calculate the capture velocity")
 
-        return v_mean, v_std_dev
+        return vel_c, c
 
     # Capture temperature
     def capture_temperature(self):

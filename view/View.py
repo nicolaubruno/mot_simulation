@@ -490,7 +490,7 @@ class View:
             print()
 
     # Plot trapped atoms ratio
-    def trapped_atoms_ratio(self, res):
+    def trapped_atoms_ratio(self, res, fitting = True):
         # With looping
         #--
         if len(res.loop["var"]) > 0:
@@ -499,7 +499,7 @@ class View:
 
             # Set figure
             plt.clf() # Clear plots
-            plt.figure(figsize=(5,4)) # Set figure size
+            plt.figure(figsize=(6,5)) # Set figure size
             plt.style.use('seaborn-whitegrid') # Theme
             #plt.subplots_adjust(top=0.80, bottom=0.15)
             plt.rcParams.update({
@@ -537,17 +537,29 @@ class View:
             # Fitting
             #--
             # Initial Velocity
-            if res.loop["var"] in ["v_0", "T_0"]:
+            if fitting and res.loop["var"] in ["v_0", "T_0"]:
                 if res.loop["var"] == "v_0":
-                    mean, std_dev = res.capture_velocity()
+                    vel_c, c = res.capture_velocity()
 
                 elif res.loop["var"] == "T_0":
-                    mean, std_dev = res.capture_temperature()
+                    vel_c, c = res.capture_temperature()
+
+                
+                # Polynomial function
+                deg = len(c) - 1
+                def f(x):
+                    y = 0.0
+
+                    for i in range(deg+1):
+                        y += c[deg - i]*x**i
+
+                    return y
 
                 x_fit = np.linspace(np.min(x), np.max(x), 1000)
-                y_fit = np.max(ratio) * np.array([res.general_erfc(xi, mean, std_dev) for xi in x_fit])
+                y_fit = np.array(list(map(f, x_fit)))
 
-                plt.plot(x_scale_factor * x_fit, y_fit, label="Fitting" r"$(\mu = " + ("%.2f" % (x_scale_factor * mean)) + ")$", marker="", linestyle="--", color="Black")
+                plt.plot(vel_c, 0.5, marker="o", linestyle="", label=(r"$v_{cap} = %.2f\ cm/s $" % vel_c))
+                plt.plot(x_scale_factor * x_fit, y_fit, label="Fitting", marker="", linestyle="--", color="Black")
             #--
 
             # Set plot
@@ -571,17 +583,13 @@ class View:
 
     # Plot trap depth vs detuning
     def trap_depth_vs_detuning(self, results):
-        # Capture velocity | temperature which half the atoms were trapped
-        capture = []
-
-        # Capture velocity | temperature which half the atoms were trapped
-        err_capture = []
-
+        # Variables
+        vels = np.zeros(len(results))
         delta = []
-
         opt = None
 
         # Get capture values
+        i = 0
         for code, name in results.items():
             res = Results(code)
 
@@ -590,22 +598,19 @@ class View:
                 delta.append(float(res.beams['main'].delta))
 
                 if opt == "T_0":
-                    mean, std_dev = res.capture_temperature()
+                    vel_c, c = res.capture_temperature()
 
                 elif opt == "v_0":
-                    mean, std_dev = res.capture_velocity()
+                    vel_c, c = res.capture_velocity()
 
                 else:
                     raise ValueError("This visualization option requires looping in T_0 or v_0 variables")
 
-                capture.append(mean)
-                err_capture.append(std_dev)
+                vels[i] = vel_c
+                i += 1
 
             else:
                 raise ValueError("This visualization option requires looping in each results set")
-
-        capture = np.array(capture)
-        err_capture = np.array(err_capture)
 
         # Capture velocity
         if opt == "v_0":
@@ -647,7 +652,7 @@ class View:
         #--
 
         # Plot trapped atoms ratio
-        plt.errorbar(delta, y_scale_factor * capture, y_scale_factor * err_capture, label="Simulated Points", marker='o', linestyle='')
+        plt.plot(delta, y_scale_factor * vels, label="Simulated Points", marker='o', linestyle='')
 
         # Set plot
         plt.grid(True, linestyle="--")

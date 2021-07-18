@@ -2038,10 +2038,10 @@ int random_pick(double *probs, int size){
     // Normalize probabilities
     module = 0;
     for(i = 0; i < size; i++) module += probs[i];
-    for(i = 0; i < size; i++) probs[i] = probs[i] / module;
+    for(i = 0; i < size; i++) probs[i] = 100*probs[i] / module;
 
     // Generate a random number  
-    rd_n = ((double) rand()) / ((double) RAND_MAX);
+    rd_n = 100*((double) rand()) / ((double) RAND_MAX);
 
     // Cumulative probabilities
     cum_probs = (double*) calloc(size, sizeof(double));
