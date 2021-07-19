@@ -1193,18 +1193,11 @@ class Results:
                 return y
 
             # Get capture velocity
-            vel_c = brentq(f, np.min(vel), np.max(vel), full_output = False)
-            #--
-            '''
-            x = np.linspace(v_mean - 5*v_std_dev, v_mean + 5*v_std_dev, 1000)
-            y = np.array([general_erfc(xi, v_mean, v_std_dev) for xi in x])
+            max_vel = np.max(vel)
+            min_vel = np.min(vel)
+            if f(min_vel) > 0: vel_c = brentq(f, min_vel, max_vel, full_output = False)
+            else: vel_c = 0
 
-            plt.clf()
-            plt.plot(v_c, ratio, marker="o", linestyle="")
-            plt.plot(x, y)
-            plt.grid(linestyle="--")
-            plt.show()
-            '''
         else: raise ValueError("The loop variable must be v_0 to calculate the capture velocity")
 
         return vel_c, c

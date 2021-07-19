@@ -558,7 +558,9 @@ class View:
                 x_fit = np.linspace(np.min(x), np.max(x), 1000)
                 y_fit = np.array(list(map(f, x_fit)))
 
-                plt.plot(vel_c, 0.5, marker="o", linestyle="", label=(r"$v_{cap} = %.2f\ cm/s $" % vel_c))
+                if vel_c > 0:
+                    plt.plot(vel_c, 0.5, marker="o", linestyle="", label=(r"$v_{cap} = %.2f\ cm/s $" % vel_c))
+                
                 plt.plot(x_scale_factor * x_fit, y_fit, label="Fitting", marker="", linestyle="--", color="Black")
             #--
 
