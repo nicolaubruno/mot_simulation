@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
-from scipy.optimize import brentq
+from scipy.optimize import brentq, curve_fit
 from scipy.special import erf
 #--
 
@@ -1133,20 +1133,33 @@ class Results:
         # With looping
         if len(self.loop["var"]) > 0:
             escape_flux_atoms = np.zeros(len(self.loop["values"]))
+            x = np.array(self.loop["values"])
 
             for i in range(len(self.loop["values"])):
                 self.loop_idx(i)
 
                 # Get escape flux of atoms
                 if self.average_escape_time > 0:
-                    escape_flux_atoms[i] = (self.perform["num_sim"] - self.trapped_atoms) / self.average_escape_time
+                    escape_flux_atoms[i] = 2*np.pi*self.transition["gamma"]*1e3 * (1 - self.trapped_atoms / self.perform["num_sim"]) / (self.average_escape_time)
+
+            # Escape rate
+            #--
+            # Exponential growth
+            def f(x, a, b):
+                return a*(np.exp(b * x) - 1)
+
+            #params, covs = curve_fit(f, x, escape_flux_atoms)
+            #print(params)
+            #exit(0)
+            #--
 
         # Without looping
         elif self.average_escape_time > 0: 
-            escape_flux_atoms = (self.perform["num_sim"] - self.trapped_atoms) / self.average_escape_time
+            escape_flux_atoms = 2*np.pi*self.transition["gamma"]*1e3 * (1 - self.trapped_atoms / self.perform["num_sim"]) / self.average_escape_time
+        
         else: escape_flux_atoms = 0
 
-        return escape_flux_atoms
+        return escape_flux_atoms # atom per second
 
     # Capture velocity
     def capture_velocity(self):

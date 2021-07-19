@@ -696,7 +696,7 @@ class View:
         plt.xlabel(x_label)
 
         # y label
-        plt.ylabel(r"$ \Phi\ [1 / \tau]$")
+        plt.ylabel(r"$ \Phi\ [atoms\ /\ s]$")
         #--
 
         # Plot trapped atoms ratio
