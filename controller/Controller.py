@@ -267,7 +267,7 @@ class Controller:
 
                     # Options
                     opts = {
-                        1: "Trap depth vs detuning"
+                        1: "Trap depth"
                     }
 
                     # Get visualization option
@@ -290,11 +290,22 @@ class Controller:
                 # Collective results set
                 #--
                 if collective:
-                    # Trap depth vs detuning
+                    # Trap depth
                     if opt == 1:
-                        results = self.__simulation.available_results(results_group)
-                        self.__view.trap_depth_vs_detuning(results)
-                        self._menu_level -= 1
+                        # Choose fitting function
+                        #--
+                        # Header
+                        header = ".. / (Collective) Group " + available_groups[results_group]
+                        header += " / Fitting options"
+
+                        # Functions
+                        opts = {
+                            1 : "Polynomial fitting",\
+                            2 : "Error function fitting"
+                        }
+
+                        opt_trap = int(self.__call_menu(opts, header, add_menu_level = True))
+                        #--
                 #--
 
                 # Individual results set
@@ -470,16 +481,30 @@ class Controller:
 
                     # Trapped atoms
                     elif opt == 8:
-                        self.__view.trapped_atoms_ratio(res)
+                        # Choose fitting function
+                        #--
+                        # Header
+                        header = ".. / Group " + available_groups[results_group] + " / " + str(res.code)
+                        if res.name: header += " (" + str(res.name) + ")"
+                        header += " / Fitting options"
 
-                        if not res.loop["var"]:
-                            opt = self.__call_input("Enter with any key to continue", header = False, clear_screen=False)
+                        # Functions
+                        opts = {
+                            1 : "Polynomial fitting",\
+                            2 : "Error function fitting"
+                        }
 
-                        self._menu_level -= 1
-            
+                        opt_trap = int(self.__call_menu(opts, header, add_menu_level = True))
+                        #--            
+                
                 # Collective results
                 elif collective:
-                    break
+                    # Trap depth
+                    if opt == 1:
+                        fit_func = ['poly', 'erf']
+                        results = self.__simulation.available_results(results_group)
+                        self.__view.trap_depth(results, fit_func=fit_func[opt_trap-1])
+                        self._menu_level -= 1
             #--
 
             # Visualization option level 3 of individual results
@@ -528,290 +553,20 @@ class Controller:
 
                         if opt_view != -1:
                             self.__view.vel_marg_hist(res, opt_view-1)
+
+                    # Trapped atoms
+                    elif opt == 8:
+                        fit_func = ['poly', 'erf']
+                        self.__view.trapped_atoms_ratio(res, fit_func=fit_func[opt_trap-1])
+
+                        if not res.loop["var"]:
+                            opt = self.__call_input("Enter with any key to continue", header = False, clear_screen=False)
+
+                        self._menu_level -= 1
             #--
 
             # Leave menu
             else: break
-
-        # Check results group
-        #--
-        while self.menu_level == 1:
-            # Get result group
-            if last_header: header = " .. / Results / Select a results group:"
-            else: header = "Results / Select a results group:"
-            available_groups = self.__simulation.available_results_groups()
-            results_group = self.__call_menu(available_groups, header)
-
-            # Check back option
-            if self.menu_level < 1: break
-
-            # Set menu level
-            self._menu_level += 1
-
-            # Collective or individual results set
-            #--
-            while self.menu_level == 2:
-                # Get code
-                header = ".. / Group " + available_groups[results_group] + " / Collective or Individual visualization"
-                code = self.__call_menu(self.__simulation.available_results(results_group), header, order_command=True)
-
-                # Check back option
-                if self.menu_level < 2: break
-
-                # Set menu level
-                self._menu_level += 1
-
-                # View option
-                #--
-                while self._menu_level == 3:
-                    #
-                    # Result
-                    res = Results(code)
-
-                    #
-                    # Header
-                    header = ".. / Group " + available_groups[results_group] + " / " + str(res.code)
-                    if res.name: header += " (" + str(res.name) + ")"
-                    header += " / Visualizations"
-
-                    #
-                    # Options
-                    options = {}
-
-                    #
-                    # Add options
-                    if len(res.pos_hist[0]["freqs"]) > 0:
-                        options[1] = "Histogram of positions"
-                        options[2] = "Centre of mass"
-                        options[3] = "R.M.S Clouds sizes"
-
-                    if len(res.vel_hist[0]["freqs"]) > 0:
-                        options[4] = "Histogram of velocities"
-                        options[5] = "Temperature"
-
-                    if res.pos_3Dhist["dens"] is not None:
-                        options[6] = "Heat map"
-
-                    if res.trapped_atoms >= 0:
-                        options[7] = "Trapped atoms ratio"
-
-                    opt = self.__call_menu(options, header)
-
-                    #
-                    # Histogram of positions
-                    if opt == 1:
-                        #
-                        # Set menu level
-                        self._menu_level += 1
-                        while self.menu_level == 4:
-                            #
-                            # Check loop
-                            if len(res.loop["var"]) > 0:
-                                header = "Choose an option"
-
-                                idx = [i+1 for i in range(len(res.loop["values"]))]
-                                loop_idx = [res.loop["var"] + " = " + ("%.2f" % res.loop["values"][i]) for i in range(len(res.loop["values"]))]
-                                opts = dict(zip(idx, loop_idx))
-
-                                opt = self.__call_menu(opts, header)
-                                opt = int(opt)
-
-                                if opt != -1: 
-                                    res.loop_idx(opt-1)
-                                    self._menu_level += 1
-
-                            else: self._menu_level += 1
-
-                            #
-                            # Set menu level
-                            while self.menu_level == 5:
-                                opts = {
-                                    1 : 'x-axis',\
-                                    2 : 'y-axis',\
-                                    3 : 'z-axis'
-                                }
-                                
-                                if len(res.loop["var"]) > 0:
-                                    header = "(" +res.loop["var"] + " = "
-                                    header += ("%.2f" % res.loop["values"][res.loop["active"]])
-                                    header += ") Choose the axis"
-
-                                else:
-                                    header = "Choose the axis"
-
-                                opt = self.__call_menu(opts, header)
-
-                                if (opt == "-1") and not (res.loop["var"]):
-                                    self._menu_level -= 1
-
-                                elif opt != "-1": 
-                                    self.__view.pos_marg_hist(res, int(opt)-1)
-
-                    #
-                    # Centre of mass
-                    elif opt == 2:
-                        #
-                        # Set menu level
-                        self._menu_level += 1
-                        while self.menu_level == 4:
-                            if res.loop["var"]:
-                                self.__view.mass_centre(res)
-                                self._menu_level -= 1
-
-                            elif not res.loop["var"]:
-                                self.__view.mass_centre(res)
-                                opt = self.__call_input("Enter with any key to continue", header = False,clear_screen=False)
-                                if opt != "-1": self._menu_level -= 1
-
-                            else:
-                                self._menu_level -= 1
-
-                    #
-                    # R.M.S. Clouds size
-                    elif opt == 3:
-                        #
-                        # Set menu level
-                        self._menu_level += 1
-
-                        #
-                        # Menu level 3
-                        while self.menu_level == 4:
-                            if res.loop["var"]:
-                                self.__view.cloud_size(res)
-                                self._menu_level -= 1
-
-                            elif not res.loop["var"]:
-                                self.__view.cloud_size(res)
-                                opt = self.__call_input("Enter with any key to continue", header = False, clear_screen=False)
-                                if opt != "-1": self._menu_level -= 1
-
-                            else:
-                                self._menu_level -= 1
-
-                    #
-                    # Histogram of velocities
-                    elif opt == 4:
-                        #
-                        # Set menu level
-                        self._menu_level += 1
-                        while self.menu_level == 4:
-                            #
-                            # Check loop
-                            if bool(res.loop["var"]):
-                                header = "Choose an option"
-
-                                idx = [i+1 for i in range(len(res.loop["values"]))]
-                                loop_idx = [res.loop["var"] + " = " + ("%.2f" % float(res.loop["values"][i])) for i in range(len(res.loop["values"]))]
-                                opts = dict(zip(idx, loop_idx))
-
-                                opt = self.__call_menu(opts, header)
-                                opt = int(opt)
-
-                                if opt != -1: 
-                                    res.loop_idx(opt-1)
-                                    self._menu_level += 1
-
-                            else: self._menu_level += 1
-
-                            #
-                            # Set menu level
-                            while self.menu_level == 5:
-                                opts = {
-                                    1 : 'x-axis',\
-                                    2 : 'y-axis',\
-                                    3 : 'z-axis'
-                                }
-                                
-                                if len(res.loop["var"]) > 0:
-                                    header = "(" +res.loop["var"] + " = "
-                                    header += ("%.2f" % res.loop["values"][res.loop["active"]])
-                                    header += ") Choose the axis"
-
-                                else:
-                                    header = "Choose the axis"
-
-                                opt = self.__call_menu(opts, header)
-
-                                if (opt == "-1") and not (res.loop["var"]):
-                                    self._menu_level -= 1
-
-                                elif opt != "-1": 
-                                    self.__view.vel_marg_hist(res, int(opt)-1)
-
-                    #
-                    # Temperature
-                    elif opt == 5:
-                        #
-                        # Set menu level
-                        self._menu_level += 1
-
-                        #
-                        # Menu level 3
-                        while self.menu_level == 4:
-                            if len(res.loop["var"]) > 0:
-                                self.__view.temperature(res)
-                                self._menu_level -= 1
-
-                            elif not res.loop["var"]:
-                                self.__view.temperature(res)
-                                opt = self.__call_input("Enter with any key to continue", header = False, clear_screen=False)
-                                if opt != "-1": self._menu_level -= 1
-
-                            else:
-                                self._menu_level -= 1
-
-                    #
-                    # Heat map
-                    elif opt == 6:
-                        #
-                        # Set menu level
-                        self._menu_level += 1
-
-                        #
-                        # Menu level 3
-                        while self.menu_level == 4:
-                            #
-                            # Axis
-                            opts = {
-                                1:"xy-axis",\
-                                2:"xz-axis",\
-                                3:"yz-axis"
-                            }
-
-                            header = "Choose axis"
-
-                            opt = self.__call_menu(opts, header)
-
-                            if opt > 0:
-                                axis = 3 - opt
-                                self.__view.heatmap(res, axis, 0)
-
-                            else: self._menu_level -= 1
-
-                    #
-                    # Trapped atoms ratio
-                    elif opt == 7:
-                        #
-                        # Set menu level
-                        self._menu_level += 1
-
-                        #
-                        # Menu level 3
-                        while self.menu_level == 4:
-                            if len(res.loop["var"]) > 0:
-                                self.__view.trapped_atoms_ratio(res)
-                                self._menu_level -= 1
-
-                            elif not res.loop["var"]:
-                                self.__view.trapped_atoms_ratio(res)
-                                opt = self.__call_input("Enter with any key to continue", header = False, clear_screen=False)
-                                if opt != "-1": self._menu_level -= 1
-
-                            else:
-                                self._menu_level -= 1
-                #--
-            #--
-        #--
 
     #
     def __call_menu(self, options, header = '', clear_screen = True, order_command = False, add_menu_level = False, enumerated_list = False):

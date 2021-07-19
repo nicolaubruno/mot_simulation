@@ -3,6 +3,7 @@
 import os, sys, time
 import pandas as pd
 from matplotlib import pyplot as plt, ticker
+from scipy.special import erf
 import seaborn as sns
 import numpy as np
 
@@ -490,7 +491,7 @@ class View:
             print()
 
     # Plot trapped atoms ratio
-    def trapped_atoms_ratio(self, res, fitting = True):
+    def trapped_atoms_ratio(self, res, fit_func = None):
         # With looping
         #--
         if len(res.loop["var"]) > 0:
@@ -537,29 +538,37 @@ class View:
             # Fitting
             #--
             # Initial Velocity
-            if fitting and res.loop["var"] in ["v_0", "T_0"]:
+            fit_opts = ["poly", "erf"]
+
+            if (fit_func in fit_opts) and (res.loop["var"] in ["v_0", "T_0"]):
                 if res.loop["var"] == "v_0":
-                    vel_c, c = res.capture_velocity()
+                    vel_c, c = res.capture_velocity(fit_func=fit_func)
+                    label_c = r"$v_{cap} = %.2f\ cm/s $" % (x_scale_factor * vel_c)
 
                 elif res.loop["var"] == "T_0":
-                    vel_c, c = res.capture_temperature()
-
+                    vel_c, c = res.capture_temperature(fit_func=fit_func)
+                    label_c = x_label + (r"$ = %.1f$" % (x_scale_factor * vel_c))
                 
                 # Polynomial function
-                deg = len(c) - 1
-                def f(x):
-                    y = 0.0
+                if fit_func == "poly":
+                    def f(x):
+                        y = 0.0
 
-                    for i in range(deg+1):
-                        y += c[deg - i]*x**i
+                        for i in range(11):
+                            y += c[10 - i]*x**i
 
-                    return y
+                        return y
+
+                elif fit_func == "erf":
+                    # Error function
+                    def f(t):
+                        return 1 - (erf((t - vel_c) / np.sqrt(2 * c**2)) - erf((- vel_c) / np.sqrt(2 * c**2))) / 2
 
                 x_fit = np.linspace(np.min(x), np.max(x), 1000)
                 y_fit = np.array(list(map(f, x_fit)))
 
                 if vel_c > 0:
-                    plt.plot(vel_c, 0.5, marker="o", linestyle="", label=(r"$v_{cap} = %.2f\ cm/s $" % vel_c))
+                    plt.plot(x_scale_factor * vel_c, 0.5, marker="o", linestyle="", label=label_c)
                 
                 plt.plot(x_scale_factor * x_fit, y_fit, label="Fitting", marker="", linestyle="--", color="Black")
             #--
@@ -584,7 +593,7 @@ class View:
         #--
 
     # Plot trap depth vs detuning
-    def trap_depth_vs_detuning(self, results):
+    def trap_depth(self, results, fit_func = "poly"):
         # Variables
         vels = np.zeros(len(results))
         delta = []
@@ -600,10 +609,10 @@ class View:
                 delta.append(float(res.beams['main'].delta))
 
                 if opt == "T_0":
-                    vel_c, c = res.capture_temperature()
+                    vel_c, c = res.capture_temperature(fit_func = fit_func)
 
                 elif opt == "v_0":
-                    vel_c, c = res.capture_velocity()
+                    vel_c, c = res.capture_velocity(fit_func = fit_func)
 
                 else:
                     raise ValueError("This visualization option requires looping in T_0 or v_0 variables")
@@ -621,7 +630,7 @@ class View:
 
         # Initial temperature
         if opt == "T_0":          
-            y_scale_factor, y_label = self.__temperature_axis(np.max(mean)) 
+            y_scale_factor, y_label = self.__temperature_axis(np.max(vels)) 
 
         # Clear stored plots
         plt.clf()

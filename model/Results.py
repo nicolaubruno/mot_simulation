@@ -1162,9 +1162,7 @@ class Results:
         return escape_flux_atoms # atom per second
 
     # Capture velocity
-    def capture_velocity(self):
-        v_mean, v_std_dev = (0,0)
-
+    def capture_velocity(self, fit_func = "poly"):
         if self.loop["var"] == 'v_0' and len(self.loop["values"]) > 1:
             # Get velocities and trapped atoms ratio
             #--
@@ -1180,52 +1178,91 @@ class Results:
 
             # Get capture velocity
             #--
-            # Fit polynomial
-            c = np.polyfit(vel, ratio, 10, full = False, cov = False)
+            # Polynomial fitting
+            if fit_func == "poly":
+                # Fit polynomial
+                c = np.polyfit(vel, ratio, 10, full = False, cov = False)
 
-            # Polynomial function
-            def f(x):
-                y = -0.5
+                # Polynomial function
+                def f(x):
+                    y = -0.5
 
-                for i in range(11):
-                    y += c[10 - i]*x**i
+                    for i in range(11):
+                        y += c[10 - i]*x**i
 
-                return y
+                    return y
 
-            # Get capture velocity
-            max_vel = np.max(vel)
-            min_vel = np.min(vel)
-            if f(min_vel) > 0: vel_c = brentq(f, min_vel, max_vel, full_output = False)
-            else: vel_c = 0
+                # Get capture velocity
+                max_vel = np.max(vel)
+                min_vel = np.min(vel)
+                if f(min_vel) > 0 and f(min_vel) > f(max_vel): vel_c = brentq(f, min_vel, max_vel, full_output = False)
+                else: vel_c = -1
+
+            # Erf function fitting
+            elif fit_func == "erf":
+                # General complementary error function
+                def general_erfc(t, mean, std_dev):
+                    return 1 - (erf((t - mean) / np.sqrt(2 * std_dev**2)) - erf((- mean) / np.sqrt(2 * std_dev**2))) / 2
+            
+                # Get data
+                params, covs = curve_fit(general_erfc, vel, ratio, bounds=([min(vel), 0], [max(vel), (max(vel) - min(vel))]))
+                vel_c = params[0]
+                c = params[1]
+            #--
 
         else: raise ValueError("The loop variable must be v_0 to calculate the capture velocity")
 
         return vel_c, c
 
     # Capture temperature
-    def capture_temperature(self):
+    def capture_temperature(self, fit_func = "poly"):
         T_mean, T_std_dev = (0,0)
 
         if self.loop["var"] == 'T_0' and len(self.loop["values"]) > 1:
-            T_c = self.loop['values']
+            T = self.loop['values']
             ratio = np.zeros(len(self.loop['values']))
 
             for i, val in enumerate(self.loop["values"]):
                 self.loop_idx(i)
                 ratio[i] = self.trapped_atoms
 
-            ratio = ratio / max(ratio)
+            ratio = ratio / self.perform['num_sim']
 
-            # General complementary error function
-            def general_erfc(t, mean, std_dev):
-                return 1 - (erf((t - mean) / np.sqrt(2 * std_dev**2)) - erf((- mean) / np.sqrt(2 * std_dev**2))) / 2
+            # Get capture temperature
+            #--
+            # Polynomial fitting
+            if fit_func == "poly":
+                # Fit polynomial
+                c = np.polyfit(T, ratio, 10, full = False, cov = False)
 
-            # Get data
-            params, covs = curve_fit(general_erfc, T_c, ratio, bounds=([min(T_c), 0], [max(T_c), (max(T_c) - min(T_c))]))
-            T_mean = params[0]
-            T_std_dev = params[1]
+                # Polynomial function
+                def f(x):
+                    y = -0.5
 
-        return T_mean, T_std_dev
+                    for i in range(11):
+                        y += c[10 - i]*x**i
+
+                    return y
+
+                # Get capture velocity
+                max_T = np.max(T)
+                min_T = np.min(T)
+                if f(min_T) > 0 and f(min_T) > f(max_T): T_c = brentq(f, min_T, max_T, full_output = False)
+                else: T_c = -1
+
+            # Erf function fitting
+            elif fit_func == "erf":
+                # General complementary error function
+                def general_erfc(t, mean, std_dev):
+                    return 1 - (erf((t - mean) / np.sqrt(2 * std_dev**2)) - erf((- mean) / np.sqrt(2 * std_dev**2))) / 2
+            
+                # Get data
+                params, covs = curve_fit(general_erfc, T, ratio, bounds=([min(T), 0], [max(T), (max(T) - min(T))]))
+                T_c = params[0]
+                c = params[1]
+            #--
+
+        return T_c, c
 
     # General complementary error function
     def general_erfc(self, t, mean, std_dev):
